@@ -73,8 +73,10 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
      `sudo "/Library/Application Support/Techlio/Connector/uninstall.sh" [--purge]`.
    - **Windows** — `techlio-connector-win-x64.exe`, opened once. It copies itself
      to `%USERPROFILE%\.techlio\connector\`, registers the hidden logon task
-     `TechlioConnector` (restart on failure; HKCU Run key if Task Scheduler is
-     blocked), starts it, shows a confirmation, and exits. The executable is
+     `TechlioConnector` (HKCU Run key if Task Scheduler is blocked), starts it,
+     shows a confirmation, and exits. The service supervises itself — it
+     restarts its worker 10 s after any crash — because Task Scheduler only
+     retries a task that fails to launch. The executable is
      GUI-subsystem, so no console opens. Remove from **Settings → Apps**.
    - Logs: `~/.techlio-connector/connector.log`. Health: `techlio-connector --status`.
    - If another connector already owns 127.0.0.1:9477 (e.g. `pnpm dev`), the

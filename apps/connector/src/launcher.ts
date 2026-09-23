@@ -112,6 +112,27 @@ function logToFile(path: string): void {
   console.error = (...args: unknown[]) => write("error", args);
 }
 
+/**
+ * Windows service loop: run the connector as a hidden child and start it again
+ * 10 s after any exit (crash, or port held by another connector — exit 75).
+ * Ends only when the task is stopped or the process is killed on uninstall.
+ */
+async function superviseWorker(): Promise<never> {
+  const { spawn } = await import("node:child_process");
+  for (;;) {
+    const code = await new Promise<number | null>((resolve) => {
+      const child = spawn(process.execPath, ["--service", "--worker"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.on("exit", (exitCode) => resolve(exitCode));
+      child.on("error", () => resolve(null));
+    });
+    console.log(`Connector worker exited (code ${code}); restarting in 10s.`);
+    await new Promise((resolve) => setTimeout(resolve, 10_000));
+  }
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes("--hook")) {
     await runHook();
@@ -125,6 +146,14 @@ async function main(): Promise<void> {
   }
   if (process.argv.includes("--status")) {
     await service.printStatus();
+    return;
+  }
+  if (process.argv.includes("--service") && process.platform === "win32" && !process.argv.includes("--worker")) {
+    // Task Scheduler's RestartOnFailure only covers a task that fails to
+    // launch, not a process that exits or crashes later (the Run-key fallback
+    // has no restart at all). So on Windows the service supervises itself.
+    if (!process.stdout.isTTY) logToFile(service.logPath());
+    await superviseWorker();
     return;
   }
   if (!process.argv.includes("--service")) {

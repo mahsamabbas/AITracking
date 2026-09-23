@@ -231,7 +231,8 @@ function unregisterWindows(): void {
   spawnSync("schtasks", ["/Delete", "/TN", WIN_TASK, "/F"], QUIET);
   reg(["delete", WIN_RUN_KEY, "/v", WIN_TASK, "/f"]);
   reg(["delete", WIN_UNINSTALL_KEY, "/f"]);
-  // A Run-key copy is not owned by Task Scheduler; stop it by image name.
+  // A Run-key copy (and the supervised worker) is not owned by Task
+  // Scheduler; stop every copy by image name.
   spawnSync("taskkill", ["/F", "/IM", exeName()], QUIET);
 }
 
