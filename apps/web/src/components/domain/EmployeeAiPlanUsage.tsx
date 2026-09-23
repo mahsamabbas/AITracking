@@ -10,6 +10,43 @@ function formatTokens(n: number | null | undefined): string {
   return formatNumber(n);
 }
 
+function usageHeadline(row: EmployeeAiSubscription): {
+  label: string;
+  value: string;
+  missing: boolean;
+} {
+  const unit = row.usageUnit ?? "tokens";
+  if (row.tokensUsed == null && !row.tokensFromTelemetry) {
+    return { label: "Usage this month", value: "", missing: true };
+  }
+  if (unit === "model_requests") {
+    return {
+      label: "Agent model requests",
+      value: formatTokens(row.tokensUsed),
+      missing: false,
+    };
+  }
+  if (unit === "cursor_admin_requests") {
+    return {
+      label: "Billing requests (completions + chat)",
+      value: formatTokens(row.tokensUsed),
+      missing: false,
+    };
+  }
+  return {
+    label: "Tokens used (in + out)",
+    value: formatTokens(row.tokensUsed),
+    missing: false,
+  };
+}
+
+function limitLabel(row: EmployeeAiSubscription): string {
+  const unit = row.usageUnit ?? "tokens";
+  if (unit === "model_requests") return "Included requests / month (org config)";
+  if (unit === "cursor_admin_requests") return "Included requests / month";
+  return "Plan limit";
+}
+
 export function EmployeeAiPlanUsage({
   rows,
   isSelf,
@@ -17,24 +54,44 @@ export function EmployeeAiPlanUsage({
   rows: EmployeeAiSubscription[];
   isSelf?: boolean;
 }) {
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader
+          title="AI subscription usage"
+          subtitle={
+            isSelf
+              ? "Install the connector and use Cursor or Claude Code on this machine to see usage here."
+              : "No Cursor or Claude Code connector activity for this person yet."
+          }
+        />
+        <CardBody>
+          <p className="hint text-sm">
+            Cards appear only for tools with a registered connector or sessions this calendar month.
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader
         title="AI subscription usage"
         subtitle={
           isSelf
-            ? "Calendar-month token totals from your connector vs organisation plan limits. Compare with your Cursor and Claude billing if telemetry is incomplete."
-            : "Calendar-month token totals from the connector vs organisation plan limits for Cursor and Claude Code."
+            ? "Calendar-month usage from your connector and, for Cursor teams, the Admin API when configured."
+            : "Calendar-month usage from the connector vs organisation plan limits."
         }
       />
       <CardBody className="grid gap-4 sm:grid-cols-2">
         {rows.map((row) => {
           const meta = providerMeta(row.provider);
+          const headline = usageHeadline(row);
           const usedPct =
             row.monthlyLimit && row.tokensUsed != null && row.monthlyLimit > 0
               ? Math.min(100, Math.round((row.tokensUsed / row.monthlyLimit) * 100))
               : null;
-          const missingTokens = row.tokensUsed == null && !row.tokensFromTelemetry;
 
           return (
             <div
@@ -50,22 +107,33 @@ export function EmployeeAiPlanUsage({
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-ink-900">{row.label}</p>
-                  <p className="hint">{row.periodLabel}</p>
+                  <p className="hint">
+                    {row.planName ? `${row.planName} · ` : ""}
+                    {row.periodLabel}
+                  </p>
                 </div>
               </div>
 
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between gap-3">
-                  <dt className="text-ink-500">Tokens used (in + out)</dt>
+                  <dt className="text-ink-500">{headline.label}</dt>
                   <dd className="num font-medium text-ink-900">
-                    {missingTokens ? (
-                      <span className="hint font-sans font-normal">Not reported by connector</span>
+                    {headline.missing ? (
+                      <span className="hint font-sans font-normal">No activity yet this month</span>
                     ) : (
-                      formatTokens(row.tokensUsed)
+                      headline.value
                     )}
                   </dd>
                 </div>
-                {row.tokenInput != null ? (
+                {row.completionsCount != null || row.chatRequestsCount != null ? (
+                  <div className="flex justify-between gap-3 text-xs">
+                    <dt className="text-ink-400">Completions / chat requests</dt>
+                    <dd className="num text-ink-600">
+                      {formatTokens(row.completionsCount)} / {formatTokens(row.chatRequestsCount)}
+                    </dd>
+                  </div>
+                ) : null}
+                {row.tokenInput != null && row.usageUnit === "tokens" ? (
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Input / output</dt>
                     <dd className="num text-ink-600">
@@ -73,8 +141,14 @@ export function EmployeeAiPlanUsage({
                     </dd>
                   </div>
                 ) : null}
+                {row.modelRequests != null && row.usageUnit === "model_requests" ? (
+                  <div className="flex justify-between gap-3 text-xs">
+                    <dt className="text-ink-400">From agent sessions</dt>
+                    <dd className="num text-ink-600">{formatTokens(row.modelRequests)}</dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-3">
-                  <dt className="text-ink-500">Plan limit</dt>
+                  <dt className="text-ink-500">{limitLabel(row)}</dt>
                   <dd className="num font-medium text-ink-900">
                     {row.monthlyLimit != null
                       ? `${formatTokens(row.monthlyLimit)} / month`
@@ -84,13 +158,7 @@ export function EmployeeAiPlanUsage({
                 <div className="flex justify-between gap-3">
                   <dt className="text-ink-500">Remaining</dt>
                   <dd className="num font-medium text-ink-900">
-                    {row.remaining != null
-                      ? formatTokens(row.remaining)
-                      : row.monthlyLimit != null && missingTokens
-                        ? "—"
-                        : row.monthlyLimit == null
-                          ? "—"
-                          : formatTokens(row.monthlyLimit)}
+                    {row.remaining != null ? formatTokens(row.remaining) : "—"}
                   </dd>
                 </div>
               </dl>
@@ -110,10 +178,18 @@ export function EmployeeAiPlanUsage({
                 </div>
               ) : null}
 
-              {row.provider === "cursor" && missingTokens ? (
+              {row.provider === "cursor" && headline.missing ? (
                 <p className="hint mt-3 text-xs leading-relaxed">
-                  Cursor hooks do not expose token totals. Check the Cursor account usage page for
-                  subscription consumption.
+                  Use the agent in Cursor with the connector running. For team billing totals matching
+                  cursor.com, set <span className="font-mono text-2xs">CURSOR_API_KEY</span> on the API
+                  and run the worker puller, or ask an admin to mirror your plan under organisation AI
+                  limits.
+                </p>
+              ) : null}
+              {row.provider === "cursor" && row.usageSource === "session_model_requests" ? (
+                <p className="hint mt-3 text-xs leading-relaxed">
+                  Cursor hooks report agent activity, not token totals. Request counts come from observed
+                  model requests; compare with your Cursor account usage page for subscription consumption.
                 </p>
               ) : null}
             </div>

@@ -49,13 +49,19 @@ export interface EmployeeAiSubscription {
   provider: string;
   label: string;
   periodLabel: string;
+  planName?: string | null;
+  usageUnit?: "tokens" | "model_requests" | "cursor_admin_requests";
   tokenInput: number | null;
   tokenOutput: number | null;
   tokensUsed: number | null;
+  modelRequests?: number | null;
+  completionsCount?: number | null;
+  chatRequestsCount?: number | null;
   monthlyLimit: number | null;
   remaining: number | null;
   tokensFromTelemetry: boolean;
   limitConfigured: boolean;
+  usageSource?: string;
 }
 
 export interface HourPattern {
