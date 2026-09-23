@@ -9,6 +9,7 @@ import {
   useConnectorOnline,
   useConnectorSetupPhase,
 } from "@/lib/connector-local";
+import { LocalAccessHint } from "@/components/domain/LocalAccessHint";
 
 function StepBadge({ done, n }: { done: boolean; n: number }) {
   return (
@@ -63,9 +64,12 @@ export function ConnectorInstallGuide() {
               : "Open the downloaded installer and follow the steps (macOS asks for your password once). Nothing is added to Applications or the Dock; the connector runs in the background for Intel and Apple silicon. Then click Check if running."}
           </p>
           {online === false ? (
-            <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
-              Not detected yet on 127.0.0.1:9477 — complete the install, then click “Check if running”.
-            </p>
+            <>
+              <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+                Not detected yet on 127.0.0.1:9477 — complete the install, then click “Check if running”.
+              </p>
+              <LocalAccessHint />
+            </>
           ) : null}
           {online === true ? (
             <p className="mt-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">

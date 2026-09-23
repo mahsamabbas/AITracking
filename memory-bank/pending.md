@@ -49,7 +49,7 @@ Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 | Connector as a real per-user service (macOS LaunchAgent, Windows task w/ restart, Linux systemd) | **Done in code** | macOS `.pkg` → `/Library/LaunchAgents`, no app/Dock icon; verified per-user install, crash restart, hook delivery on macOS (2026-09-23). Windows exe is GUI-subsystem (no console), hidden task + Run-key fallback + Settings → Apps entry — needs a run on a clean Windows machine, and the signed `.pkg` |
 | Windows SCM service (LocalSystem) instead of per-user logon task | **Open — decision** | Would need a per-user helper for hooks/DPAPI; only if IT requires a service visible in services.msc |
 | OS credential store for connector secrets | **Done** | Keychain / DPAPI / Secret Service, 0600 fallback |
-| Connector tray / menu-bar health UI | **Open** | ~2–3 d; `--status` and dashboard cover it today |
+| Connector tray / menu-bar health UI | **Done (macOS) / Open (Windows)** | Swift menu-bar app in the `.pkg` (status, pause/resume, log, restart). Windows tray icon not built |
 | Connector auto-update with signature check | **Open** | ~3 d |
 | Support-access workflow (SEC-004) | **Open** | |
 | DB-enforced append-only audit (SEC-006/008) | **Open** | |

@@ -66,7 +66,10 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
      MDM can push it silently). Installs to
      `/Library/Application Support/Techlio/Connector/` plus the LaunchAgent
      `/Library/LaunchAgents/com.techlio.connector.plist`, which runs one instance
-     per signed-in user and restarts it after a crash. Remove with
+     per signed-in user and restarts it after a crash. A menu-bar icon
+     (`com.techlio.connector.menubar`, no Dock icon) shows Running / Paused /
+     Not activated / Not running, with Pause, Resume, Show log, and Restart.
+     Hiding the icon never stops collection. Remove with
      `sudo "/Library/Application Support/Techlio/Connector/uninstall.sh" [--purge]`.
    - **Windows** — `techlio-connector-win-x64.exe`, opened once. It copies itself
      to `%USERPROFILE%\.techlio\connector\`, registers the hidden logon task
@@ -74,6 +77,13 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
      blocked), starts it, shows a confirmation, and exits. The executable is
      GUI-subsystem, so no console opens. Remove from **Settings → Apps**.
    - Logs: `~/.techlio-connector/connector.log`. Health: `techlio-connector --status`.
+   - If another connector already owns 127.0.0.1:9477 (e.g. `pnpm dev`), the
+     service retries every ~40 s and takes over when that one stops.
+   - **Dashboard says "not detected" while the connector runs:** Chrome/Edge
+     142+ ask before a website may reach apps on this device. The employee must
+     choose **Allow** (or set *Local network access* → Allow in the site
+     settings); ad blockers such as Brave Shields also block it. The install
+     page detects a denied permission and says so.
    - Why per-user and not a SYSTEM/root service: the AI tools, their hook
      configs, and the credential store (Keychain, DPAPI) belong to the
      signed-in user.

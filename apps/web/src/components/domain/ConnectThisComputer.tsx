@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { CONNECTOR_LOCAL } from "@/lib/connector-local";
 import { Callout } from "@/components/ui/Callout";
+import { LocalAccessHint } from "@/components/domain/LocalAccessHint";
 
 export { CONNECTOR_LOCAL };
 
@@ -41,7 +42,7 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "This page could not reach the connector at 127.0.0.1:9477. Download the connector from this site, open it, then try again.",
+        "This page could not reach the connector at 127.0.0.1:9477. If it is installed, your browser may be blocking local access: allow “Local network access” for this site in the address-bar site settings, then try again.",
     };
   }
 }
@@ -97,8 +98,9 @@ export function ThisComputerStatus() {
 
   if (state.kind === "offline") {
     return (
-      <Callout tone="warn" title="Connector not running on this computer">
-        Download the connector from this page, open it once, then activate your key.
+      <Callout tone="warn" title="Connector not detected on this computer">
+        Download the connector from this page and install it once, then activate your key.
+        <LocalAccessHint />
       </Callout>
     );
   }

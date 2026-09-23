@@ -148,6 +148,7 @@ function registerMac(dest: string): boolean {
 
 function unregisterMac(): void {
   spawnSync("launchctl", ["bootout", `${macDomain()}/${LABEL}`], QUIET);
+  spawnSync("launchctl", ["bootout", `${macDomain()}/${LABEL}.menubar`], QUIET);
   if (existsSync(macPlistPath())) unlinkSync(macPlistPath());
   if (existsSync(MAC_SYSTEM_PLIST) && process.env.TECHLIO_SYSTEM_UNINSTALL !== "1") {
     console.log(

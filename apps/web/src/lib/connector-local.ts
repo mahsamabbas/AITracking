@@ -78,3 +78,39 @@ export function detectMacChip(): "arm" | "intel" {
   if (/Intel/i.test(ua)) return "intel";
   return "arm";
 }
+
+/**
+ * Chrome/Edge 142+ ask before a website may call apps on this device
+ * (127.0.0.1). A denied or unanswered prompt makes every connector check fail
+ * even though the connector is running, so the UI must say which it is.
+ * Permission names changed across releases; the first one the browser knows wins.
+ */
+export type LocalAccess = "granted" | "prompt" | "denied" | "unknown";
+
+export async function localAccessState(): Promise<LocalAccess> {
+  if (typeof navigator === "undefined" || !navigator.permissions) return "unknown";
+  for (const name of ["loopback-network", "local-network-access", "local-network"]) {
+    try {
+      const status = await navigator.permissions.query({ name } as unknown as PermissionDescriptor);
+      return status.state as LocalAccess;
+    } catch {
+      /* this browser does not know that permission name */
+    }
+  }
+  return "unknown";
+}
+
+export function useLocalAccess(pollMs = 5_000): LocalAccess {
+  const [state, setState] = useState<LocalAccess>("unknown");
+  useEffect(() => {
+    let alive = true;
+    const check = () => void localAccessState().then((s) => alive && setState(s));
+    check();
+    const t = setInterval(check, pollMs);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [pollMs]);
+  return state;
+}

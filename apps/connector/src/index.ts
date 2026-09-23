@@ -802,6 +802,14 @@ app
         const r = await fetch(`http://127.0.0.1:${port}/health`);
         const body = (await r.json()) as { version?: string };
         if (body.version) {
+          if (process.argv.includes("--service")) {
+            // Another copy (e.g. `pnpm dev`) holds the port. The service must
+            // take over when it stops, so exit non-zero after a pause and let
+            // launchd / Task Scheduler / systemd start it again.
+            console.log(`Another Techlio connector owns 127.0.0.1:${port}; retrying in 30s.`);
+            setTimeout(() => process.exit(75), 30_000); // EX_TEMPFAIL
+            return;
+          }
           console.log(`Techlio connector is already running on 127.0.0.1:${port}. Nothing to do.`);
           process.exit(0);
         }

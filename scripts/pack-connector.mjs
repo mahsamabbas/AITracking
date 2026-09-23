@@ -149,6 +149,10 @@ function signWindows(exePath) {
 // --- macOS installer package ----------------------------------------------
 const MAC_DIR = "/Library/Application Support/Techlio/Connector";
 const MAC_LABEL = "com.techlio.connector";
+const MENUBAR_LABEL = "com.techlio.connector.menubar";
+const MENUBAR_APP = `${MAC_DIR}/Techlio Connector.app`;
+const MENUBAR_EXE = `${MENUBAR_APP}/Contents/MacOS/TechlioStatus`;
+const DASHBOARD_URL = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app-api-t9yd.vercel.app").split(",")[0];
 
 const launchAgentPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -166,6 +170,63 @@ const launchAgentPlist = `<?xml version="1.0" encoding="UTF-8"?>
 </dict></plist>
 `;
 
+// Menu-bar status icon: its own agent so quitting the icon never stops collection.
+const menubarPlist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${MENUBAR_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array><string>${MENUBAR_EXE}</string><string>--dashboard</string><string>${DASHBOARD_URL}</string></array>
+  <key>RunAtLoad</key><true/>
+  <!-- "Hide menu bar icon" exits 0 and stays hidden until the next sign-in. -->
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+</dict></plist>
+`;
+
+const menubarInfoPlist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleName</key><string>Techlio Connector</string>
+  <key>CFBundleIdentifier</key><string>${MENUBAR_LABEL}</string>
+  <key>CFBundleExecutable</key><string>TechlioStatus</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <!-- Menu bar only: no Dock icon, no app switcher entry. -->
+  <key>LSUIElement</key><true/>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+</dict></plist>
+`;
+
+// Compiled once per build; both installers embed the same universal binary.
+function buildMenubarApp(stageDir) {
+  const macOs = join(stageDir, "Techlio Connector.app", "Contents", "MacOS");
+  mkdirSync(macOs, { recursive: true });
+  const src = join(root, "apps/connector/macos/TechlioStatus.swift");
+  const slices = [];
+  for (const arch of ["arm64", "x86_64"]) {
+    const outFile = join(out, `TechlioStatus-${arch}`);
+    const r = spawnSync("swiftc", ["-O", "-target", `${arch}-apple-macos12`, src, "-o", outFile], { stdio: "inherit" });
+    if (r.status !== 0) {
+      console.error("swiftc failed for the menu bar app (install Xcode Command Line Tools).");
+      process.exit(1);
+    }
+    slices.push(outFile);
+  }
+  const exe = join(macOs, "TechlioStatus");
+  if (spawnSync("lipo", ["-create", ...slices, "-output", exe], { stdio: "inherit" }).status !== 0) process.exit(1);
+  writeFileSync(join(stageDir, "Techlio Connector.app", "Contents", "Info.plist"), menubarInfoPlist);
+  const args = APPLE_ID
+    ? ["--force", "--options", "runtime", "--timestamp", "--sign", APPLE_ID, join(stageDir, "Techlio Connector.app")]
+    : ["--force", "--sign", "-", join(stageDir, "Techlio Connector.app")];
+  if (spawnSync("codesign", args, { stdio: "inherit" }).status !== 0 && APPLE_ID) process.exit(1);
+}
+const menubarStage = join(out, "menubar");
+buildMenubarApp(menubarStage);
+
 // Runs as root. Stops any earlier copy for the signed-in user (including the
 // old per-user LaunchAgent) before the payload is replaced.
 const preinstall = `#!/bin/sh
@@ -173,27 +234,47 @@ USER_NAME=$(stat -f%Su /dev/console)
 [ -n "$USER_NAME" ] && [ "$USER_NAME" != "root" ] || exit 0
 USER_ID=$(id -u "$USER_NAME")
 launchctl bootout "gui/$USER_ID/${MAC_LABEL}" 2>/dev/null || true
+launchctl bootout "gui/$USER_ID/${MENUBAR_LABEL}" 2>/dev/null || true
 exit 0
 `;
 
 // Starts the agent for the signed-in user now; every other user gets it at
 // their next sign-in (RunAtLoad). The service installs the AI-tool hooks.
 const postinstall = `#!/bin/sh
-PLIST="/Library/LaunchAgents/${MAC_LABEL}.plist"
-chown root:wheel "$PLIST"; chmod 644 "$PLIST"
+# Output goes to /var/log/install.log.
+for P in "/Library/LaunchAgents/${MAC_LABEL}.plist" "/Library/LaunchAgents/${MENUBAR_LABEL}.plist"; do
+  chown root:wheel "$P"; chmod 644 "$P"
+done
 USER_NAME=$(stat -f%Su /dev/console)
-[ -n "$USER_NAME" ] && [ "$USER_NAME" != "root" ] || exit 0
+if [ -z "$USER_NAME" ] || [ "$USER_NAME" = "root" ] || [ "$USER_NAME" = "_mbsetupuser" ]; then
+  echo "techlio: no user signed in; the connector starts at the next sign-in"
+  exit 0
+fi
 USER_ID=$(id -u "$USER_NAME")
 USER_HOME=$(dscl . -read "/Users/$USER_NAME" NFSHomeDirectory | awk '{print $2}')
 LEGACY="$USER_HOME/Library/LaunchAgents/${MAC_LABEL}.plist"
 [ -f "$LEGACY" ] && rm -f "$LEGACY"
-launchctl bootout "gui/$USER_ID/${MAC_LABEL}" 2>/dev/null || true
-i=0
-until launchctl bootstrap "gui/$USER_ID" "$PLIST" 2>/dev/null; do
-  i=$((i+1)); [ $i -ge 5 ] && break; sleep 1
-done
-launchctl enable "gui/$USER_ID/${MAC_LABEL}" 2>/dev/null || true
-launchctl kickstart "gui/$USER_ID/${MAC_LABEL}" 2>/dev/null || true
+
+start_agent() {
+  LABEL="$1"; PLIST="/Library/LaunchAgents/$1.plist"
+  launchctl bootout "gui/$USER_ID/$LABEL" 2>/dev/null || true
+  # bootout is asynchronous: wait until the old job is gone before loading.
+  n=0; while launchctl print "gui/$USER_ID/$LABEL" >/dev/null 2>&1 && [ $n -lt 20 ]; do sleep 0.5; n=$((n+1)); done
+  n=0
+  until launchctl print "gui/$USER_ID/$LABEL" >/dev/null 2>&1; do
+    launchctl asuser "$USER_ID" launchctl bootstrap "gui/$USER_ID" "$PLIST" 2>&1 || true
+    n=$((n+1)); [ $n -ge 5 ] && break; sleep 1
+  done
+  launchctl enable "gui/$USER_ID/$LABEL" 2>/dev/null || true
+  launchctl kickstart "gui/$USER_ID/$LABEL" 2>/dev/null || true
+  if launchctl print "gui/$USER_ID/$LABEL" >/dev/null 2>&1; then
+    echo "techlio: $LABEL loaded for $USER_NAME"
+  else
+    echo "techlio: could not load $LABEL for $USER_NAME; it starts at the next sign-in"
+  fi
+}
+start_agent ${MAC_LABEL}
+start_agent ${MENUBAR_LABEL}
 exit 0
 `;
 
@@ -211,8 +292,9 @@ fi
 # Stop it for everyone else who is signed in (fast user switching).
 for U in $(who | awk '{print $1}' | sort -u); do
   launchctl bootout "gui/$(id -u "$U")/${MAC_LABEL}" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u "$U")/${MENUBAR_LABEL}" 2>/dev/null || true
 done
-rm -f "/Library/LaunchAgents/${MAC_LABEL}.plist"
+rm -f "/Library/LaunchAgents/${MAC_LABEL}.plist" "/Library/LaunchAgents/${MENUBAR_LABEL}.plist"
 rm -rf "${MAC_DIR}"
 pkgutil --forget ${MAC_LABEL} >/dev/null 2>&1 || true
 echo "Techlio connector removed."
@@ -233,17 +315,24 @@ function writePkg(binaryPath, pkgPath) {
   codesignBinary(exe);
   writeFileSync(join(appDir, "uninstall.sh"), uninstall, { mode: 0o755 });
   writeFileSync(join(payload, `Library/LaunchAgents/${MAC_LABEL}.plist`), launchAgentPlist, { mode: 0o644 });
+  writeFileSync(join(payload, `Library/LaunchAgents/${MENUBAR_LABEL}.plist`), menubarPlist, { mode: 0o644 });
+  spawnSync("ditto", [join(menubarStage, "Techlio Connector.app"), join(appDir, "Techlio Connector.app")], { stdio: "inherit" });
   writeFileSync(join(scripts, "preinstall"), preinstall, { mode: 0o755 });
   writeFileSync(join(scripts, "postinstall"), postinstall, { mode: 0o755 });
 
   // Extended attributes (quarantine, provenance) would ship as ._ AppleDouble files.
   spawnSync("xattr", ["-cr", payload], { stdio: "inherit" });
+  // Never let Installer "relocate" the menu bar app to another copy it finds.
+  const componentPlist = join(work, "components.plist");
+  spawnSync("pkgbuild", ["--analyze", "--root", payload, componentPlist], { stdio: "inherit" });
+  spawnSync("plutil", ["-replace", "0.BundleIsRelocatable", "-bool", "NO", componentPlist], { stdio: "inherit" });
   const component = join(work, "component.pkg");
   const built = spawnSync(
     "pkgbuild",
     [
       "--root", payload,
       "--scripts", scripts,
+      "--component-plist", componentPlist,
       "--identifier", MAC_LABEL,
       "--version", "0.1.0",
       "--install-location", "/",
