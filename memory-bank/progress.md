@@ -95,3 +95,20 @@ Full findings, truth map, and proof checklist: `docs/PRODUCTION_TRUTH_AUDIT.md`.
 
 Still open or blocked: see `pending.md` (legal, certificates, production
 credential rotation, SSO, §19 CI suite, Claude OTel tokens).
+
+## 2026-09-23 AI Progress module
+
+- **Capture:** Claude Code OTel (`/v1/logs`, http/json) gives real per-call timing and tokens; hook
+  turns for those sessions are dropped. Antigravity adapter from its official hooks (per-call model
+  timing, tools, model names; `Stop` ignored; `toolCall.args` never read). Provider allowlist at
+  registration and heartbeat.
+- **FR-012:** connectors report per-provider capabilities on every heartbeat (pushed immediately on
+  change); stored in `connector_health.capabilities` (012) and preferred over the static catalog.
+- **API:** `aiProgress` on `/v1/employees/:id`, `/v1/employees/:id/ai-progress/timeline`, live
+  `people` strip, effective capabilities on tool/session pages, `received_at`/`late` on session events.
+- **UI:** AI Progress panel is the centre of the employee hub (provider cards with capability
+  provenance, Tier B daily bars, observed %), day timeline, "Right now" on the overview, turn-aware
+  duration labels, late-event badges.
+- **Ops:** `/v1/health` reports schema version; schema drift answers 503 with the fix instead of 500.
+- **Tests:** adapters 9, server-core 44, puller 5; live `ai-progress` + `tier-b` suites (`LIVE_STACK=1`).
+- Docs: `docs/phase0/provider-capability-matrix.md`, `docs/ai-progress-data-lineage.md`.

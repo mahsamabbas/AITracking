@@ -40,7 +40,9 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
 ## Greenfield organisation — live dashboard in about 15 minutes
 
 1. **Deploy** the API and web with the environment above.
-   `curl -s https://<api>/v1/health` → `{"ok":true,…}`
+   `curl -s https://<api>/v1/health` → `{"ok":true,…,"schema":{"upToDate":true}}`.
+   `schema.upToDate: false` means the code is newer than the database — run step 2.
+   Until then, affected routes answer **503 `schema_out_of_date`** instead of a bare 500.
 2. **Migrate** (from a trusted machine, production credentials in
    `apps/api/.env.production.local`):
    ```bash
