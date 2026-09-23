@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import pg from "pg";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,7 +18,16 @@ const sqlDir = join(root, "infra", "sql");
 // Local by default. Production env files are only read with --production
 // (used by scripts/migrate-prod.sh), so a routine `pnpm db:migrate` can never
 // migrate the production database by accident.
-const PRODUCTION = process.argv.includes("--production");
+// --on-deploy: run from the Vercel build command (vercel.json). Vercel exposes
+// Sensitive env vars (the Neon DATABASE_URL) to builds but never to the CLI,
+// so this is where production migrations can run without anyone copying the
+// URL. Only production builds migrate; preview builds skip.
+const ON_DEPLOY = process.argv.includes("--on-deploy");
+if (ON_DEPLOY && process.env.VERCEL && process.env.VERCEL_ENV !== "production") {
+  console.log(`==> Migrate skipped: VERCEL_ENV=${process.env.VERCEL_ENV ?? "unknown"} (only production builds migrate).`);
+  process.exit(0);
+}
+const PRODUCTION = process.argv.includes("--production") || ON_DEPLOY;
 const ENV_CANDIDATES = PRODUCTION
   ? [
       join(root, "apps/api/.env.production.local"),
@@ -294,8 +304,82 @@ if (config.source === "local default" && PRODUCTION) {
 const { source: _source, envFile: _envFile, ...poolOptions } = config;
 const pool = new pg.Pool(poolOptions);
 
+// Migration 008 disables accounts that still use a published demo password.
+// Applying it with no real administrator would lock everyone out, so it is
+// deferred (not failed) until one exists. TECHLIO_BOOTSTRAP_ADMIN_EMAIL /
+// TECHLIO_BOOTSTRAP_ADMIN_PASSWORD create that administrator right here.
+const DISABLE_DEFAULTS = "008_disable_default_credentials.sql";
+const DEMO_HASHES = [
+  "7944d0e9050aaf0eb8b5440daf0680f4d40c243cd6893f7336d1c952758d7693",
+  "9b1da24f47b7c55ba48e11b72745280ab7c1f77300c525fcdb6eaa73d6adce68",
+  "a797291477b881b7ce6e205716292b923b9ff1886725ab73e72d9326efee495e",
+  "4851f4eb86fe570574aea226fd2a1aa1c0a71dd02826c3d01edb6d99c8f0a01a",
+];
+
+async function realAdministratorCount(client) {
+  const { rows } = await client.query(
+    `SELECT COUNT(*)::int AS n FROM portal_users
+     WHERE role = 'administrator'
+       AND password_hash <> ALL($1::text[])
+       AND password_hash NOT LIKE '!%'`,
+    [DEMO_HASHES],
+  );
+  return rows[0]?.n ?? 0;
+}
+
+/** Same format as packages/server-core/src/users.ts hashPassword(). */
+function scryptHash(password) {
+  const salt = randomBytes(16);
+  return `scrypt$${salt.toString("hex")}$${scryptSync(password, salt, 32).toString("hex")}`;
+}
+
+async function bootstrapAdministrator(client) {
+  const email = process.env.TECHLIO_BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.TECHLIO_BOOTSTRAP_ADMIN_PASSWORD;
+  if (!email || !password) return false;
+  if (password.length < 12) {
+    console.error("  TECHLIO_BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters — administrator not created.");
+    return false;
+  }
+  const orgs = await client.query("SELECT id FROM organizations ORDER BY name LIMIT 2");
+  let orgId = process.env.TECHLIO_PULL_ORG_ID || (orgs.rows.length === 1 ? orgs.rows[0].id : null);
+  if (!orgId) {
+    orgId = randomUUID();
+    await client.query("INSERT INTO organizations (id, name) VALUES ($1, $2)", [orgId, "Techlio"]);
+  }
+  const existing = await client.query("SELECT id FROM portal_users WHERE email = $1", [email]);
+  const id = existing.rows[0]?.id ?? randomUUID();
+  if (existing.rows[0]) {
+    await client.query("UPDATE portal_users SET password_hash = $1, role = 'administrator' WHERE id = $2", [scryptHash(password), id]);
+  } else {
+    await client.query(
+      `INSERT INTO portal_users (id, organization_id, email, password_hash, display_name, role, developer_id)
+       VALUES ($1, $2, $3, $4, $5, 'administrator', NULL)`,
+      [id, orgId, email, scryptHash(password), email.split("@")[0]],
+    );
+  }
+  await client.query(
+    "INSERT INTO audit_log (organization_id, actor_id, action, detail, created_at) VALUES ($1, $2, $3, $4::jsonb, NOW())",
+    [orgId, id, existing.rows[0] ? "users.admin_reset_bootstrap" : "users.admin_create_bootstrap", JSON.stringify({ email })],
+  );
+  console.log(`  administrator ${existing.rows[0] ? "reset" : "created"} from TECHLIO_BOOTSTRAP_ADMIN_EMAIL (${email}). Remove the two bootstrap env vars now.`);
+  return true;
+}
+
 async function main() {
   console.log(`==> Migrate (${describeConfig(config)})`);
+  // One migrator at a time, even if two deploys build concurrently.
+  const lock = await pool.connect();
+  await lock.query("SELECT pg_advisory_lock(hashtext('techlio-schema-migrations'))");
+  try {
+    await runMigrations();
+  } finally {
+    await lock.query("SELECT pg_advisory_unlock(hashtext('techlio-schema-migrations'))").catch(() => {});
+    lock.release();
+  }
+}
+
+async function runMigrations() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name       TEXT PRIMARY KEY,
@@ -316,6 +400,21 @@ async function main() {
     const sql = readFileSync(join(sqlDir, file), "utf8");
     const client = await pool.connect();
     try {
+      if (file === DISABLE_DEFAULTS) {
+        const hasPortalUsers = (await client.query("SELECT to_regclass('portal_users') AS t")).rows[0]?.t;
+        if (hasPortalUsers && (await realAdministratorCount(client)) === 0) {
+          await bootstrapAdministrator(client);
+          if ((await realAdministratorCount(client)) === 0) {
+            console.warn(
+              `  DEFERRED ${file}: no administrator with a real password exists, so disabling the demo\n` +
+                "           accounts now would lock everyone out. Create one (pnpm admin:create, or set\n" +
+                "           TECHLIO_BOOTSTRAP_ADMIN_EMAIL + TECHLIO_BOOTSTRAP_ADMIN_PASSWORD and redeploy); the next\n" +
+                "           migrate run applies it. Later migrations continue.",
+            );
+            continue;
+          }
+        }
+      }
       await client.query("BEGIN");
       await client.query(sql);
       await client.query("INSERT INTO schema_migrations (name) VALUES ($1)", [

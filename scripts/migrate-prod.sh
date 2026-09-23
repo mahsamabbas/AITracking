@@ -18,6 +18,15 @@ corrupted_env() {
   [[ -f "$f" ]] && grep -q '\[SENSITIVE\]' "$f" 2>/dev/null
 }
 
+prod_env_file="$API_DIR/.env.production.local"
+if [[ -f "$prod_env_file" ]] && ! corrupted_env "$prod_env_file"; then
+  if grep -qE '^DATABASE_URL(_UNPOOLED)?=postgres' "$prod_env_file" 2>/dev/null \
+    || grep -qE '^POSTGRES_URL=postgres' "$prod_env_file" 2>/dev/null; then
+    echo "==> Using apps/api/.env.production.local (real Postgres URL)"
+    exec node "$ROOT/scripts/migrate.mjs" --production
+  fi
+fi
+
 if corrupted_env "$API_DIR/.env.local" || corrupted_env "$API_DIR/.env.production.local"; then
   echo "NOTE: apps/api/.env*.local contain [SENSITIVE] placeholders."
   echo "      Your database variables are marked Sensitive on Vercel, and Vercel never"
