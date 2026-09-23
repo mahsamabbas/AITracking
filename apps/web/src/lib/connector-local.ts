@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 
 export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
 export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
-export const CONNECTOR_MAC_DMG = "/downloads/techlio-connector-macos.dmg";
-export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64.dmg";
-export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64.dmg";
+/** Installer package: sets the connector up as a background LaunchAgent (no app, no Dock icon). */
+export const CONNECTOR_MAC_PKG = "/downloads/techlio-connector-macos.pkg";
+export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64.pkg";
+export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64.pkg";
 
 export function connectorDownloadPath(platform: "mac" | "windows" | "other"): string {
   if (platform === "windows") return CONNECTOR_WINDOWS_EXE;
-  return CONNECTOR_MAC_DMG;
+  return CONNECTOR_MAC_PKG;
 }
 
 export async function fetchConnectorHealth(): Promise<boolean> {

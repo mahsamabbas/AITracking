@@ -12,3 +12,4 @@ dist
 .env*
 .next-build
 .next-dev
+apps/web/public/downloads/build/

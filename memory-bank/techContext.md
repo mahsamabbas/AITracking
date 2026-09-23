@@ -2,7 +2,8 @@
 
 - **Monorepo:** pnpm + Turborepo, TypeScript
 - **Connector:** separate per-machine service (localhost :9477). Employees download
-  a Windows `.exe` or a macOS `.dmg` (universal app for Intel and Apple silicon)
+  a Windows `.exe` (GUI-subsystem, registers a hidden logon task) or a macOS
+  `.pkg` (universal; installs a LaunchAgent, no app bundle)
   from the dashboard — they do not run `pnpm` or clone this repo. Encrypted file
   queue, Ed25519 signing, Claude hooks + IDE companion.
 - **API:** NestJS + Fastify, `@techlio/server-core` + Postgres + Drizzle

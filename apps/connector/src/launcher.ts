@@ -1,3 +1,6 @@
+import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { dirname } from "node:path";
+
 /**
  * Downloadable connector: start the agent immediately, then keep it running
  * at sign-in. Developers never need the git repo or pnpm.
@@ -82,6 +85,33 @@ async function runHook(): Promise<void> {
   process.stdout.write("{}\n");
 }
 
+/**
+ * A background service has no terminal (and on Windows no valid stdout at
+ * all), so its console output goes to ~/.techlio-connector/connector.log,
+ * rotated once at 5 MB.
+ */
+function logToFile(path: string): void {
+  const MAX_BYTES = 5 * 1024 * 1024;
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  try {
+    if (statSync(path).size > MAX_BYTES) renameSync(path, `${path}.1`);
+  } catch {
+    /* no log yet */
+  }
+  const write = (level: string, args: unknown[]) => {
+    const line = args.map((a) => (typeof a === "string" ? a : a instanceof Error ? a.stack ?? a.message : JSON.stringify(a))).join(" ");
+    try {
+      appendFileSync(path, `${new Date().toISOString()} ${level} ${line}\n`, { mode: 0o600 });
+    } catch {
+      /* disk full or permissions: never crash the service over logging */
+    }
+  };
+  console.log = (...args: unknown[]) => write("info ", args);
+  console.info = console.log;
+  console.warn = (...args: unknown[]) => write("warn ", args);
+  console.error = (...args: unknown[]) => write("error", args);
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes("--hook")) {
     await runHook();
@@ -98,11 +128,12 @@ async function main(): Promise<void> {
     return;
   }
   if (!process.argv.includes("--service")) {
-    // Install, hand off to the OS service manager, and exit. Only fall back
-    // to running here when no service could be registered.
-    const handedOff = await service.installBackgroundService();
-    if (handedOff) return;
+    // Install, hand off to the OS service manager, and exit. The connector
+    // never stays open as a foreground program.
+    await service.installBackgroundService();
+    return;
   }
+  if (!process.stdout.isTTY) logToFile(service.logPath());
   await import("./index.js");
 }
 

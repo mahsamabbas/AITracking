@@ -59,9 +59,24 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
    matched on it).
 5. **Issue a connector credential** per employee and AI tool (Access /
    Connectors → register). Hand the device ID and token to the employee.
-6. **Employee installs the connector** from **Install agent** in the dashboard
-   (DMG on macOS, `.exe` on Windows). It installs itself as a background
-   service and starts at sign-in. No terminal, Node, or repository needed.
+6. **Employee installs the connector** from **Install agent** in the dashboard.
+   It is a background service, not an app — no window, Dock icon, or taskbar
+   button — and starts at every sign-in. No terminal, Node, or repository needed.
+   - **macOS** — `techlio-connector-macos.pkg` (asks for an admin password once;
+     MDM can push it silently). Installs to
+     `/Library/Application Support/Techlio/Connector/` plus the LaunchAgent
+     `/Library/LaunchAgents/com.techlio.connector.plist`, which runs one instance
+     per signed-in user and restarts it after a crash. Remove with
+     `sudo "/Library/Application Support/Techlio/Connector/uninstall.sh" [--purge]`.
+   - **Windows** — `techlio-connector-win-x64.exe`, opened once. It copies itself
+     to `%USERPROFILE%\.techlio\connector\`, registers the hidden logon task
+     `TechlioConnector` (restart on failure; HKCU Run key if Task Scheduler is
+     blocked), starts it, shows a confirmation, and exits. The executable is
+     GUI-subsystem, so no console opens. Remove from **Settings → Apps**.
+   - Logs: `~/.techlio-connector/connector.log`. Health: `techlio-connector --status`.
+   - Why per-user and not a SYSTEM/root service: the AI tools, their hook
+     configs, and the credential store (Keychain, DPAPI) belong to the
+     signed-in user.
 7. **Employee activates** on **My connectors**: paste the credential, read and
    accept the collection notice. Activation binds the connector's signing key.
 8. **Verify** within a minute:
@@ -84,13 +99,15 @@ yourself out. See `docs/PRODUCTION_TRUTH_AUDIT.md` §5 for the full checklist
 
 ## Connector installers
 
-`pnpm connector:pack` builds macOS DMGs, the Windows executable, the companion
+`pnpm connector:pack` builds the macOS installer packages (`.pkg`, universal and
+per-architecture), the Windows executable, the companion
 VSIX, and `SHA256SUMS.txt` into `apps/web/public/downloads/`. Local builds are
 ad-hoc signed and **will be blocked by Gatekeeper/SmartScreen** when downloaded.
 Distribution builds:
 
 ```bash
 APPLE_SIGNING_IDENTITY="Developer ID Application: Techlio (TEAMID)" \
+APPLE_INSTALLER_IDENTITY="Developer ID Installer: Techlio (TEAMID)" \
 APPLE_NOTARY_PROFILE=techlio-notary \
 WINDOWS_CERT_PFX=/secure/techlio.pfx WINDOWS_CERT_PASSWORD=… \
 pnpm connector:pack --release

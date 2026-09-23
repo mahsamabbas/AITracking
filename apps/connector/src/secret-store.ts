@@ -23,7 +23,8 @@ export type SecretBackend = "keychain" | "dpapi" | "secret-service" | "file";
 let cachedBackend: SecretBackend | null = null;
 
 function run(cmd: string, args: string[], input?: string) {
-  return spawnSync(cmd, args, { input, encoding: "utf8", timeout: 10_000 });
+  // windowsHide: the service has no console, so PowerShell must not open one.
+  return spawnSync(cmd, args, { input, encoding: "utf8", timeout: 10_000, windowsHide: true });
 }
 
 export function backend(): SecretBackend {
