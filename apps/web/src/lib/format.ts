@@ -39,11 +39,12 @@ export function formatDateTime(iso?: string | null): string {
   });
 }
 
-export function formatTime(iso?: string | null): string {
+/** Clock time; pass the org timezone wherever the UI says "times in …". */
+export function formatTime(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone });
 }
 
 export function formatDate(iso?: string | null): string {

@@ -25,7 +25,7 @@ import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
-import { formatDuration, formatNumber } from "@/lib/format";
+import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
 import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
 import type { ToolAnalytics } from "@/lib/types";
@@ -110,10 +110,16 @@ export default function EmployeeToolPage() {
             {d.capability.emptyState || d.capability.note}
             {d.capability.missing.length > 0 ? (
               <span className="mt-1 block">
-                Unavailable from this provider: {d.capability.missing.join(", ").replace(/_/g, " ")}.
-                These read as “not available”, never as zero.
+                Unavailable from this provider:{" "}
+                {(d.capability.unavailable ?? d.capability.missing).join(" · ").replace(/_/g, " ")}. These read
+                as “not available”, never as zero.
               </span>
             ) : null}
+            <span className="mt-1 block opacity-80">
+              {d.capability.capabilitySource === "connector"
+                ? `Reported live by this person's connector ${formatRelative(d.capability.reportedAt ?? null)}${d.capability.observedVia?.length ? ` · observed via ${d.capability.observedVia.join(", ")}` : ""}.`
+                : "No recent connector report — this is the provider's documented capability."}
+            </span>
           </Callout>
         </div>
       ) : meta.note ? (

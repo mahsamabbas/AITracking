@@ -38,3 +38,25 @@ describe("cursorRowToEvent", () => {
     expect(a.event_id).toBe(b.event_id);
   });
 });
+
+import { ActivityEventSchema } from "@techlio/event-schema";
+
+describe("Tier B events pass the strict event schema", () => {
+  it("cursor daily row is a valid, allowlisted event", () => {
+    const e = cursorRowToEvent(
+      { userId: 7, email: "dev@company.com", date: Date.UTC(2026, 8, 20), chatRequests: 3, agentRequests: 4, composerRequests: 1, totalTabsAccepted: 12, subscriptionIncludedReqs: 6 },
+      {
+        organizationId: "550e8400-e29b-41d4-a716-446655440010",
+        developerId: "550e8400-e29b-41d4-a716-446655440011",
+        deviceId: "550e8400-e29b-41d4-a716-446655440012",
+        connectorVersion: "puller-0.2.0",
+        consentVersion: "1",
+      },
+    );
+    const parsed = ActivityEventSchema.safeParse(e);
+    expect(parsed.success).toBe(true);
+    expect(e.metadata?.agent_requests_count).toBe(5);
+    // The account email is used for attribution only and never stored.
+    expect(JSON.stringify(e)).not.toContain("dev@company.com");
+  });
+});

@@ -44,6 +44,10 @@ const hookToEvent: Record<string, ActivityEvent["event_type"]> = {
   Stop: EventTypes.model_request_completed,
   stop: EventTypes.model_request_completed,
   afterFileEdit: EventTypes.file_modified,
+  // Google Antigravity: one Pre/PostInvocation pair per model call, so the
+  // measured duration is real per-call model timing (unlike prompt → stop).
+  PreInvocation: EventTypes.model_request_started,
+  PostInvocation: EventTypes.model_request_completed,
 };
 
 function workspaceName(cwd: string | undefined): string | undefined {
@@ -69,6 +73,9 @@ export function claudeHookToEvents(
   payload: ClaudeHookPayload,
   ctx: ConnectorContext,
 ): ActivityEvent[] {
+  // Antigravity's Stop ends an execution; its model calls are already counted
+  // by Pre/PostInvocation, so Stop must not become a second model request.
+  if (ctx.provider === "antigravity" && payload.hook_event_name === "Stop") return [];
   const type = payload.hook_event_name
     ? hookToEvent[payload.hook_event_name]
     : undefined;
@@ -96,6 +103,7 @@ export function claudeHookToEvents(
   if (workspace) metadata.path_category = workspace;
   if (filePath) metadata.file_path = filePath;
   if (model) metadata.model_name = model;
+  metadata.telemetry_source = "hook";
 
   const event: ActivityEvent = {
     event_id: randomUUID(),

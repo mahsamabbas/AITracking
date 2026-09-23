@@ -44,6 +44,14 @@ const META: Record<string, ProviderMeta> = {
     ink: "#334155",
     note: "Tier B: GitHub reports aggregate per day, so session-level metrics are unavailable.",
   },
+  antigravity: {
+    id: "antigravity",
+    label: "Google Antigravity",
+    color: "#16a34a",
+    soft: "#f0fdf4",
+    ink: "#166534",
+    note: "Observed through Antigravity hooks: model invocations with per-call timing, tool calls. No token totals.",
+  },
   vscode: {
     id: "vscode",
     label: "VS Code companion",

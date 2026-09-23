@@ -160,6 +160,58 @@ export class DashboardController {
       eventCount: r.event_count,
     }));
 
+    // Per-person live strip (FR-020/021): what each agent is doing right now.
+    // Only allowlisted metadata (model name, tool name) — never content.
+    const peopleRes = canViewActivityEvents(user)
+      ? await db.execute<{
+          developer_id: string;
+          display_name: string;
+          provider: string | null;
+          last_at: Date | null;
+          last_model: string | null;
+          last_tool: string | null;
+          hour_events: number;
+        }>(sql`
+          WITH recent AS (
+            SELECT e.developer_id, e.occurred_at, e.payload
+            FROM activity_events e
+            WHERE e.organization_id = ${user.organizationId}
+              AND e.occurred_at > NOW() - INTERVAL '2 hours'
+              AND e.event_type NOT IN ('heartbeat_sent')
+              ${selfOnly !== null ? sql`AND e.developer_id = ${selfOnly}` : sql``}
+          )
+          SELECT r.developer_id, emp.display_name,
+                 (SELECT x.payload->>'provider' FROM recent x WHERE x.developer_id = r.developer_id
+                   AND x.payload->>'event_type' LIKE ANY (ARRAY['model_%','tool_%','file_%','session_%'])
+                   ORDER BY x.occurred_at DESC LIMIT 1) AS provider,
+                 MAX(r.occurred_at) AS last_at,
+                 (SELECT x.payload->'metadata'->>'model_name' FROM recent x WHERE x.developer_id = r.developer_id
+                   AND x.payload->'metadata'->>'model_name' IS NOT NULL ORDER BY x.occurred_at DESC LIMIT 1) AS last_model,
+                 (SELECT x.payload->'metadata'->>'tool_name' FROM recent x WHERE x.developer_id = r.developer_id
+                   AND x.payload->>'event_type' LIKE 'tool_%' ORDER BY x.occurred_at DESC LIMIT 1) AS last_tool,
+                 COUNT(*) FILTER (WHERE r.occurred_at >= date_trunc('hour', NOW()))::int AS hour_events
+          FROM recent r
+          JOIN employees emp ON emp.id = r.developer_id
+          GROUP BY r.developer_id, emp.display_name
+          ORDER BY last_at DESC
+        `)
+      : { rows: [] };
+    const people = peopleRes.rows.map((p) => {
+      const last = p.last_at ? new Date(p.last_at) : null;
+      const ageMs = last ? Date.now() - last.getTime() : Infinity;
+      return {
+        developerId: p.developer_id,
+        displayName: p.display_name,
+        provider: p.provider,
+        // "active" = agent event in the last 10 minutes (the idle threshold).
+        sessionState: ageMs < 10 * 60_000 ? ("active" as const) : ("recent" as const),
+        lastEventAt: last ? last.toISOString() : null,
+        lastModel: p.last_model,
+        lastTool: p.last_tool,
+        eventsThisHour: p.hour_events,
+      };
+    });
+
     const recentEvents = canViewActivityEvents(user)
       ? (
           await listRecentEvents(user.organizationId, Math.min(Number(limit ?? 25) || 25, 100), {
@@ -260,6 +312,7 @@ export class DashboardController {
       dbAvailable: true,
       connectors,
       activeSessions,
+      people,
       alerts,
       recentEvents,
       policy: getOrgPolicy(),

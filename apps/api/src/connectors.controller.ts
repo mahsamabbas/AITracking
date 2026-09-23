@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -32,7 +33,7 @@ import {
   listDeveloperDevices,
 } from "@techlio/server-core";
 import { eq } from "drizzle-orm";
-import { EventTypes } from "@techlio/event-schema";
+import { EventTypes, isKnownProvider } from "@techlio/event-schema";
 import { randomUUID } from "node:crypto";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
@@ -77,6 +78,9 @@ export class ConnectorsController {
       });
     }
     const provider = body.provider ?? "cursor";
+    if (!isKnownProvider(provider)) {
+      throw new BadRequestException(`unknown_provider: ${provider}`);
+    }
     return registerDevice({
       organizationId: user.organizationId,
       developerId,
@@ -218,6 +222,7 @@ export class ConnectorsController {
       paused: Boolean(body.paused),
       provider: body.provider ?? null,
       tokenHash: hashDeviceToken(token),
+      capabilities: body.capabilities,
     });
 
     return { ok: true };

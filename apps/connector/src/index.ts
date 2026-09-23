@@ -8,10 +8,15 @@ import {
   providerFromHostApp,
   type ActivityEvent,
 } from "@techlio/event-schema";
-import { claudeHookToEvents, type ClaudeHookPayload } from "@techlio/provider-adapters";
+import {
+  claudeHookToEvents,
+  claudeOtlpLogsToEvents,
+  type ClaudeHookPayload,
+  type OtlpLogsPayload,
+} from "@techlio/provider-adapters";
 import { createHash, randomBytes } from "node:crypto";
 import { getSecret, setSecret, backend as secretBackend } from "./secret-store.js";
-import { ensureAgentHooks } from "./agent-hooks.js";
+import { claudeOtelConfigured, ensureAgentHooks } from "./agent-hooks.js";
 import { config } from "./config.js";
 import {
   clearIdentity,
@@ -228,6 +233,7 @@ async function postApiHeartbeat(): Promise<void> {
           hourly: caps?.hourly ?? false,
           missing: caps?.missing ?? [],
           tier: caps?.tier ?? "B",
+          ...capabilityReport(),
         },
       }),
     });
@@ -533,6 +539,48 @@ function rememberStart(
   (kind === "model" ? modelStartedAt : toolStartedAt).set(key, Date.now());
 }
 
+// ---------------------------------------------------------------------------
+// FR-012 — what each provider on this machine can actually supply, reported
+// with every heartbeat and persisted server-side. Derived from what has been
+// observed, not only from the static catalog.
+// ---------------------------------------------------------------------------
+const DAY_MS = 24 * 60 * 60 * 1000;
+const providerSeen = new Map<string, { lastEventAt: number; sources: Set<string> }>();
+/** Claude sessions whose model calls arrive over OpenTelemetry. */
+const otelSessions = new Map<string, number>();
+let claudeOtelSeenAt = 0;
+
+function noteProvider(provider: string, source: string): void {
+  const entry = providerSeen.get(provider) ?? { lastEventAt: 0, sources: new Set<string>() };
+  entry.lastEventAt = Date.now();
+  entry.sources.add(source);
+  providerSeen.set(provider, entry);
+}
+
+function capabilityReport() {
+  for (const [id, at] of otelSessions) if (Date.now() - at > DAY_MS) otelSessions.delete(id);
+  const providers: Record<string, { missing: string[]; sources: string[]; lastEventAt: string | null; tier: string; hourly: boolean }> = {};
+  const ids = new Set<string>([hostProvider, ...providerSeen.keys()]);
+  for (const id of ids) {
+    const caps = providerCapability(id);
+    if (!caps) continue;
+    const seen = providerSeen.get(id);
+    let missing = [...caps.missing];
+    // With OpenTelemetry flowing, Claude Code reports tokens and per-call timing.
+    if (id === "claude_code" && Date.now() - claudeOtelSeenAt < DAY_MS) {
+      missing = missing.filter((m) => m !== "token_totals" && m !== "model_call_timing");
+    }
+    providers[id] = {
+      missing,
+      sources: seen ? [...seen.sources] : [],
+      lastEventAt: seen ? new Date(seen.lastEventAt).toISOString() : null,
+      tier: caps.tier,
+      hourly: caps.hourly,
+    };
+  }
+  return { reportedAt: new Date().toISOString(), claudeOtelConfigured: claudeOtelConfigured(), providers };
+}
+
 const recentAgentEvents = new Map<string, number>();
 // Cross-provider echo suppression. Cursor also runs the Claude-format hooks with
 // a full Claude environment, so one Cursor action arrives as both a Cursor event
@@ -588,11 +636,11 @@ function routeAgentEvent(event: ActivityEvent): boolean {
 
 function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
-  const provider = payload.provider === "cursor" || payload.provider === "claude_code" || payload.provider === "vscode"
+  const provider = payload.provider === "cursor" || payload.provider === "claude_code" || payload.provider === "vscode" || payload.provider === "antigravity"
     ? payload.provider
     : fallbackProvider;
   const sessionId = asSessionId(payload.session_id ?? payload.conversation_id);
-  if (payload.hook_event_name === "model_request_started" || payload.hook_event_name === "UserPromptSubmit" || payload.hook_event_name === "beforeSubmitPrompt") {
+  if (payload.hook_event_name === "model_request_started" || payload.hook_event_name === "UserPromptSubmit" || payload.hook_event_name === "beforeSubmitPrompt" || payload.hook_event_name === "PreInvocation") {
     rememberStart("model", provider, sessionId, undefined);
   }
   if (payload.hook_event_name === "tool_started" || payload.hook_event_name === "PreToolUse" || payload.hook_event_name === "preToolUse") {
@@ -613,9 +661,34 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
     );
     return duration ? { ...event, duration_ms: duration } : event;
   });
-  const clean = events
+  let clean = events
     .map(sanitizeEvent)
     .filter((event): event is NonNullable<typeof event> => event !== null);
+  // When Claude Code's OpenTelemetry is flowing, real per-call model events
+  // come from /v1/logs. The hook's prompt→stop "turn" would double count, so
+  // it is dropped. Before the first OTel batch of a session arrives, a Stop is
+  // held briefly and dropped if OTel reports that session meanwhile.
+  if (provider === "claude_code") {
+    const otelLive = Date.now() - claudeOtelSeenAt < DAY_MS;
+    clean = clean.filter((event) => {
+      if (event.event_type !== "model_request_started" && event.event_type !== "model_request_completed") return true;
+      if (otelLive || (event.session_id && otelSessions.has(event.session_id))) return false;
+      if (event.event_type === "model_request_completed" && claudeOtelConfigured()) {
+        const held = event;
+        const timer = setTimeout(() => {
+          if (held.session_id && otelSessions.has(held.session_id)) return;
+          if (Date.now() - claudeOtelSeenAt < DAY_MS) return;
+          emitAgentEvent(held);
+        }, 8_000);
+        timer.unref?.();
+        return false;
+      }
+      return true;
+    });
+  }
+  const firstSighting = clean.some((event) => !providerSeen.has(event.provider));
+  for (const event of clean) noteProvider(event.provider, "hook");
+  if (firstSighting) void postApiHeartbeat();
   if (!clean.length) return { accepted: 0, provider };
   const fresh = clean.filter((event) => {
     // Same-provider repeat guard (e.g. native + Claude-format both under Cursor).
@@ -653,7 +726,40 @@ const rejectUnavailableOtlp = async (
   });
 
 app.post("/v1/traces", rejectUnavailableOtlp);
-app.post("/v1/logs", rejectUnavailableOtlp);
+app.post("/v1/metrics", rejectUnavailableOtlp);
+
+/**
+ * Claude Code OpenTelemetry logs (OTLP/HTTP JSON). Only api_request/api_error
+ * are kept — model id, per-call duration, token counts. Prompt and response
+ * events are ignored by the adapter. Paused or unpaired: accepted and dropped,
+ * so Claude does not retry, and nothing is collected.
+ */
+app.post("/v1/logs", async (req, reply) => {
+  const contentType = String(req.headers["content-type"] ?? "");
+  if (!contentType.includes("json")) {
+    return reply.code(415).send({
+      error: "otlp_json_only",
+      message: "Set OTEL_EXPORTER_OTLP_LOGS_PROTOCOL=http/json for Claude Code.",
+    });
+  }
+  if (paused || !identity) return { partialSuccess: {} };
+  const mapped = claudeOtlpLogsToEvents((req.body ?? {}) as OtlpLogsPayload, connectorCtx("claude_code"));
+  // First OTel data in a day changes what Claude Code can report — tell the
+  // API now instead of waiting for the next 30s heartbeat (FR-012).
+  const capabilityChanged = mapped.length > 0 && Date.now() - claudeOtelSeenAt >= DAY_MS;
+  for (const { sessionKey, event } of mapped) {
+    const sessionId = asSessionId(sessionKey);
+    const withSession = sessionId ? { ...event, session_id: sessionId } : event;
+    const clean = sanitizeEvent(withSession);
+    if (!clean) continue;
+    claudeOtelSeenAt = Date.now();
+    if (sessionId) otelSessions.set(sessionId, Date.now());
+    noteProvider("claude_code", "otel");
+    emitAgentEvent(clean);
+  }
+  if (capabilityChanged) void postApiHeartbeat();
+  return { partialSuccess: {} };
+});
 
 setInterval(() => {
   void flushQueue();
@@ -683,6 +789,8 @@ app
     console.log("Dashboard pings are hidden. Agent events print below as they happen.");
     if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");
     if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
+    if (hooks.antigravity) console.log("Antigravity hooks are installed (~/.gemini/config/hooks.json).");
+    if (claudeOtelConfigured()) console.log("Claude Code telemetry is routed here for token totals (prompts stay redacted).");
     console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
   })
   .catch(async (err: NodeJS.ErrnoException) => {

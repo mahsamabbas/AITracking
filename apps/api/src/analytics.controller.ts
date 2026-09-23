@@ -11,6 +11,10 @@ import {
 import type { FastifyRequest } from "fastify";
 import {
   activityTotals,
+  aiProgress,
+  aiProgressTimeline,
+  catalogCapability,
+  effectiveCapabilities,
   canViewDeveloper,
   canViewTeam,
   classificationSplit,
@@ -220,6 +224,7 @@ export class AnalyticsController {
       fileChangeWorkspaces,
       fileChangeTrendSeries,
       aiSubscriptions,
+      progress,
     ] = await Promise.all([
       activityTotals(scope, range),
       activityTotals(scope, prev),
@@ -243,6 +248,7 @@ export class AnalyticsController {
       safeAnalytics("workspaceFileChanges", () => workspaceFileChanges(scope, range), []),
       safeAnalytics("fileChangeTrend", () => fileChangeTrend(scope, range), []),
       employeeAiSubscriptions(user.organizationId, id),
+      aiProgress({ organizationId: user.organizationId, developerId: id, range }),
     ]);
 
     return {
@@ -263,6 +269,8 @@ export class AnalyticsController {
       fileChangeWorkspaces,
       fileChangeTrend: fileChangeTrendSeries,
       aiSubscriptions,
+      /** Unified AI Progress: per-provider rollup, effective capabilities, Tier B daily, coverage. */
+      aiProgress: progress,
       idlePeriods: gaps,
       recentSessions: recent.sessions,
       totalSessions: recent.total,
@@ -322,7 +330,7 @@ export class AnalyticsController {
       }),
     ]);
 
-    const capability = PROVIDER_CAPABILITIES[provider] ?? null;
+    const capability = await capabilityFor(user.organizationId, id, provider);
 
     return {
       preset,
@@ -347,6 +355,24 @@ export class AnalyticsController {
   // -------------------------------------------------------------------------
   // Session history
   // -------------------------------------------------------------------------
+  /**
+   * GET /v1/employees/:id/ai-progress/timeline?date=YYYY-MM-DD
+   * Hourly activity by provider for one day in the org timezone, plus that
+   * day's sessions. Developers may only request themselves.
+   */
+  @Get("employees/:id/ai-progress/timeline")
+  async progressTimeline(
+    @Param("id") id: string,
+    @Req() req: FastifyRequest,
+    @Query("date") date?: string,
+  ) {
+    const user = userFromRequest(req);
+    assertCanViewPeople(user);
+    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
+    return aiProgressTimeline({ organizationId: user.organizationId, developerId: id, date: day });
+  }
+
   @Get("employees/:id/sessions")
   async employeeSessions(
     @Param("id") id: string,
@@ -421,7 +447,11 @@ export class AnalyticsController {
       user.organizationId,
       detail.session.developerId,
     );
-    const capability = PROVIDER_CAPABILITIES[detail.session.provider] ?? null;
+    const capability = await capabilityFor(
+      user.organizationId,
+      detail.session.developerId,
+      detail.session.provider,
+    );
     return { ...detail, employee, capability };
   }
 
@@ -434,4 +464,25 @@ export class AnalyticsController {
     const { range } = rangeFrom(q);
     return coverageSummary(user.organizationId, range, scopeDeveloperIds(user));
   }
+}
+
+/**
+ * Provider capability as shown on the tool and session pages: the static
+ * catalog entry with `missing` replaced by the live connector report when one
+ * exists (FR-012). `capabilitySource` says which one the UI is showing.
+ */
+async function capabilityFor(organizationId: string, developerId: string, provider: string) {
+  const base = PROVIDER_CAPABILITIES[provider];
+  if (!base) return null;
+  const live = (await effectiveCapabilities(organizationId, developerId)).get(provider);
+  const eff = live ?? catalogCapability(provider);
+  return {
+    ...base,
+    missing: eff.missing,
+    unavailable: eff.unavailable,
+    emptyState: eff.missing.length ? base.emptyState : "",
+    capabilitySource: eff.source,
+    reportedAt: eff.reportedAt,
+    observedVia: eff.observedVia,
+  };
 }

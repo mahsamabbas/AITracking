@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { AiProgressPanel } from "@/components/domain/AiProgressPanel";
+import { AiProgressTimeline } from "@/components/domain/AiProgressTimeline";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatTile } from "@/components/ui/StatTile";
@@ -24,7 +26,6 @@ import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge } from "@/components/domain/Badges";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
-import { ToolCard } from "@/components/domain/ToolCard";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
 import { EmployeeAiPlanUsage } from "@/components/domain/EmployeeAiPlanUsage";
 import { EventTimeline } from "@/components/domain/EventTimeline";
@@ -320,6 +321,18 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
+          {/* ---------------- AI progress (primary module) ---------------- */}
+          <section className="mt-5" aria-label="AI progress">
+            <AiProgressPanel
+              progress={d.aiProgress}
+              employeeId={employeeId}
+              emptyVariant={silenceVariant}
+            />
+          </section>
+          <section className="mt-5">
+            <AiProgressTimeline employeeId={employeeId} />
+          </section>
+
           {/* ---------------- Trend + split ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
@@ -370,37 +383,6 @@ export default function EmployeeDetailPage() {
               </CardBody>
             </Card>
           </section>
-
-          {/* ---------------- AI tools ---------------- */}
-          <section className="mt-5">
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <div>
-                <h2 className="h-section">AI tools used</h2>
-                <p className="hint">
-                  {isSelf
-                    ? "Open a tool to see your usage of it in detail"
-                    : "Open a tool to see this employee's usage of it in detail"}
-                </p>
-              </div>
-            </div>
-            {d.tools.length === 0 ? (
-              <Card>
-                <EmptyState compact variant={silenceVariant} />
-              </Card>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {d.tools.map((tool) => (
-                  <ToolCard
-                    key={tool.provider}
-                    tool={tool}
-                    href={`/employees/${employeeId}/tools/${tool.provider}`}
-                    shareOfMs={t.activeMs}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
 
           {/* ---------------- Projects & file changes ---------------- */}
           <section className="mt-5">

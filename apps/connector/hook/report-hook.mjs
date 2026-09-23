@@ -9,6 +9,9 @@
 const fallback = process.argv[2] || "claude_code";
 
 function detectProvider() {
+  // Only Antigravity reads ~/.gemini/config/hooks.json, so its explicit
+  // argument is trusted even when launched from a Claude Code terminal.
+  if (fallback === "antigravity") return "antigravity";
   // Cursor also runs Claude-format hooks, so a Cursor action can reach the
   // Claude settings entry. Cursor markers win first — real Claude Code never
   // sets them — so Cursor work is never mislabelled as Claude.
@@ -33,7 +36,10 @@ process.stdin.on("end", () => {
   } catch {
     raw = {};
   }
-  const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : [];
+  const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : Array.isArray(raw.workspacePaths) ? raw.workspacePaths : [];
+  // Antigravity: only toolCall.name is read; toolCall.args (commands, file
+  // content) never leaves this process.
+  const toolCall = raw.toolCall && typeof raw.toolCall === "object" ? raw.toolCall : {};
   const cwd =
     typeof raw.cwd === "string"
       ? raw.cwd
@@ -42,17 +48,19 @@ process.stdin.on("end", () => {
         : undefined;
   const body = {
     provider: detectProvider(),
-    hook_event_name: raw.hook_event_name,
+    // Antigravity does not name the event on stdin; the installer passes it as argv[3].
+    hook_event_name: raw.hook_event_name || process.argv[3],
     session_id:
       raw.session_id ||
       raw.conversation_id ||
+      raw.conversationId ||
       raw.generation_id ||
       process.env.CURSOR_CONVERSATION_ID,
-    tool_name: raw.tool_name || raw.tool,
+    tool_name: raw.tool_name || raw.tool || toolCall.name,
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
-    model: raw.model || raw.model_name,
-    status: raw.status,
+    model: raw.model || raw.model_name || raw.modelName,
+    status: raw.status || (typeof raw.error === "string" && raw.error ? "failed" : undefined),
   };
   fetch("http://127.0.0.1:9477/hooks/agent", {
     method: "POST",

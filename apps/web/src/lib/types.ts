@@ -207,9 +207,15 @@ export interface ProviderCapability {
   missing: string[];
   emptyState: string;
   note?: string;
+  /** FR-012: "connector" when the live report from this person's connector is shown. */
+  capabilitySource?: "connector" | "catalog";
+  reportedAt?: string | null;
+  observedVia?: string[];
+  unavailable?: string[];
 }
 
 export interface EmployeeAnalytics {
+  aiProgress?: AiProgress;
   preset: string;
   range: { from: string; to: string };
   employee: EmployeeProfile;
@@ -260,6 +266,9 @@ export interface ActivityEventRow {
   event_id: string;
   event_type: string;
   occurred_at: string;
+  /** Server receipt time; `late` when it arrived > 5 min after occurred_at. */
+  received_at?: string;
+  late?: boolean;
   provider?: string;
   session_id?: string;
   project_id?: string;
@@ -301,6 +310,7 @@ export interface LiveConnector {
 }
 
 export interface LiveStatus {
+  people?: LivePerson[];
   dbAvailable: boolean;
   hint?: string;
   connectors: LiveConnector[];
@@ -334,4 +344,92 @@ export interface FilterMeta {
   workItems: { id: string; title: string; projectId: string | null }[];
   timezone?: string;
   providers: ProviderCapability[];
+}
+
+// ---------------------------------------------------------------------------
+// AI Progress (GET /v1/employees/:id → aiProgress; see docs/ai-progress-data-lineage.md)
+// ---------------------------------------------------------------------------
+export interface EffectiveCapability {
+  missing: string[];
+  unavailable: string[];
+  source: "connector" | "catalog";
+  reportedAt: string | null;
+  observedVia: string[];
+  tier: "A" | "B";
+  hourly: boolean;
+  note: string | null;
+  emptyState: string | null;
+}
+
+export interface ProviderProgress {
+  provider: string;
+  label: string;
+  capability: EffectiveCapability;
+  sessions: number;
+  activeMs: number;
+  modelMs: number;
+  toolMs: number;
+  modelRequests: number;
+  toolCalls: number;
+  fileChanges: number;
+  testsRun: number;
+  testsPassed: number;
+  testsFailed: number;
+  buildsRun: number;
+  buildsFailed: number;
+  tokenInput: number | null;
+  tokenOutput: number | null;
+  models: { model: string; sessions: number }[];
+  lastActivityAt: string | null;
+  sharePct: number;
+}
+
+export interface TierBDay {
+  date: string;
+  provider: string;
+  billableRequests: number | null;
+  chatRequests: number | null;
+  agentRequests: number | null;
+  completions: number | null;
+  suggestions: number | null;
+  acceptances: number | null;
+  linesAdded: number | null;
+  linesDeleted: number | null;
+}
+
+export interface AiProgress {
+  range: { from: string; to: string };
+  providers: ProviderProgress[];
+  tierBDaily: TierBDay[];
+  coverage: { gapCount: number; gapMs: number; observedSpanMs: number; observedPct: number | null };
+}
+
+export interface ProgressTimeline {
+  date: string;
+  timezone: string;
+  hours: {
+    hour: number;
+    byProvider: Record<string, { modelRequests: number; toolCalls: number; fileChanges: number; checks: number; failures: number }>;
+    coverageEvents: number;
+  }[];
+  sessions: {
+    id: string;
+    provider: string;
+    startedAt: string;
+    endedAt: string | null;
+    activeMs: number;
+    classification: string;
+    coverageState: string;
+  }[];
+}
+
+export interface LivePerson {
+  developerId: string;
+  displayName: string;
+  provider: string | null;
+  sessionState: "active" | "recent";
+  lastEventAt: string | null;
+  lastModel: string | null;
+  lastTool: string | null;
+  eventsThisHour: number;
 }

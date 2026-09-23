@@ -325,11 +325,13 @@ export async function listSessions(f: SessionListFilters): Promise<{
   };
 }
 
+export const LATE_EVENT_MS = 5 * 60 * 1000;
+
 export interface SessionDetail {
   session: SessionRow;
   project: { id: string; name: string } | null;
   workItem: { id: string; title: string } | null;
-  events: ActivityEvent[];
+  events: (ActivityEvent & { late?: boolean })[];
   contextChanges: {
     version: number;
     projectId: string | null;
@@ -359,7 +361,7 @@ export async function getSessionDetail(
   const [eventRows, projectRows, workItemRows, prevRows, nextRows] =
     await Promise.all([
       db
-        .select({ payload: activityEvents.payload })
+        .select({ payload: activityEvents.payload, receivedAt: activityEvents.receivedAt, occurredAt: activityEvents.occurredAt })
         .from(activityEvents)
         .where(
           and(
@@ -422,7 +424,13 @@ export async function getSessionDetail(
     workItem: workItemRows[0]
       ? { id: workItemRows[0].id, title: workItemRows[0].title }
       : null,
-    events: eventRows.map((r) => r.payload as ActivityEvent),
+    // received_at vs occurred_at (§11): an event that arrived more than five
+    // minutes after it happened is flagged late — e.g. uploaded after an outage.
+    events: eventRows.map((r) => ({
+      ...(r.payload as ActivityEvent),
+      received_at: r.receivedAt.toISOString(),
+      late: r.receivedAt.getTime() - r.occurredAt.getTime() > LATE_EVENT_MS,
+    })),
     contextChanges: contextChanges.rows.map((r) => ({
       version: r.version,
       projectId: r.project_id,

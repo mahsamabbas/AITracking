@@ -81,6 +81,8 @@ export default function SessionDetailPage() {
   }
 
   const meta = providerMeta(s?.provider);
+  // Hook-only providers report agent turns, not individual model calls.
+  const turnTiming = Boolean(d?.capability?.missing.includes("model_call_timing"));
   const classification = classificationOf(s?.classification ?? "exploration");
 
   return (
@@ -205,10 +207,12 @@ export default function SessionDetailPage() {
                     totalLabel="Elapsed session span"
                     bands={[
                       {
-                        label: "Model execution",
+                        label: turnTiming ? "Agent turns (prompt → stop)" : "Model execution",
                         ms: s.modelDurationMs,
                         color: "var(--chart-1)",
-                        help: "Sum of model request durations, clipped to this session.",
+                        help: turnTiming
+                          ? `${meta.label} does not report individual model calls. This is the time from each prompt to the agent stopping, which includes tool time.`
+                          : "Sum of model API call durations, clipped to this session.",
                       },
                       {
                         label: "Tool & check execution",
@@ -232,7 +236,7 @@ export default function SessionDetailPage() {
                   />
                   <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-xs">
                     {[
-                      ["Model duration", formatDuration(s.modelDurationMs)],
+                      [turnTiming ? "Agent-turn duration" : "Model duration", formatDuration(s.modelDurationMs)],
                       ["Tool duration", formatDuration(s.toolDurationMs)],
                       ["Merged active", formatDuration(s.activeDurationMs)],
                       ["Interactive span", formatDuration(s.interactiveSpanMs)],

@@ -6,7 +6,15 @@ export const Providers = {
   cursor: "cursor",
   github_copilot: "github_copilot",
   vscode: "vscode",
+  antigravity: "antigravity",
 } as const;
+
+/** Every provider id the API accepts on registration, heartbeats, and events. */
+export const KNOWN_PROVIDERS = Object.values(Providers) as string[];
+
+export function isKnownProvider(id: string | null | undefined): id is ProviderId {
+  return Boolean(id) && KNOWN_PROVIDERS.includes(id as string);
+}
 
 export type ProviderId = (typeof Providers)[keyof typeof Providers];
 
@@ -83,6 +91,19 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
       "Provider does not expose this metric. Copilot organization reports are daily-only.",
     note: "Tier B: GitHub reports aggregate per day, so hourly and session metrics are unavailable.",
   },
+  antigravity: {
+    id: "antigravity",
+    label: "Google Antigravity",
+    tier: "A",
+    hourly: true,
+    // Hooks fire around every model invocation and tool call (real per-call
+    // timing), but carry no token counts; Antigravity has no OTel exporter.
+    missing: ["token_totals"],
+    emptyState:
+      "Antigravity hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Antigravity hooks (~/.gemini/config/hooks.json): model invocations with per-call timing, tool calls, and model names. No token totals.",
+  },
   vscode: {
     id: "vscode",
     label: "VS Code companion",
@@ -111,5 +132,6 @@ export function providerFromHostApp(appName: string | undefined): ProviderId {
   if (n.includes("cursor")) return "cursor";
   if (n.includes("visual studio code") || n === "vscode") return "vscode";
   if (n.includes("claude")) return "claude_code";
+  if (n.includes("antigravity")) return "antigravity";
   return "cursor";
 }

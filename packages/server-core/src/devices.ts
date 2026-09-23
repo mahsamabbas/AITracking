@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { providerLabel } from "@techlio/event-schema";
+import { isKnownProvider, providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
 import { devAffordancesEnabled } from "./runtime.js";
 import { auditLog, connectorHealth, devices } from "./schema.js";
@@ -203,9 +203,11 @@ export async function recordLiveHeartbeat(input: {
   paused?: boolean;
   provider?: string | null;
   tokenHash?: string;
+  capabilities?: unknown;
 }): Promise<void> {
   const now = new Date();
-  const provider = input.provider ?? null;
+  const provider = isKnownProvider(input.provider) ? input.provider : null;
+  const capabilities = sanitizeCapabilityReport(input.capabilities);
 
   await db
     .insert(devices)
@@ -236,6 +238,8 @@ export async function recordLiveHeartbeat(input: {
       queueDepth: input.queueDepth ?? 0,
       paused: input.paused ? 1 : 0,
       provider,
+      capabilities,
+      capabilitiesAt: capabilities ? now : null,
     })
     .onConflictDoUpdate({
       target: connectorHealth.deviceId,
@@ -245,6 +249,48 @@ export async function recordLiveHeartbeat(input: {
         queueDepth: input.queueDepth ?? 0,
         paused: input.paused ? 1 : 0,
         provider,
+        ...(capabilities ? { capabilities, capabilitiesAt: now } : {}),
       },
     });
+}
+
+export interface ProviderCapabilityReport {
+  missing: string[];
+  sources: string[];
+  lastEventAt: string | null;
+}
+
+const KNOWN_AREAS = new Set([
+  "session_boundaries",
+  "model_request",
+  "model_call_timing",
+  "tool_calls",
+  "token_totals",
+  "hourly_summary",
+]);
+
+/**
+ * Keeps only known providers, known capability areas, and known sources, so a
+ * connector cannot write arbitrary JSON into the dashboard.
+ */
+export function sanitizeCapabilityReport(
+  raw: unknown,
+): { providers: Record<string, ProviderCapabilityReport>; claudeOtelConfigured: boolean } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as { providers?: Record<string, unknown>; claudeOtelConfigured?: unknown };
+  if (!r.providers || typeof r.providers !== "object") return null;
+  const providers: Record<string, ProviderCapabilityReport> = {};
+  for (const [id, value] of Object.entries(r.providers)) {
+    if (!isKnownProvider(id) || !value || typeof value !== "object") continue;
+    const v = value as { missing?: unknown; sources?: unknown; lastEventAt?: unknown };
+    const missing = Array.isArray(v.missing)
+      ? v.missing.filter((m): m is string => typeof m === "string" && KNOWN_AREAS.has(m))
+      : [];
+    const sources = Array.isArray(v.sources)
+      ? v.sources.filter((m): m is string => ["hook", "otel", "companion", "provider_api"].includes(String(m))).map(String)
+      : [];
+    const last = typeof v.lastEventAt === "string" && !Number.isNaN(Date.parse(v.lastEventAt)) ? v.lastEventAt : null;
+    providers[id] = { missing, sources, lastEventAt: last };
+  }
+  return { providers, claudeOtelConfigured: r.claudeOtelConfigured === true };
 }

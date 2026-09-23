@@ -80,6 +80,9 @@ export const connectorHealth = pgTable("connector_health", {
   queueDepth: integer("queue_depth"),
   paused: integer("paused").default(0),
   provider: text("provider"),
+  /** FR-012 — per-provider capability report from the connector. */
+  capabilities: jsonb("capabilities"),
+  capabilitiesAt: timestamp("capabilities_at", { withTimezone: true }),
 });
 
 export const devices = pgTable("devices", {

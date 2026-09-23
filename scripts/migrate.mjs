@@ -85,6 +85,18 @@ function dsnIsParseable(dsn) {
 }
 
 /** Split a postgres DSN even when the password contains @ : / # (new URL() fails). */
+/** Local Postgres (Docker) has no TLS; hosted Postgres requires it. */
+function sslFor(dsn) {
+  try {
+    const u = new URL(dsn);
+    if (u.searchParams.get("sslmode") === "disable") return false;
+    if (["localhost", "127.0.0.1", "::1", "postgres"].includes(u.hostname)) return false;
+  } catch {
+    /* fall through */
+  }
+  return { rejectUnauthorized: false };
+}
+
 function parsePostgresDsn(raw) {
   const dsn = normalizeDsn(raw);
   if (!dsn) return null;
@@ -100,7 +112,7 @@ function parsePostgresDsn(raw) {
       user: decodeURIComponent(parsed.username),
       password: decodeURIComponent(parsed.password),
       database: database || "neondb",
-      ssl: { rejectUnauthorized: false },
+      ssl: sslFor(dsn),
     };
   }
   const match = dsn.match(

@@ -68,6 +68,14 @@ export function EventTimeline({
                 {failed ? (
                   <span className="badge-bad">failed</span>
                 ) : null}
+                {e.late ? (
+                  <span
+                    className="badge-warn"
+                    title={`Received ${e.received_at ? new Date(e.received_at).toLocaleString() : "later"} — after an outage or offline period. Hourly figures were recalculated as a new version.`}
+                  >
+                    arrived late
+                  </span>
+                ) : null}
               </div>
               {summary ? <p className="hint truncate">{summary}</p> : null}
             </div>

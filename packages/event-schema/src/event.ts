@@ -71,6 +71,11 @@ export const MetadataSchema = z
     total_accepts: z.number().int().nonnegative().optional(),
     total_rejects: z.number().int().nonnegative().optional(),
     capabilities_missing: z.string().max(256).optional(),
+    /** Where the event came from — lineage for every derived metric. */
+    telemetry_source: z.enum(["hook", "otel", "provider_api", "companion", "connector"]).optional(),
+    /** Prompt-cache token counts reported by OpenTelemetry (never content). */
+    cache_read_tokens: z.number().int().nonnegative().optional(),
+    cache_creation_tokens: z.number().int().nonnegative().optional(),
   })
   .strict();
 

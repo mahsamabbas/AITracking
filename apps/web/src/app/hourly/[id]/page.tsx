@@ -106,7 +106,11 @@ export default function HourlyDetailPage() {
                 <MetricGrid
                   columns={5}
                   metrics={[
-                    { label: "Model duration", value: formatDuration(m.modelDurationMs) },
+                    {
+                      label: "Model duration",
+                      value: formatDuration(m.modelDurationMs),
+                      help: "For hook-only providers (Cursor, and Claude Code without OpenTelemetry) this is agent-turn time — prompt to stop, including tools — not individual model calls.",
+                    },
                     { label: "Tool duration", value: formatDuration(m.toolDurationMs) },
                     {
                       label: "Merged active",
