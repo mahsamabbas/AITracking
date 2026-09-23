@@ -25,7 +25,10 @@ pnpm db:seed        # 90 days of realistic telemetry for a 12-person org
 pnpm dev            # API :3001, web :3000, connector :9477
 ```
 
-Then open <http://localhost:3000> and sign in.
+Then open <http://localhost:3000> and sign in. These accounts exist **only in
+local dev mode** (`pnpm dev` sets `TECHLIO_DEV_MODE=1`); a hosted API refuses
+them and migration 008 disables them in any existing database. Production
+starts with `pnpm admin:create` — see `docs/DEPLOY.md`.
 
 | Portal | Email | Password | Lands on |
 |--------|-------|----------|----------|
@@ -117,10 +120,11 @@ cases the product must handle — stale and offline connectors, a paused one, a
 person with no telemetry at all, unassigned sessions, coverage gaps mid-session,
 failed tests and builds, weekend and idle patterns.
 
-Because seeded heartbeats are static, fake connector online states are **off**
-during local `pnpm dev`. Set `DEMO_CONNECTOR_KEEPALIVE=1` only if you need the
-sample org to look live. The developer login (Alex) is never seeded with fake
-sessions — that identity is the machine running the local connector.
+The seed refuses to run outside dev mode or against a non-local database.
+Seeded heartbeats go stale honestly — nothing re-anchors them — and it does not
+fabricate token totals that real hooks cannot report. The developer login (Alex)
+is never seeded with fake sessions; that identity is the machine running the
+local connector. Production starts empty: see `docs/DEPLOY.md`.
 
 ## Privacy posture
 

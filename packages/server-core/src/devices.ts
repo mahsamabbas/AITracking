@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
+import { devAffordancesEnabled } from "./runtime.js";
 import { auditLog, connectorHealth, devices } from "./schema.js";
 import { DEV_DEVELOPER_ALEX, DEV_ORG } from "./users.js";
 
@@ -49,7 +50,7 @@ export async function verifyDeviceToken(
   deviceId: string,
   token: string,
 ): Promise<{ ok: boolean; organizationId?: string; developerId?: string }> {
-  if (token === "dev-device-token") {
+  if (token === "dev-device-token" && devAffordancesEnabled()) {
     return {
       ok: true,
       organizationId: DEV_ORG,
@@ -128,7 +129,7 @@ export async function listOrgDevices(organizationId: string) {
   return db
     .select()
     .from(devices)
-    .where(eq(devices.organizationId, organizationId));
+    .where(and(eq(devices.organizationId, organizationId), eq(devices.kind, "connector")));
 }
 
 export async function listDeveloperDevices(
@@ -143,6 +144,7 @@ export async function listDeveloperDevices(
         eq(devices.organizationId, organizationId),
         eq(devices.developerId, developerId),
         isNull(devices.revokedAt),
+        eq(devices.kind, "connector"),
       ),
     );
 }
@@ -234,7 +236,6 @@ export async function recordLiveHeartbeat(input: {
       queueDepth: input.queueDepth ?? 0,
       paused: input.paused ? 1 : 0,
       provider,
-      demoState: null,
     })
     .onConflictDoUpdate({
       target: connectorHealth.deviceId,
@@ -244,36 +245,6 @@ export async function recordLiveHeartbeat(input: {
         queueDepth: input.queueDepth ?? 0,
         paused: input.paused ? 1 : 0,
         provider,
-        demoState: null,
       },
     });
-
-  await db.execute(sql`
-    UPDATE connector_health AS ch
-    SET last_heartbeat = NULL,
-        demo_state = 'offline'
-    FROM devices AS sibling
-    WHERE sibling.id = ch.device_id
-      AND sibling.developer_id = ${input.developerId}
-      AND sibling.id <> ${input.deviceId}
-      AND sibling.revoked_at IS NULL
-      AND ch.demo_state IS NOT NULL
-      AND ch.demo_state <> 'offline'
-  `);
-
-  if (provider) {
-    await db.execute(sql`
-      UPDATE devices
-      SET revoked_at = ${now}
-      WHERE developer_id = ${input.developerId}
-        AND organization_id = ${input.organizationId}
-        AND id <> ${input.deviceId}
-        AND revoked_at IS NULL
-        AND provider = ${provider}
-        AND EXISTS (
-          SELECT 1 FROM connector_health ch
-          WHERE ch.device_id = devices.id AND ch.demo_state IS NOT NULL
-        )
-    `);
-  }
 }

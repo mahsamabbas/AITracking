@@ -80,8 +80,6 @@ export const connectorHealth = pgTable("connector_health", {
   queueDepth: integer("queue_depth"),
   paused: integer("paused").default(0),
   provider: text("provider"),
-  /** Demo-only: the state seeded data is meant to show. NULL for real connectors. */
-  demoState: text("demo_state"),
 });
 
 export const devices = pgTable("devices", {
@@ -92,6 +90,8 @@ export const devices = pgTable("devices", {
   publicKey: text("public_key"),
   provider: text("provider"),
   label: text("label"),
+  /** "connector" (heartbeating install) or "provider_pull" (Tier B report source). */
+  kind: text("kind").notNull().default("connector"),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });

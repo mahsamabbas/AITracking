@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { providerLabel, type ActivityEvent } from "@techlio/event-schema";
 import { db } from "./db.js";
+import { devAffordancesEnabled } from "./runtime.js";
 import { computeSessionMetrics } from "./sessions.js";
 import { DEMO_USERS, DEV_DEVICE_ALEX, DEV_ORG } from "./users.js";
 import { finalizeHourForDeveloper } from "./hourly.js";
@@ -173,10 +174,34 @@ export interface SeedResult {
   snapshots: number;
 }
 
+/**
+ * Demo data is local-only. It refuses to run without dev mode, or against any
+ * database that is not on this machine — it deletes and rewrites the org.
+ */
+export function assertSeedTargetIsLocal(): void {
+  if (!devAffordancesEnabled()) {
+    throw new Error("Refusing to seed: demo data requires TECHLIO_DEV_MODE=1 on a non-hosted runtime.");
+  }
+  const url = process.env.DATABASE_URL ?? "postgres://techlio:techlio@localhost:5432/techlio_activity";
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error("Refusing to seed: DATABASE_URL is not a valid URL.");
+  }
+  const local = ["localhost", "127.0.0.1", "::1", "postgres", "host.docker.internal"];
+  if (!local.includes(host)) {
+    throw new Error(
+      `Refusing to seed remote database host "${host}". Demo data must never reach a shared or production database.`,
+    );
+  }
+}
+
 export async function seedDemoOrganization(options?: {
   days?: number;
   seed?: number;
 }): Promise<SeedResult> {
+  assertSeedTargetIsLocal();
   const days = options?.days ?? 45;
   const rnd = mulberry32(options?.seed ?? 20260919);
   const orgId = DEV_ORG;
@@ -203,8 +228,7 @@ export async function seedDemoOrganization(options?: {
       'Techlio',
       'UTC',
       ${JSON.stringify({
-        cursor: { monthlyTokenBudget: 5_000_000 },
-        claude_code: { monthlyTokenBudget: 2_000_000 },
+        cursor: { monthlyRequestBudget: 500 },
       })}::jsonb
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -278,21 +302,14 @@ export async function seedDemoOrganization(options?: {
         if (p.connector === "offline") lastHeartbeat = null;
         if (p.connector === "paused") paused = 1;
       }
-      // Alex's extra seeded tools (Claude Code, …) must not look like a live
-      // process. The local connector is Cursor-only unless another host reports in.
-      let demoState: string | null = isPrimary ? p.connector : "online";
-      if (isLiveEmployee && !isPrimary) {
-        demoState = "offline";
-        lastHeartbeat = null;
-      }
-      if (isLiveEmployee && isPrimary) {
-        demoState = null;
-        lastHeartbeat = null;
-      }
+      // Seeded heartbeats are a snapshot at seed time. They go stale honestly
+      // afterwards — nothing re-anchors them. The live developer's rows start
+      // empty so only the real local connector can mark them online.
+      if (isLiveEmployee) lastHeartbeat = null;
       await db.execute(sql`
-        INSERT INTO connector_health (device_id, organization_id, last_heartbeat, version, queue_depth, paused, provider, demo_state)
+        INSERT INTO connector_health (device_id, organization_id, last_heartbeat, version, queue_depth, paused, provider)
         VALUES (${deviceId}, ${orgId}, ${lastHeartbeat}, '0.4.2',
-                ${paused === 1 ? 14 : Math.floor(rnd() * 3)}, ${paused}, ${prov.provider}, ${demoState})
+                ${paused === 1 ? 14 : Math.floor(rnd() * 3)}, ${paused}, ${prov.provider})
       `);
     }
     employees.push({ ...p, id, devices });
@@ -406,8 +423,6 @@ export async function seedDemoOrganization(options?: {
               metadata: {
                 model_name: model,
                 provider_name: provider,
-                token_input: 900 + Math.floor(rnd() * 14000),
-                token_output: 200 + Math.floor(rnd() * 3400),
               },
             }, base);
           }

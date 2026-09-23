@@ -4,7 +4,8 @@
  * Double-click starts the local connector. Employees never need this repo.
  */
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -73,9 +74,65 @@ function writeMacApp(binaryPath, stageDir) {
 </dict></plist>
 `,
   );
-  spawnSync("codesign", ["--force", "--sign", "-", join(stageDir, "Techlio Connector.app")], {
+  codesignApp(join(stageDir, "Techlio Connector.app"));
+}
+
+// --- Signing -------------------------------------------------------------
+// Local builds are ad-hoc signed ("-"), which macOS Gatekeeper blocks for
+// downloaded apps. Distribution builds must pass --release with real
+// credentials:
+//   APPLE_SIGNING_IDENTITY  "Developer ID Application: Techlio (TEAMID)"
+//   APPLE_NOTARY_PROFILE    keychain profile created with `xcrun notarytool store-credentials`
+//   WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD  Authenticode cert, signed via osslsigncode
+const RELEASE = process.argv.includes("--release");
+const APPLE_ID = process.env.APPLE_SIGNING_IDENTITY;
+const NOTARY = process.env.APPLE_NOTARY_PROFILE;
+const WIN_PFX = process.env.WINDOWS_CERT_PFX;
+const WIN_PASS = process.env.WINDOWS_CERT_PASSWORD;
+
+if (RELEASE && (!APPLE_ID || !NOTARY || !WIN_PFX || !WIN_PASS)) {
+  console.error(
+    "--release requires APPLE_SIGNING_IDENTITY, APPLE_NOTARY_PROFILE, WINDOWS_CERT_PFX and WINDOWS_CERT_PASSWORD. Refusing to publish unsigned installers.",
+  );
+  process.exit(1);
+}
+
+function codesignApp(appPath) {
+  const args = APPLE_ID
+    ? ["--force", "--deep", "--options", "runtime", "--timestamp", "--sign", APPLE_ID, appPath]
+    : ["--force", "--sign", "-", appPath];
+  const r = spawnSync("codesign", args, { stdio: "inherit" });
+  if (APPLE_ID && r.status !== 0) {
+    console.error(`codesign failed for ${appPath}`);
+    process.exit(1);
+  }
+}
+
+function notarize(dmgPath) {
+  if (!NOTARY) return;
+  const submit = spawnSync("xcrun", ["notarytool", "submit", dmgPath, "--keychain-profile", NOTARY, "--wait"], {
     stdio: "inherit",
   });
+  if (submit.status !== 0) {
+    console.error(`Notarization failed for ${dmgPath}`);
+    process.exit(1);
+  }
+  spawnSync("xcrun", ["stapler", "staple", dmgPath], { stdio: "inherit" });
+}
+
+function signWindows(exePath) {
+  if (!WIN_PFX) return;
+  const signed = `${exePath}.signed`;
+  const r = spawnSync(
+    "osslsigncode",
+    ["sign", "-pkcs12", WIN_PFX, "-pass", WIN_PASS ?? "", "-h", "sha256", "-t", "http://timestamp.digicert.com", "-in", exePath, "-out", signed],
+    { stdio: "inherit" },
+  );
+  if (r.status !== 0) {
+    console.error(`Authenticode signing failed for ${exePath}`);
+    process.exit(1);
+  }
+  renameSync(signed, exePath);
 }
 
 function writeDmg(stageDir, dmgPath) {
@@ -99,6 +156,7 @@ function writeDmg(stageDir, dmgPath) {
     console.error(`Failed to create ${dmgPath}`);
     process.exit(created.status ?? 1);
   }
+  notarize(dmgPath);
 }
 
 const arm = join(downloads, "techlio-connector-macos-arm64");
@@ -121,6 +179,8 @@ for (const [binary, dmgName, stageName] of [
   writeDmg(stage, join(downloads, dmgName));
 }
 
+signWindows(join(downloads, "techlio-connector-win-x64.exe"));
+
 const extBuild = spawnSync("pnpm", ["--filter", "techlio-activity-companion", "run", "build"], {
   cwd: root,
   stdio: "inherit",
@@ -134,4 +194,13 @@ if (extBuild.status === 0) {
   if (vsix.status !== 0) console.warn("Companion extension package failed; the connector executable is still usable.");
 }
 
+// Published checksums let IT and the installer verify what was downloaded.
+const sums = readdirSync(downloads)
+  .filter((f) => /\.(dmg|exe|vsix|zip)$|^techlio-connector/.test(f) && !f.endsWith(".txt"))
+  .map((f) => `${createHash("sha256").update(readFileSync(join(downloads, f))).digest("hex")}  ${f}`);
+writeFileSync(join(downloads, "SHA256SUMS.txt"), `${sums.join("\n")}\n`);
+
 console.log("Executables are in", downloads);
+if (!APPLE_ID || !WIN_PFX) {
+  console.warn("WARNING: these installers are NOT signed for distribution (ad-hoc/unsigned). Use --release with signing credentials before publishing.");
+}

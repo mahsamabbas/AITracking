@@ -6,9 +6,8 @@ import {
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
-import { getDevice, verifyDeviceToken } from "@techlio/server-core";
+import { devAffordancesEnabled, getDevice, verifyDeviceToken } from "@techlio/server-core";
 import { ingestBatch } from "./services/ingest.js";
-import { DEV_ORG } from "./constants.js";
 import { verifyBatchSignature } from "./signatures.js";
 
 @Controller("v1/events")
@@ -32,14 +31,13 @@ export class EventsController {
     const verified = await verifyDeviceToken(deviceId, token);
     if (!verified.ok) throw new UnauthorizedException("invalid_token");
 
-    const orgId = events?.[0]?.organization_id ?? verified.organizationId ?? DEV_ORG;
-    if (orgId !== verified.organizationId) {
+    const orgId = verified.organizationId;
+    if (!orgId || (events?.[0]?.organization_id && events[0].organization_id !== orgId)) {
       throw new UnauthorizedException("org_mismatch");
     }
 
     const device = await getDevice(orgId, deviceId);
-    const isLocalDevBypass =
-      token === "dev-device-token" && process.env.NODE_ENV !== "production";
+    const isLocalDevBypass = token === "dev-device-token" && devAffordancesEnabled();
     if (!isLocalDevBypass) {
       if (!device?.publicKey || !signature) {
         throw new UnauthorizedException("signed_batch_required");

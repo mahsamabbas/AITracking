@@ -2,25 +2,17 @@ import { Badge } from "@/components/ui/Badge";
 import { CONNECTOR_STATE, classificationOf, type ConnectorState } from "@/lib/vocab";
 import { providerMeta } from "@/lib/providers";
 
-export function ConnectorBadge({
-  state,
-  demo,
-}: {
-  state: ConnectorState;
-  demo?: boolean;
-}) {
-  if (demo && (state === "online" || state === "stale")) {
+export function ConnectorBadge({ state }: { state: ConnectorState }) {
+  const s = CONNECTOR_STATE[state] ?? CONNECTOR_STATE.offline;
+  if (state === "online") {
+    // The only pulsing element in the product: a live heartbeat.
     return (
-      <Badge
-        tone="neutral"
-        dot
-        title="Seeded sample connector. This is not a live process check on this machine."
-      >
-        Demo sample
-      </Badge>
+      <span className="badge-ok" title={s.help}>
+        <span className="pulse-online h-1.5 w-1.5 rounded-full bg-conn-ok" aria-hidden />
+        {s.label}
+      </span>
     );
   }
-  const s = CONNECTOR_STATE[state] ?? CONNECTOR_STATE.offline;
   return (
     <Badge tone={s.tone} dot title={s.help}>
       {s.label}

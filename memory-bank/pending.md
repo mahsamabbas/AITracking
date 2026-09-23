@@ -1,165 +1,80 @@
 # Pending work vs PRD v0.2
 
-Source: [requirements.md](requirements.md).  
-Last reviewed: 2026-09-21 (delivery-phase audit and integrity pass).
+Source: [requirements.md](requirements.md) · Audit: [docs/PRODUCTION_TRUTH_AUDIT.md](../docs/PRODUCTION_TRUTH_AUDIT.md)
+Last reviewed: 2026-09-23 (production-truth audit).
+
+Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
+(needs an external decision, purchase, or evidence). Nothing is "partial".
 
 ---
 
-## Current prioritized pending list
+## P0 — blocks pilot or production approval
 
-### P0 — blocks pilot or production approval
+| Item | Status | Notes |
+|------|--------|-------|
+| Remove auth bypasses (header auth, demo passwords, `dev-device-token`, default JWT secret) | **Done** | Fail-closed `TECHLIO_DEV_MODE`; migration 008; boot refuses weak secrets |
+| Production credential hygiene after the bypasses | **Blocked — owner action** | Create real admin, deploy 008–011, rotate `JWT_SECRET` + DB password, review audit log, decide on git-history purge (audit §5) |
+| Legal/HR approval of notice, consent, retention, access, pause, dispute, jurisdiction (SEC-007/010) | **Blocked — legal** | Notice is still a draft; do not start a pilot without it |
+| Phase 0 live Claude Code validation, recorded | **Open** | Hooks are proven live locally (2026-09-23); a sanitized, documented pilot session is still required |
+| §19 live integration tests (offline queue, heartbeat stop, pause, late event, invalid signature, replay, provider-missing UI) in CI | **Open** | Manual verification done for pause/resume/gap; automated suite not written (~3 d) |
+| TLS + managed encryption at rest for Postgres, Redis, backups, exports (SEC-003) | **Blocked — infrastructure** | Neon/Vercel provide TLS + at-rest encryption; needs written confirmation and a backup-encryption decision |
+| SSO/OIDC (FR-001) | **Open** | ~3–5 d; password login remains, now scrypt-hashed |
+| Signed connector installers | **Blocked — certificates** | Apple Developer ID + notarization, Authenticode. Tooling done (`--release`) |
 
-- [ ] Obtain Legal/HR approval for the monitoring notice, consent, retention,
-  access, pause, dispute, client-confidentiality, jurisdiction, and cross-border
-  policy (SEC-007/010).
-- [ ] Run and document one real sanitized Claude Code validation session,
-  including hooks/OTel, model/tool/test/file/token coverage, licensing, and
-  supported operating systems (Phase 0).
-- [ ] Add live integration tests for offline queue recovery, heartbeat stop,
-  pause/resume, late-event recalculation, invalid signatures, replay through the
-  API, and provider-missing UI behavior (§19).
-- [ ] Add production TLS and managed encryption at rest for Postgres, Redis,
-  backups, and exports (SEC-003).
-- [ ] Implement production SSO/OIDC and remove development authentication
-  fallbacks (FR-001).
+## P1 — MVP product behaviour
 
-### P1 — complete the MVP product behavior
+| Item | Status | Notes |
+|------|--------|-------|
+| Tier B attribution to the right person | **Done** | Email / explicit identity mapping; unmapped rows skipped |
+| Admin UI for provider identity mapping | **Open** | ~1 d; today via SQL on `employee_provider_identities` |
+| Cursor puller uses real Admin API fields | **Done** | Verified against cursor.com/docs 2026-09-23 |
+| Cursor Analytics endpoints (team DAU, agent edits) | **Deferred** | Field names unverified and team-level rows cannot be attributed to a person; no longer ingested |
+| AI-plan usage truthful (no invented limits, no team fallback, unit-matched) | **Done** | |
+| Claude Code token totals | **Open** | Requires OpenTelemetry ingestion (OTLP routes currently 501); until then tokens are "not reported" |
+| Persist connector-reported capabilities (FR-012) | **Open** | ~1–2 d |
+| Durable server-side ingestion queue vs direct Postgres | **Open — decision** | Record an ADR; connector queue already gives at-least-once |
+| Notifications: unsupported version, prolonged unassigned, summary failure; email/Slack (FR-027) | **Open** | In-app upload-failure and pause/stale/offline alerts are done |
+| FR-024 generated summaries | **Deferred** | Off by decision (open-decisions #9); UI states metrics are deterministic |
+| Hourly completeness includes stale/offline/upload gaps; late delivery exposed | **Open** | Coverage-event hours already partial |
+| Late-event recalculation without Redis | **Done** | Inline fallback |
+| Seven-day internal pilot + report | **Blocked** | After legal approval and signed installers |
 
-- [ ] Decide whether direct Postgres ingestion is the accepted durability
-  boundary; otherwise add a durable server-side ingestion queue.
-- [ ] Persist connector-reported capabilities and use them in health/coverage
-  views instead of relying only on the static provider catalog (FR-012).
-- [x] Surface repeated `upload_failed` (two or more in 24h), `upload_recovered`,
-  and `update_required` on the live overview. Email/Slack delivery is still open.
-- [x] Add per-developer current-hour event count/current context to the team
-  overview (FR-020). Offline or paused connectors with no events stay blank
-  rather than a zero.
-- [x] Wire `/v1/developers/:id/timeline` into an employee-day hourly-card UI
-  (FR-022). Labels use `ORG_TIMEZONE`.
-- [x] Add work-item, coverage-state, and clock-hour filters on session history
-  (FR-026). Event-type filtering already exists on the session detail timeline.
-- [x] Generate a real PDF activity summary (FR-028). CSV remains the full event
-  list. The PDF is an operational count by event type, not a billing document.
-- [ ] Complete notification rules for repeated upload failure, unsupported
-  versions, prolonged unassigned activity, and summary failure; add approved
-  email/Slack delivery if required (FR-027).
-- [ ] Decide FR-024 generated-summary scope. If enabled, add the database model,
-  evidence links, model metadata, versioned corrections, and failure handling.
-- [ ] Make hourly completeness include every relevant stale/offline/upload gap
-  and expose late delivery (`received_at` versus `occurred_at`) explicitly.
-- [x] Apply configured organization timezone (`ORG_TIMEZONE`) to hourly-card labels.
-- [ ] Run the seven-day internal pilot and complete
-  `docs/pilot-report-template.md`.
+## P2 — production hardening
 
-### P2 — production hardening
-
-- [ ] Add approved, time-limited, audited support-access workflow (SEC-004).
-- [ ] Enforce append-only audit records at the database-role/permission level
-  while retaining an approved expiry mechanism (SEC-006/008).
-- [ ] Implement 365-day retention jobs for hourly snapshots and audit records
-  after legal approval (SEC-008).
-- [ ] Add request IDs and idempotency keys to all write APIs where required.
-- [ ] Add operational metrics for event lag, queue depth, rejected events,
-  connector versions, stale heartbeats, hourly job duration, summary failures,
-  and API errors (NFR-005).
-- [ ] Run the 50-developer load test and record dashboard/API p95 results
-  (NFR-003).
-- [ ] Define and monitor the 99.5% pilot availability SLO (NFR-004).
-- [ ] Add automated accessibility checks and complete a WCAG 2.1 AA review
-  (NFR-007).
-- [ ] Add production infrastructure-as-code, environment separation, secret
-  management, and deployment/rollback automation (NFR-008).
-- [ ] Execute and record backup/restore, rollback, incident-response, and
-  disaster-recovery drills using `docs/ops/runbook.md`.
-- [ ] Package and sign macOS/Windows connectors and move local credentials to
-  the OS keychain.
-- [ ] Complete the remaining ADRs for identity, privacy, storage,
-  sessionization, hourly aggregation, and live updates.
-- [ ] Implement Codex/Gemini adapters only after Claude Code passes the real
-  pilot; configure Cursor/Copilot Tier B pullers only with approved Enterprise
-  credentials.
+| Item | Status | Notes |
+|------|--------|-------|
+| Connector as a real per-user service (macOS LaunchAgent, Windows task w/ restart, Linux systemd) | **Done in code** | Needs verification on clean Windows and Linux machines, and from the signed DMG |
+| Windows Service (not logon task) | **Open** | After Authenticode certificate |
+| OS credential store for connector secrets | **Done** | Keychain / DPAPI / Secret Service, 0600 fallback |
+| Connector tray / menu-bar health UI | **Open** | ~2–3 d; `--status` and dashboard cover it today |
+| Connector auto-update with signature check | **Open** | ~3 d |
+| Support-access workflow (SEC-004) | **Open** | |
+| DB-enforced append-only audit (SEC-006/008) | **Open** | |
+| 365-day retention for snapshots and audit | **Blocked — legal** | 90-day event retention is done and now org-scoped |
+| Request IDs / idempotency keys on write APIs | **Open** | |
+| Operational metrics (NFR-005), availability SLO (NFR-004) | **Open** | |
+| 50-developer load test (NFR-003) | **Open** | |
+| WCAG 2.1 AA automated checks + review (NFR-007) | **Open** | |
+| IaC, environment separation, DR drills (NFR-008) | **Open** | Runbook exists; drills not executed |
+| Remaining ADRs (identity, privacy, storage, sessionization, hourly, live updates) | **Open** | |
+| Codex / Gemini adapters | **Deferred** | Only after Claude Code passes the pilot |
 
 ---
 
-## Policy & gates (unchanged — human/legal)
+## Policy & gates
 
 | Item | Status |
 |------|--------|
-| Monitoring notice approved (SEC-007) | Draft only (shown in Policy) |
-| Legal / HR (SEC-010) | Not done |
-| Section 21 open decisions | Partial — `docs/policy/open-decisions.md` |
-| Phase 0 live Claude validation | Not done |
-| 7-day pilot + report (§20) | Not done |
-| Definition of Done (§22) | Not met (legal + production ops) |
+| Monitoring notice approved (SEC-007) | Blocked — draft only |
+| Legal / HR (SEC-010) | Blocked |
+| Section 21 open decisions | Open — `docs/policy/open-decisions.md` |
+| Definition of Done (§22) | Not met |
 
----
-
-## Prototype portals (resolved this pass)
+## Portals (unchanged)
 
 | Role | Sees | Cannot see |
 |------|------|------------|
-| **Administrator** | Users, connector register/revoke, policy/retention, audit, team overview | Other organizations |
-| **Manager** | Team overview (all org developers), hourly timelines, filters, in-app alerts, CSV/PDF export | User admin, credential issue/revoke, audit log |
-| **Developer** | Own connector, own events, own hourly cards, pause/resume, collection notice | Other developers (e.g. Sam vs Alex), exports, audit, user admin |
-| **Auditor** | Live `audit_log`, connector health (read), policy/retention | Developer timelines, hourly drill-down, exports, mutations |
-
----
-
-## Functional requirements — remaining (not prototype-local)
-
-| ID | Status |
-|----|--------|
-| FR-001 | **Partial** — JWT portals; production SSO/OIDC still pending |
-| FR-006 | **Partial** — Claude hooks; Cursor companion/daily only; Codex/Gemini adapters pending |
-| FR-007 | **Done locally** — register/revoke, token hash, activation key binding, API Ed25519 verification |
-| FR-024 | **Deferred** — UI explains deterministic metrics only |
-| FR-027 | **Partial** — in-app alerts including repeated upload failure and update required; no email/Slack |
-| FR-028 | **Done locally** — CSV event list and a real PDF summary (not a billing layout) |
-
-FR-020, FR-021, FR-022, and the session filters in FR-026 are done in the local
-prototype. FR-025 session drill-down is done. Production SSO, live Claude
-validation, and the seven-day pilot remain open.
-
-FR-002/003/004/005 are implemented for the local prototype (RBAC on routes, org-scoped queries, developer self-view, pause → coverage gap).
-
----
-
-## Security / NFR / ops — remaining
-
-- SEC-003 TLS + encryption at rest (prod)
-- SEC-004 support access workflow
-- SEC-006 append-only audit **DB role** enforcement
-- NFR-003–005 load/SLO/OTel metrics
-- NFR-007 WCAG 2.1 AA audit
-- NFR-008 Terraform and executed backup/restore/rollback/incident drills
-
----
-
-## Tests (§19) — remaining integration
-
-Automated: interval overlap merge, idle exclusion from the interactive span,
-session classification, null (not zero) token totals, coverage-gap detection,
-date-range resolution, secrets, unassigned, provider-missing, timesheet reject,
-unauthorized developer view, auditor denied timeline, secret scan.
-
-Also automated: encrypted queue peek/ack semantics, exact-body Ed25519
-verification with tamper rejection, and in-process duplicate-event replay
-rejection.
-
-Still need **live integration**: offline connector, long idle, late event E2E, heartbeat stop, pause E2E, replay against API, provider-missing full UI.
-
----
-
-## Tier B & packaging
-
-- Schedule Cursor/Copilot pullers in worker with real Enterprise tokens
-- macOS/Windows signed connector, OS keychain (`keytar`)
-- Full OTLP pipeline
-
----
-
-## Deliverables
-
-- Remaining ADRs and executed ops/DR evidence
-- `docs/ops/runbook.md` is the local baseline; production drills are not done.
-- `docs/pilot-report-template.md` exists; the seven-day pilot has not started.
+| Administrator | Users, connectors, policy, audit, org analytics | Other organisations |
+| Manager | Org analytics, employees, sessions, alerts, exports | User admin, credentials, audit |
+| Developer | Own analytics, own connectors, pause/resume, notice | Other people, exports, audit, admin |
+| Auditor | Audit log, connector health, policy | Individual activity, exports, mutations |

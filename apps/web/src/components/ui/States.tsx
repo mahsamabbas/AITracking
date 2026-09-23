@@ -54,12 +54,14 @@ export type EmptyVariant =
   | "paused"
   | "provider-missing"
   | "delayed"
-  | "unassigned";
+  | "unassigned"
+  | "no-employees"
+  | "no-permission";
 
 export function emptyActivityVariant(
-  connectors: { state?: string; isDemo?: boolean }[],
+  connectors: { state?: string }[],
 ): "no-activity" | "paused" | "connector-offline" {
-  const live = connectors.filter((c) => !c.isDemo);
+  const live = connectors;
   const pool = live.length > 0 ? live : connectors;
   if (pool.some((c) => c.state === "online" || c.state === "stale")) {
     return "no-activity";
@@ -71,7 +73,7 @@ export function emptyActivityVariant(
 const EMPTY_COPY: Record<EmptyVariant, { title: string; body: string }> = {
   "no-activity": {
     title: "No activity observed",
-    body: "The connector reported in, but no agent sessions occurred in this period. Cursor chat and completions are not sent here unless the Techlio companion records a save or task.",
+    body: "The connector reported in, but no agent sessions happened in this period. That describes the agent, not the person — planning, review, and manual coding are invisible here.",
   },
   "no-results": {
     title: "No matches",
@@ -96,6 +98,14 @@ const EMPTY_COPY: Record<EmptyVariant, { title: string; body: string }> = {
   unassigned: {
     title: "No task selected",
     body: "Activity in this period was not linked to a project or work item.",
+  },
+  "no-employees": {
+    title: "No employees yet",
+    body: "An administrator adds people under Access and issues each one a connector key. Nothing appears here until a real connector reports in.",
+  },
+  "no-permission": {
+    title: "Outside your access",
+    body: "Your role does not include this view. Developers see their own activity; auditors see access history and configuration.",
   },
 };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useChartAnimation } from "@/lib/use-reduced-motion";
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
 import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
 import { formatDuration } from "@/lib/format";
@@ -16,6 +17,7 @@ export function HourPatternChart({
   height?: number;
   emptyVariant?: EmptyVariant;
 }) {
+  const anim = useChartAnimation();
   const max = Math.max(...data.map((d) => d.activeMs), 0);
   return (
     <ChartFrame height={height} isEmpty={max === 0} emptyVariant={emptyVariant}>
@@ -51,7 +53,7 @@ export function HourPatternChart({
             ) : null
           }
         />
-        <Bar dataKey="activeMs" radius={[3, 3, 0, 0]}>
+        <Bar {...anim} dataKey="activeMs" radius={[3, 3, 0, 0]}>
           {data.map((d) => (
             <Cell
               key={d.hour}

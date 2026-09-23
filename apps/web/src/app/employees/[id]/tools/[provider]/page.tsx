@@ -21,6 +21,7 @@ import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { FilterBar } from "@/components/filters/FilterBar";
+import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
@@ -92,6 +93,13 @@ export default function EmployeeToolPage() {
         </>
       }
     >
+      <ContextBar
+        subject={`${d?.employee.displayName ?? "Employee"} · ${meta.label}`}
+        rangeLabel={rangeLabel(range)}
+        fetchedAt={query.fetchedAt}
+        refreshing={query.refreshing}
+        onRefresh={() => { query.reload() }}
+      />
       <FilterBar>
         <RangePicker value={range} onChange={setRange} />
       </FilterBar>

@@ -29,6 +29,7 @@ import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChanges
 import { EmployeeAiPlanUsage } from "@/components/domain/EmployeeAiPlanUsage";
 import { EventTimeline } from "@/components/domain/EventTimeline";
 import { FilterBar } from "@/components/filters/FilterBar";
+import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
@@ -138,8 +139,7 @@ export default function EmployeeDetailPage() {
       <AppShell title="Employee">
         <Card>
           <EmptyState
-            title="Outside your access scope"
-            body="Your role does not include this employee's individual activity."
+            variant="no-permission"
             action={
               <Link href="/" className="btn-ghost">
                 Back to overview
@@ -151,7 +151,7 @@ export default function EmployeeDetailPage() {
     );
   }
 
-  const worstLive = (d?.devices ?? []).filter((x) => !x.isDemo).find((x) => x.state !== "online");
+  const worstLive = (d?.devices ?? []).find((x) => x.state !== "online");
   const silenceVariant = emptyActivityVariant(d?.devices ?? []);
 
   return (
@@ -179,6 +179,14 @@ export default function EmployeeDetailPage() {
         ) : null
       }
     >
+      <ContextBar
+        subject={d?.employee.displayName ?? "Employee"}
+        rangeLabel={rangeLabel(range)}
+        fetchedAt={query.fetchedAt}
+        live={Boolean(live.data?.generatedAt)}
+        refreshing={query.refreshing || live.refreshing}
+        onRefresh={() => { query.reload(); live.reload(); }}
+      />
       <FilterBar>
         <RangePicker value={range} onChange={setRange} />
       </FilterBar>
@@ -230,7 +238,7 @@ export default function EmployeeDetailPage() {
                 ) : (
                   d.devices.map((dev) => (
                     <span key={dev.deviceId} className="flex items-center gap-1.5">
-                      <ConnectorBadge state={dev.state} demo={dev.isDemo} />
+                      <ConnectorBadge state={dev.state} />
                       <span className="hint">
                         {dev.label ?? dev.provider} · {formatRelative(dev.lastHeartbeat)}
                       </span>
@@ -241,7 +249,7 @@ export default function EmployeeDetailPage() {
             </div>
           </Card>
 
-          {isSelf && d.devices.filter((x) => !x.isDemo).length === 0 ? (
+          {isSelf && d.devices.length === 0 ? (
             <div className="mb-5">
               <Callout
                 tone="warn"
@@ -312,10 +320,6 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
-          <section className="mt-5">
-            <EmployeeAiPlanUsage rows={d.aiSubscriptions ?? []} isSelf={isSelf} />
-          </section>
-
           {/* ---------------- Trend + split ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
@@ -367,24 +371,6 @@ export default function EmployeeDetailPage() {
             </Card>
           </section>
 
-          <section className="mt-5">
-            <ProjectsFileChangesCard
-              trend={d.fileChangeTrend ?? []}
-              workspaces={d.fileChangeWorkspaces ?? []}
-              dailyUsage={d.dailyTrend}
-              totals={{
-                activeMs: t.activeMs,
-                sessions: t.sessions,
-                fileChanges: t.fileChanges,
-              }}
-              subtitle={
-                isSelf
-                  ? "Your AI active time, workspaces your agent edited, and file changes from your connector. Session time is counted per workspace when that folder had file activity."
-                  : "This employee's AI active time, edited workspaces, and file changes from their connector. Session time is counted per workspace when that folder had file activity."
-              }
-            />
-          </section>
-
           {/* ---------------- AI tools ---------------- */}
           <section className="mt-5">
             <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -413,6 +399,106 @@ export default function EmployeeDetailPage() {
                 ))}
               </div>
             )}
+          </section>
+
+
+          {/* ---------------- Projects & file changes ---------------- */}
+          <section className="mt-5">
+            <ProjectsFileChangesCard
+              trend={d.fileChangeTrend ?? []}
+              workspaces={d.fileChangeWorkspaces ?? []}
+              dailyUsage={d.dailyTrend}
+              totals={{
+                activeMs: t.activeMs,
+                sessions: t.sessions,
+                fileChanges: t.fileChanges,
+              }}
+              subtitle={
+                isSelf
+                  ? "Your AI active time, workspaces your agent edited, and file changes from your connector. Session time is counted per workspace when that folder had file activity."
+                  : "This employee's AI active time, edited workspaces, and file changes from their connector. Session time is counted per workspace when that folder had file activity."
+              }
+            />
+          </section>
+
+
+          {/* ---------------- AI subscription usage ---------------- */}
+          <section className="mt-5">
+            <EmployeeAiPlanUsage rows={d.aiSubscriptions ?? []} isSelf={isSelf} />
+          </section>
+
+
+          {/* ---------------- Hourly timeline ---------------- */}
+          <section className="mt-5">
+            <Card>
+              <CardHeader
+                title="Hourly timeline"
+                subtitle={
+                  timeline.data?.timezone
+                    ? `Latest version of each hour · ${timeline.data.timezone}`
+                    : "One card per clock hour, linked to its source events"
+                }
+              />
+              {timeline.error ? (
+                <ErrorState
+                  title="Could not load hourly cards"
+                  detail={timeline.error}
+                  onRetry={timeline.reload}
+                />
+              ) : timeline.loading ? (
+                <LoadingBlock rows={4} />
+              ) : (timeline.data?.hourlyCards.length ?? 0) === 0 ? (
+                <EmptyState
+                  compact
+                  title="No hourly summaries yet"
+                  body="Hourly cards appear after the worker finalises a completed hour. The current hour stays open until it closes."
+                />
+              ) : (
+                <div
+                  className={`grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3 ${
+                    timeline.data!.hourlyCards.length > 6 ? "scroll-y pr-1" : ""
+                  }`}
+                >
+                  {timeline.data!.hourlyCards.map((card) => (
+                    <Link
+                      key={card.id}
+                      href={`/hourly/${card.id}`}
+                      className="rounded-xl border border-line bg-card p-3 transition hover:border-brand-300"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-ink-900">{card.hourLabel}</p>
+                        <span
+                          className={
+                            card.completeness === "complete" ? "badge-ok" : "badge-warn"
+                          }
+                        >
+                          {card.completeness}
+                        </span>
+                      </div>
+                      <p className="hint mt-2">
+                        {formatDuration(card.metrics.mergedActiveDurationMs ?? 0)} active ·{" "}
+                        {card.metrics.eventCount ?? 0} events · {card.metrics.fileChanges ?? 0} file
+                        changes
+                      </p>
+                      <p className="hint">v{card.version}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </section>
+
+          {/* ---------------- Sessions + idle + timeline ---------------- */}
+          <section className="mt-5">
+            <Card>
+              <CardHeader
+                title="Recent sessions"
+                subtitle="Most recent first — open one for its full event trail"
+                href={`/employees/${employeeId}/sessions`}
+                hrefLabel={`All ${d.totalSessions} sessions`}
+              />
+              <SessionTable sessions={d.recentSessions} projectNames={projectNames} />
+            </Card>
           </section>
 
           {/* ---------------- Patterns ---------------- */}
@@ -501,78 +587,6 @@ export default function EmployeeDetailPage() {
                   />
                 )}
               </CardBody>
-            </Card>
-          </section>
-
-          {/* ---------------- Sessions + idle + timeline ---------------- */}
-          <section className="mt-5">
-            <Card>
-              <CardHeader
-                title="Recent sessions"
-                subtitle="Most recent first — open one for its full event trail"
-                href={`/employees/${employeeId}/sessions`}
-                hrefLabel={`All ${d.totalSessions} sessions`}
-              />
-              <SessionTable sessions={d.recentSessions} projectNames={projectNames} />
-            </Card>
-          </section>
-
-          <section className="mt-5">
-            <Card>
-              <CardHeader
-                title="Hourly timeline"
-                subtitle={
-                  timeline.data?.timezone
-                    ? `Latest version of each hour · ${timeline.data.timezone}`
-                    : "One card per clock hour, linked to its source events"
-                }
-              />
-              {timeline.error ? (
-                <ErrorState
-                  title="Could not load hourly cards"
-                  detail={timeline.error}
-                  onRetry={timeline.reload}
-                />
-              ) : timeline.loading ? (
-                <LoadingBlock rows={4} />
-              ) : (timeline.data?.hourlyCards.length ?? 0) === 0 ? (
-                <EmptyState
-                  compact
-                  title="No hourly summaries yet"
-                  body="Hourly cards appear after the worker finalises a completed hour. The current hour stays open until it closes."
-                />
-              ) : (
-                <div
-                  className={`grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3 ${
-                    timeline.data!.hourlyCards.length > 6 ? "scroll-y pr-1" : ""
-                  }`}
-                >
-                  {timeline.data!.hourlyCards.map((card) => (
-                    <Link
-                      key={card.id}
-                      href={`/hourly/${card.id}`}
-                      className="rounded-xl border border-line bg-card p-3 transition hover:border-brand-300"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-ink-900">{card.hourLabel}</p>
-                        <span
-                          className={
-                            card.completeness === "complete" ? "badge-ok" : "badge-warn"
-                          }
-                        >
-                          {card.completeness}
-                        </span>
-                      </div>
-                      <p className="hint mt-2">
-                        {formatDuration(card.metrics.mergedActiveDurationMs ?? 0)} active ·{" "}
-                        {card.metrics.eventCount ?? 0} events · {card.metrics.fileChanges ?? 0} file
-                        changes
-                      </p>
-                      <p className="hint">v{card.version}</p>
-                    </Link>
-                  ))}
-                </div>
-              )}
             </Card>
           </section>
 

@@ -16,7 +16,7 @@ const META: Record<string, ProviderMeta> = {
     color: "#4f46e5",
     soft: "#eef2ff",
     ink: "#3730a3",
-    note: "Observed through the local connector running inside Cursor.",
+    note: "Observed through Cursor agent hooks: agent turns, tool calls, file edits. No token totals.",
   },
   claude_code: {
     id: "claude_code",
@@ -24,7 +24,7 @@ const META: Record<string, ProviderMeta> = {
     color: "#d97706",
     soft: "#fffbeb",
     ink: "#92400e",
-    note: "Observed through Claude Code hooks — full session, model, and tool telemetry.",
+    note: "Observed through Claude Code hooks: agent turns, tool calls, file edits. Token totals need OpenTelemetry, not yet ingested.",
   },
   codex: { id: "codex", label: "Codex", color: "#0d9488", soft: "#f0fdfa", ink: "#115e59" },
   gemini: {

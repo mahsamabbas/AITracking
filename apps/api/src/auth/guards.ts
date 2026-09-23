@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import type { AuthUser, Role } from "@techlio/server-core";
+import { devAffordancesEnabled, type AuthUser, type Role } from "@techlio/server-core";
 import { verifyUserToken } from "./jwt.js";
 import { DEV_DEVELOPER, DEV_ORG } from "../constants.js";
 
@@ -18,6 +18,11 @@ export function userFromRequest(req: FastifyRequest): AuthUser {
     } catch {
       throw new UnauthorizedException("invalid_token");
     }
+  }
+  // Header identity is a local-development convenience only. Outside dev mode
+  // an unauthenticated request never resolves to a user.
+  if (!devAffordancesEnabled()) {
+    throw new UnauthorizedException("token_required");
   }
   const role = (req.headers["x-role"] as string | undefined) ?? "manager";
   return {
@@ -43,7 +48,7 @@ export class DashboardAuthGuard implements CanActivate {
         throw new UnauthorizedException("invalid_token");
       }
     }
-    if (process.env.ALLOW_DEV_HEADER_AUTH === "0") {
+    if (!devAffordancesEnabled()) {
       throw new UnauthorizedException("token_required");
     }
     return true;

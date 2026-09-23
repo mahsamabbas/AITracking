@@ -167,6 +167,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@techlio/event-schema':
+        specifier: workspace:*
+        version: link:../../packages/event-schema
       '@techlio/puller':
         specifier: workspace:*
         version: link:../../packages/puller

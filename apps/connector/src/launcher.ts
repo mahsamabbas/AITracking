@@ -6,6 +6,8 @@
  * download works even when Node.js is not installed:
  *   <exe> --hook [fallbackProvider]   read a hook payload on stdin and report it
  *   <exe> --service                    run in the background without re-installing
+ *   <exe> --status                     print local connector health
+ *   <exe> --uninstall [--purge]        remove the service and hooks (and credentials with --purge)
  */
 function detectProvider(fallback: string): string {
   // Cursor markers win first — Cursor also runs Claude-format hooks, and real
@@ -71,9 +73,20 @@ async function main(): Promise<void> {
     return;
   }
   process.env.TECHLIO_PACKAGED = "1";
-  const { installBackgroundService } = await import("./install-service.js");
+  const service = await import("./install-service.js");
+  if (process.argv.includes("--uninstall")) {
+    service.uninstallBackgroundService({ purgeData: process.argv.includes("--purge") });
+    return;
+  }
+  if (process.argv.includes("--status")) {
+    await service.printStatus();
+    return;
+  }
   if (!process.argv.includes("--service")) {
-    await installBackgroundService();
+    // Install, hand off to the OS service manager, and exit. Only fall back
+    // to running here when no service could be registered.
+    const handedOff = await service.installBackgroundService();
+    if (handedOff) return;
   }
   await import("./index.js");
 }

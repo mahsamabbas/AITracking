@@ -4,8 +4,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, agentSessions, sessionContextVersions } from "./schema.js";
 import { recomputeSessionMetrics } from "./sessions.js";
+import { activityTypeOf } from "./activity.js";
 
 const SESSION_END = new Set(["session_ended", "connector_stopped"]);
+
+/** Only agent activity opens a session. Health and coverage events never do. */
+const OPENS_SESSION = new Set(["session", "model", "tool", "engineering_check", "file_change"]);
 
 /** Stable session id so one developer's events never attach to another person's session. */
 function sessionIdForDeveloper(developerId: string, sessionId: string): string {
@@ -24,6 +28,17 @@ function sessionIdForDeveloper(developerId: string, sessionId: string): string {
 export async function applySessionization(event: ActivityEvent): Promise<void> {
   let sessionId = event.session_id;
   if (!sessionId) return;
+
+  // A heartbeat or coverage event carrying a session id must not create a
+  // phantom "agent session" — that would inflate session counts with time in
+  // which the agent did nothing.
+  if (!OPENS_SESSION.has(activityTypeOf(event.event_type))) {
+    const exists = await db
+      .select({ id: agentSessions.id })
+      .from(agentSessions)
+      .where(eq(agentSessions.id, sessionId));
+    if (!exists[0]) return;
+  }
 
   const owner = await db
     .select({ developerId: agentSessions.developerId })

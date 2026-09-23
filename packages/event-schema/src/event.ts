@@ -55,6 +55,10 @@ export const MetadataSchema = z
     lines_deleted: z.number().int().nonnegative().optional(),
     completions_count: z.number().int().nonnegative().optional(),
     chat_requests_count: z.number().int().nonnegative().optional(),
+    /** Cursor agent + composer requests (daily report). */
+    agent_requests_count: z.number().int().nonnegative().optional(),
+    /** Requests Cursor bills against the plan: included + usage-based + API-key. */
+    billable_requests_count: z.number().int().nonnegative().optional(),
     suggestions_count: z.number().int().nonnegative().optional(),
     acceptances_count: z.number().int().nonnegative().optional(),
     lines_suggested: z.number().int().nonnegative().optional(),

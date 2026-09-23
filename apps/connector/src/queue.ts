@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 import type { ActivityEvent } from "@techlio/event-schema";
@@ -24,13 +24,17 @@ function deriveKey(secret: string): Buffer {
 export class EncryptedQueue {
   private path: string;
   private key: Buffer;
+  private legacyKeys: Buffer[];
   private rows: StoredRow[] = [];
   private nextId = 1;
+  /** Rows that could not be decrypted with any known key (reported as a gap). */
+  lostRows = 0;
 
-  constructor(path: string, secret: string) {
+  constructor(path: string, secret: string, legacySecrets: string[] = []) {
     this.path = path;
     this.key = deriveKey(secret);
-    mkdirSync(dirname(path), { recursive: true });
+    this.legacyKeys = legacySecrets.map(deriveKey);
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.load();
   }
 
@@ -41,14 +45,24 @@ export class EncryptedQueue {
       this.rows = Array.isArray(parsed.rows) ? parsed.rows : [];
       this.nextId = Number(parsed.nextId) || this.rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
     } catch {
+      // Keep the unreadable file for inspection rather than overwriting it.
+      try {
+        renameSync(this.path, `${this.path}.corrupt-${Date.now()}`);
+      } catch {
+        /* nothing to preserve */
+      }
       this.rows = [];
       this.nextId = 1;
+      this.lostRows += 1;
     }
   }
 
   private save(): void {
     const body: StoreFile = { nextId: this.nextId, rows: this.rows };
-    writeFileSync(this.path, JSON.stringify(body));
+    // Atomic replace: a crash mid-write never leaves a truncated queue file.
+    const tmp = `${this.path}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(body), { mode: 0o600 });
+    renameSync(tmp, this.path);
   }
 
   private encrypt(text: string): string {
@@ -59,14 +73,25 @@ export class EncryptedQueue {
     return Buffer.concat([iv, tag, enc]).toString("base64");
   }
 
-  private decrypt(encoded: string): string {
+  private decryptWith(key: Buffer, encoded: string): string {
     const buf = Buffer.from(encoded, "base64");
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const data = buf.subarray(28);
-    const decipher = createDecipheriv(ALGO, this.key, iv);
+    const decipher = createDecipheriv(ALGO, key, iv);
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  }
+
+  private decrypt(encoded: string): string {
+    for (const key of [this.key, ...this.legacyKeys]) {
+      try {
+        return this.decryptWith(key, encoded);
+      } catch {
+        /* try the next key */
+      }
+    }
+    throw new Error("undecryptable_row");
   }
 
   enqueue(events: ActivityEvent[]): void {
@@ -93,6 +118,7 @@ export class EncryptedQueue {
       }
     }
     if (drop.size) {
+      this.lostRows += drop.size;
       this.rows = this.rows.filter((row) => !drop.has(row.id));
       this.save();
     }

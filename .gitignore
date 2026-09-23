@@ -10,3 +10,5 @@ dist
 *.tsbuildinfo
 .vercel
 .env*
+.next-build
+.next-dev

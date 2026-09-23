@@ -1,7 +1,5 @@
 import jwt from "jsonwebtoken";
-import type { AuthUser, Role } from "@techlio/server-core";
-
-const JWT_SECRET = process.env.JWT_SECRET ?? "techlio-dev-jwt-secret-change-me";
+import { jwtSecret, type AuthUser, type Role } from "@techlio/server-core";
 const JWT_EXPIRES = "12h";
 
 export interface JwtPayload {
@@ -29,11 +27,11 @@ export function signUserToken(user: {
     organizationId: user.organizationId,
     developerId: user.developerId,
   };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  return jwt.sign(payload, jwtSecret(), { expiresIn: JWT_EXPIRES });
 }
 
 export function verifyUserToken(token: string): AuthUser {
-  const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+  const decoded = jwt.verify(token, jwtSecret()) as JwtPayload;
   return {
     id: decoded.sub,
     email: decoded.email,

@@ -6,12 +6,15 @@ import {
 } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module.js";
 import { initRecalcQueue } from "./services/recalc-queue.js";
-import { seedPortalUsers, startDemoConnectorKeepalive } from "@techlio/server-core";
+import { assertRuntimeConfig, devAffordancesEnabled, seedPortalUsers } from "@techlio/server-core";
 
 async function bootstrap() {
+  assertRuntimeConfig();
   initRecalcQueue();
-  await seedPortalUsers();
-  startDemoConnectorKeepalive(); // live-only unless DEMO_CONNECTOR_KEEPALIVE=1
+  if (devAffordancesEnabled()) {
+    // Local-only demo portal users. Never runs on a hosted runtime.
+    await seedPortalUsers();
+  }
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

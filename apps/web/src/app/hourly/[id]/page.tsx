@@ -22,7 +22,7 @@ interface SnapshotDetail {
     version: number;
     completeness: string;
     recalcReason: string | null;
-    metrics: Record<string, number | undefined>;
+    metrics: Record<string, number | null | undefined>;
   };
   sourceEvents: ActivityEventRow[];
   versions: { id: string; version: number; recalcReason: string | null }[];
@@ -133,11 +133,13 @@ export default function HourlyDetailPage() {
                     { label: "Builds completed", value: formatNumber(m.buildsCompleted ?? 0) },
                     {
                       label: "Tokens in / out",
+                      // null means no event this hour reported tokens; a real
+                      // 0 is shown as 0.
                       value:
-                        (m.tokenInput ?? 0) === 0 && (m.tokenOutput ?? 0) === 0
+                        m.tokenInput == null && m.tokenOutput == null
                           ? "Not available from provider"
                           : `${formatNumber(m.tokenInput ?? 0)} / ${formatNumber(m.tokenOutput ?? 0)}`,
-                      unavailable: (m.tokenInput ?? 0) === 0 && (m.tokenOutput ?? 0) === 0,
+                      unavailable: m.tokenInput == null && m.tokenOutput == null,
                     },
                   ]}
                 />

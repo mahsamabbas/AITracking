@@ -1,4 +1,4 @@
-import { lt } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, auditLog } from "./schema.js";
 
@@ -8,7 +8,12 @@ export async function purgeEventsOlderThan(
 ): Promise<number> {
   const deleted = await db
     .delete(activityEvents)
-    .where(lt(activityEvents.occurredAt, cutoff))
+    .where(
+      and(
+        eq(activityEvents.organizationId, organizationId),
+        lt(activityEvents.occurredAt, cutoff),
+      ),
+    )
     .returning({ eventId: activityEvents.eventId });
   if (deleted.length > 0) {
     await db.insert(auditLog).values({

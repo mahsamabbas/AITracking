@@ -28,6 +28,12 @@ const config: Config = {
           700: "rgb(var(--color-brand-700) / <alpha-value>)",
           900: "rgb(var(--color-brand-900) / <alpha-value>)",
         },
+        conn: {
+          ok: "rgb(var(--state-ok) / <alpha-value>)",
+          warn: "rgb(var(--state-warn) / <alpha-value>)",
+          bad: "rgb(var(--state-bad) / <alpha-value>)",
+          idle: "rgb(var(--state-idle) / <alpha-value>)",
+        },
         state: {
           ok: "#0d9488",
           okSoft: "#ccfbf1",
@@ -47,10 +53,19 @@ const config: Config = {
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.04)",
-        pop: "0 8px 28px rgba(16,24,40,0.12)",
+        card: "var(--shadow-1)",
+        pop: "var(--shadow-2)",
+        modal: "var(--shadow-3)",
       },
       borderRadius: { xl: "0.75rem", "2xl": "1rem" },
+      transitionDuration: {
+        fast: "var(--motion-fast)",
+        normal: "var(--motion-normal)",
+        slow: "var(--motion-slow)",
+      },
+      transitionTimingFunction: {
+        "out-soft": "var(--ease-out)",
+      },
     },
   },
   plugins: [],

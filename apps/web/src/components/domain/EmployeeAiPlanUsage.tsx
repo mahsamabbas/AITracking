@@ -21,14 +21,14 @@ function usageHeadline(row: EmployeeAiSubscription): {
   }
   if (unit === "model_requests") {
     return {
-      label: "Agent model requests",
+      label: "Agent turns (prompt → stop)",
       value: formatTokens(row.tokensUsed),
       missing: false,
     };
   }
   if (unit === "cursor_admin_requests") {
     return {
-      label: "Billing requests (completions + chat)",
+      label: "Chat requests (Cursor daily report)",
       value: formatTokens(row.tokensUsed),
       missing: false,
     };
@@ -42,9 +42,8 @@ function usageHeadline(row: EmployeeAiSubscription): {
 
 function limitLabel(row: EmployeeAiSubscription): string {
   const unit = row.usageUnit ?? "tokens";
-  if (unit === "model_requests") return "Included requests / month (org config)";
-  if (unit === "cursor_admin_requests") return "Included requests / month";
-  return "Plan limit";
+  if (unit === "tokens") return "Token limit (admin-configured)";
+  return "Request limit (admin-configured)";
 }
 
 export function EmployeeAiPlanUsage({
@@ -81,7 +80,7 @@ export function EmployeeAiPlanUsage({
         subtitle={
           isSelf
             ? "Calendar-month usage from your connector and, for Cursor teams, the Admin API when configured."
-            : "Calendar-month usage from the connector vs organisation plan limits."
+            : "Calendar-month usage exactly as each provider reports it. Limits appear only when an administrator configures them."
         }
       />
       <CardBody className="grid gap-4 sm:grid-cols-2">
@@ -119,7 +118,11 @@ export function EmployeeAiPlanUsage({
                   <dt className="text-ink-500">{headline.label}</dt>
                   <dd className="num font-medium text-ink-900">
                     {headline.missing ? (
-                      <span className="hint font-sans font-normal">No activity yet this month</span>
+                      <span className="hint font-sans font-normal">
+                        {(row.sessionsThisMonth ?? 0) > 0
+                          ? `Not reported by provider · ${row.sessionsThisMonth} sessions observed`
+                          : "No activity yet this month"}
+                      </span>
                     ) : (
                       headline.value
                     )}
@@ -143,24 +146,26 @@ export function EmployeeAiPlanUsage({
                 ) : null}
                 {row.modelRequests != null && row.usageUnit === "model_requests" ? (
                   <div className="flex justify-between gap-3 text-xs">
-                    <dt className="text-ink-400">From agent sessions</dt>
+                    <dt className="text-ink-400">Observed by connector hooks</dt>
                     <dd className="num text-ink-600">{formatTokens(row.modelRequests)}</dd>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">
                   <dt className="text-ink-500">{limitLabel(row)}</dt>
                   <dd className="num font-medium text-ink-900">
-                    {row.monthlyLimit != null
-                      ? `${formatTokens(row.monthlyLimit)} / month`
-                      : "Not configured"}
+                    {row.monthlyLimit != null ? (
+                      `${formatTokens(row.monthlyLimit)} / month`
+                    ) : (
+                      <span className="hint font-sans font-normal">No limit configured</span>
+                    )}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-ink-500">Remaining</dt>
-                  <dd className="num font-medium text-ink-900">
-                    {row.remaining != null ? formatTokens(row.remaining) : "—"}
-                  </dd>
-                </div>
+                {row.remaining != null ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Remaining</dt>
+                    <dd className="num font-medium text-ink-900">{formatTokens(row.remaining)}</dd>
+                  </div>
+                ) : null}
               </dl>
 
               {usedPct != null ? (
@@ -178,12 +183,12 @@ export function EmployeeAiPlanUsage({
                 </div>
               ) : null}
 
-              {row.provider === "cursor" && headline.missing ? (
+              {row.provider === "cursor" && headline.missing && !(row.sessionsThisMonth > 0) ? (
                 <p className="hint mt-3 text-xs leading-relaxed">
-                  Use the agent in Cursor with the connector running. For team billing totals matching
-                  cursor.com, set <span className="font-mono text-2xs">CURSOR_API_KEY</span> on the API
-                  and run the worker puller, or ask an admin to mirror your plan under organisation AI
-                  limits.
+                  Nothing has been reported for Cursor this month. Session activity appears once the
+                  connector observes Cursor agent hooks; daily request counts appear only when the
+                  organisation&apos;s Cursor Admin API puller is configured and this person&apos;s Cursor
+                  email matches their directory email.
                 </p>
               ) : null}
               {row.provider === "cursor" && row.usageSource === "session_model_requests" ? (

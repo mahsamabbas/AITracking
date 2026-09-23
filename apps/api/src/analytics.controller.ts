@@ -168,6 +168,15 @@ export class AnalyticsController {
     });
     return {
       employees: rows,
+      // Summary is computed here from the same rows, so the browser never
+      // aggregates metrics itself.
+      summary: {
+        listed: rows.length,
+        withActivity: rows.filter((r) => r.sessions > 0).length,
+        activeMs: rows.reduce((s, r) => s + r.activeMs, 0),
+        sessions: rows.reduce((s, r) => s + r.sessions, 0),
+        coverageWarnings: rows.filter((r) => r.coverageWarning).length,
+      },
       preset,
       range: { from: range.from.toISOString(), to: range.to.toISOString() },
       canViewTeam: canViewTeam(user),
@@ -390,6 +399,7 @@ export class AnalyticsController {
       employee: profile,
       sessions: result.sessions,
       total: result.total,
+      matched: result.matched,
       page,
       pageSize,
     };

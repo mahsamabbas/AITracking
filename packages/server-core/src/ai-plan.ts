@@ -51,22 +51,26 @@ export interface EmployeeAiSubscriptionRow {
   remaining: number | null;
   tokensFromTelemetry: boolean;
   limitConfigured: boolean;
-  usageSource: "session_tokens" | "session_model_requests" | "tier_b_pull" | "cursor_admin_api" | "none";
+  /** Sessions observed this month — lets the UI tell "no activity" from "not reported". */
+  sessionsThisMonth: number;
+  usageSource: "session_tokens" | "session_model_requests" | "tier_b_pull" | "none";
 }
 
+/**
+ * Plan limits exist only when an administrator configures them (organizations.
+ * ai_plan_limits, or TECHLIO_DEFAULT_AI_PLAN_LIMITS). There is no built-in
+ * budget: an unconfigured plan shows usage with no limit and no "remaining".
+ */
 function defaultLimits(): AiPlanLimits {
   const raw = process.env.TECHLIO_DEFAULT_AI_PLAN_LIMITS;
   if (raw) {
     try {
       return JSON.parse(raw) as AiPlanLimits;
     } catch {
-      /* ignore */
+      /* ignore malformed override */
     }
   }
-  return {
-    cursor: { monthlyRequestBudget: 500, planName: "Cursor plan" },
-    claude_code: { monthlyTokenBudget: 2_000_000, planName: "Claude Code" },
-  };
+  return {};
 }
 
 export async function getOrgAiPlanLimits(organizationId: string): Promise<AiPlanLimits> {
@@ -122,7 +126,7 @@ async function employeeAiProviderPresence(
       LEFT JOIN connector_health ch ON ch.device_id = d.id
       WHERE d.organization_id = ${organizationId}
         AND d.developer_id = ${developerId}
-        AND d.revoked_at IS NULL
+        AND d.revoked_at IS NULL AND d.kind = 'connector'
       UNION
       SELECT s.provider
       FROM agent_sessions s
@@ -130,6 +134,13 @@ async function employeeAiProviderPresence(
         AND s.developer_id = ${developerId}
         AND s.provider IN ('cursor', 'claude_code')
         AND s.started_at >= ${monthFrom}
+      UNION
+      SELECT e.payload->>'provider'
+      FROM activity_events e
+      WHERE e.organization_id = ${organizationId}
+        AND e.developer_id = ${developerId}
+        AND e.event_type = 'provider_daily_aggregate'
+        AND e.occurred_at >= ${monthFrom}
     ) x
     WHERE provider IN ('cursor', 'claude_code')
   `);
@@ -154,89 +165,29 @@ type SessionMonthRow = {
 type TierBRow = {
   completions: string | null;
   chat_requests: string | null;
+  billable_requests: string | null;
 };
 
-async function cursorAdminMonthlyUsage(
-  organizationId: string,
-  developerId: string,
-  from: Date,
-  to: Date,
-): Promise<{ completions: number; chatRequests: number } | null> {
-  const apiKey = process.env.CURSOR_API_KEY?.trim();
-  if (!apiKey) return null;
-
-  const idRes = await db.execute<{ provider_user_id: string }>(sql`
-    SELECT metadata->>'provider_user_id' AS provider_user_id
-    FROM activity_events
-    WHERE organization_id = ${organizationId}
-      AND developer_id = ${developerId}
-      AND provider = 'cursor'
-      AND metadata->>'provider_user_id' IS NOT NULL
-    ORDER BY occurred_at DESC
-    LIMIT 1
-  `);
-  const cursorUserId = idRes.rows[0]?.provider_user_id;
-
-  const res = await fetch("https://api.cursor.com/teams/daily-usage-data", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`,
-    },
-    body: JSON.stringify({ startDate: from.getTime(), endDate: to.getTime() }),
-  });
-  if (!res.ok) return null;
-
-  const json = (await res.json()) as {
-    data?: Array<{
-      userId: number;
-      day: string;
-      completions?: number;
-      chatRequests?: number;
-    }>;
-  };
-  const rows = json.data ?? [];
-  const filtered =
-    cursorUserId != null
-      ? rows.filter((r) => String(r.userId) === cursorUserId)
-      : rows;
-
-  if (filtered.length === 0) return null;
-
-  let completions = 0;
-  let chatRequests = 0;
-  for (const row of filtered) {
-    completions += row.completions ?? 0;
-    chatRequests += row.chatRequests ?? 0;
-  }
-  return { completions, chatRequests };
-}
-
+/** A limit is only compared against usage in the same unit. */
 function monthlyLimitForProvider(
   config: ProviderPlanConfig | undefined,
   usageUnit: AiUsageUnit,
 ): number | null {
   if (!config) return null;
-  if (usageUnit === "cursor_admin_requests" || usageUnit === "model_requests") {
-    const req = config.monthlyRequestBudget;
-    if (req != null && req > 0) return req;
-  }
-  const tok = config.monthlyTokenBudget;
-  if (tok != null && tok > 0) return tok;
-  return null;
+  const value =
+    usageUnit === "tokens" ? config.monthlyTokenBudget : config.monthlyRequestBudget;
+  return value != null && value > 0 ? value : null;
 }
 
-function buildProviderRow(input: {
+export function buildProviderRow(input: {
   provider: TrackedProvider;
   periodLabel: string;
   planConfig: ProviderPlanConfig | undefined;
   session: SessionMonthRow | undefined;
   tierB: TierBRow | undefined;
-  cursorAdmin: { completions: number; chatRequests: number } | null;
 }): EmployeeAiSubscriptionRow {
   const cap = PROVIDER_CAPABILITIES[input.provider];
   const label = cap?.label ?? input.provider;
-  const missingTokenTotals = cap?.missing.includes("token_totals") ?? false;
   const planName = input.planConfig?.planName ?? null;
 
   const sessionTokens =
@@ -250,14 +201,15 @@ function buildProviderRow(input: {
     input.session && Number(input.session.model_requests ?? 0) > 0
       ? Number(input.session.model_requests)
       : null;
+  const tierBChat = input.tierB?.chat_requests != null ? Number(input.tierB.chat_requests) : null;
+  const tierBCompletions =
+    input.tierB?.completions != null ? Number(input.tierB.completions) : null;
+  const tierBBillable =
+    input.tierB?.billable_requests != null ? Number(input.tierB.billable_requests) : null;
+  const hasTierB = tierBBillable != null || tierBChat != null || tierBCompletions != null;
 
-  const tierBCompletions = input.tierB ? Number(input.tierB.completions ?? 0) : 0;
-  const tierBChat = input.tierB ? Number(input.tierB.chat_requests ?? 0) : 0;
-  const hasTierB = tierBCompletions > 0 || tierBChat > 0;
-
-  const admin = input.cursorAdmin;
-  const hasAdmin = admin != null && (admin.completions > 0 || admin.chatRequests > 0);
-
+  // Each branch reports only what a source actually measured. A source that
+  // reported nothing yields null ("not reported"), never a 0.
   let usageUnit: AiUsageUnit = "tokens";
   let usageSource: EmployeeAiSubscriptionRow["usageSource"] = "none";
   let tokenInput: number | null = null;
@@ -265,69 +217,34 @@ function buildProviderRow(input: {
   let tokensUsed: number | null = null;
   let completionsCount: number | null = null;
   let chatRequestsCount: number | null = null;
-  let modelReq: number | null = modelRequests;
 
-  if (sessionTokens && !missingTokenTotals) {
+  if (sessionTokens) {
     tokenInput = sessionTokens.in;
     tokenOutput = sessionTokens.out;
     tokensUsed = tokenInput + tokenOutput;
     usageUnit = "tokens";
     usageSource = "session_tokens";
-  } else if (hasAdmin && input.provider === "cursor") {
-    completionsCount = admin!.completions;
-    chatRequestsCount = admin!.chatRequests;
-    tokensUsed = admin!.completions + admin!.chatRequests;
-    usageUnit = "cursor_admin_requests";
-    usageSource = "cursor_admin_api";
   } else if (hasTierB && input.provider === "cursor") {
-    completionsCount = tierBCompletions;
+    // Cursor's daily report counts chat requests and tab completions
+    // separately. They are different units, so they are never summed.
+    // Headline is the billable request count Cursor reports against the plan
+    // (the figure shown on cursor.com); chat requests and accepted tab
+    // completions are shown alongside, never summed into it.
     chatRequestsCount = tierBChat;
-    tokensUsed = tierBCompletions + tierBChat;
+    completionsCount = tierBCompletions;
+    tokensUsed = tierBBillable;
     usageUnit = "cursor_admin_requests";
     usageSource = "tier_b_pull";
-  } else if (modelRequests != null && modelRequests > 0) {
+  } else if (modelRequests != null) {
     tokensUsed = modelRequests;
     usageUnit = "model_requests";
     usageSource = "session_model_requests";
-  } else if (
-    input.session &&
-    (input.session.session_count ?? 0) > 0 &&
-    missingTokenTotals
-  ) {
-    tokensUsed = 0;
-    modelReq = Number(input.session.model_requests ?? 0);
-    usageUnit = "model_requests";
-    usageSource = "session_model_requests";
-  } else if (sessionTokens && missingTokenTotals) {
-    // Claude with partial token data only — still show tokens.
-    tokenInput = sessionTokens.in;
-    tokenOutput = sessionTokens.out;
-    tokensUsed = tokenInput + tokenOutput;
-    usageUnit = "tokens";
-    usageSource = "session_tokens";
-  } else if (
-    input.session &&
-    (input.session.session_count ?? 0) > 0 &&
-    !missingTokenTotals
-  ) {
-    tokenInput = 0;
-    tokenOutput = 0;
-    tokensUsed = 0;
-    usageUnit = "tokens";
-    usageSource = "session_tokens";
   }
 
   const monthlyLimit = monthlyLimitForProvider(input.planConfig, usageUnit);
-  const limitConfigured = monthlyLimit != null && monthlyLimit > 0;
-
-  let remaining: number | null = null;
-  if (limitConfigured && tokensUsed != null) {
-    remaining = Math.max(0, monthlyLimit! - tokensUsed);
-  }
-
-  const tokensFromTelemetry =
-    usageSource !== "none" &&
-    (usageSource !== "session_tokens" || tokensUsed != null);
+  const limitConfigured = monthlyLimit != null;
+  const remaining =
+    limitConfigured && tokensUsed != null ? Math.max(0, monthlyLimit - tokensUsed) : null;
 
   return {
     provider: input.provider,
@@ -338,13 +255,14 @@ function buildProviderRow(input: {
     tokenInput,
     tokenOutput,
     tokensUsed,
-    modelRequests: modelReq,
+    modelRequests,
     completionsCount,
     chatRequestsCount,
-    monthlyLimit: limitConfigured ? monthlyLimit : null,
+    monthlyLimit,
     remaining,
-    tokensFromTelemetry,
+    tokensFromTelemetry: usageSource !== "none",
     limitConfigured,
+    sessionsThisMonth: input.session?.session_count ?? 0,
     usageSource,
   };
 }
@@ -401,16 +319,17 @@ async function employeeAiSubscriptionsInner(
 
   const usageByProvider = new Map(usageRes.rows.map((r) => [r.provider, r]));
 
-  let tierBByProvider = new Map<string, TierBRow>();
+  const tierBByProvider = new Map<string, TierBRow>();
   if (presence.has("cursor")) {
     const tierRes = await db.execute<TierBRow>(sql`
       SELECT
-        COALESCE(SUM((e.metadata->>'completions_count')::bigint), 0)::text AS completions,
-        COALESCE(SUM((e.metadata->>'chat_requests_count')::bigint), 0)::text AS chat_requests
+        SUM((e.payload->'metadata'->>'completions_count')::bigint)::text AS completions,
+        SUM((e.payload->'metadata'->>'chat_requests_count')::bigint)::text AS chat_requests,
+        SUM((e.payload->'metadata'->>'billable_requests_count')::bigint)::text AS billable_requests
       FROM activity_events e
       WHERE e.organization_id = ${organizationId}
         AND e.developer_id = ${developerId}
-        AND e.provider = 'cursor'
+        AND e.payload->>'provider' = 'cursor'
         AND e.event_type = 'provider_daily_aggregate'
         AND e.occurred_at >= ${monthBounds.from}
         AND e.occurred_at < ${monthBounds.to}
@@ -420,16 +339,6 @@ async function employeeAiSubscriptionsInner(
     }
   }
 
-  const cursorAdmin =
-    presence.has("cursor")
-      ? await cursorAdminMonthlyUsage(
-          organizationId,
-          developerId,
-          monthBounds.from,
-          monthBounds.to,
-        )
-      : null;
-
   return providers.map((provider) =>
     buildProviderRow({
       provider,
@@ -437,7 +346,6 @@ async function employeeAiSubscriptionsInner(
       planConfig: limits[provider],
       session: usageByProvider.get(provider),
       tierB: tierBByProvider.get(provider),
-      cursorAdmin: provider === "cursor" ? cursorAdmin : null,
     }),
   );
 }

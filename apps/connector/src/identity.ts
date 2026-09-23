@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { deleteSecret, getSecret, setSecret } from "./secret-store.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -22,13 +23,24 @@ export function identityDir(): string {
   return DIR;
 }
 
+const TOKEN_SECRET = "device-token";
+
+/**
+ * identity.json holds only non-secret pairing metadata. The device token lives
+ * in the OS credential store. Files written by older builds that still contain
+ * the token are migrated on first load.
+ */
 export function loadIdentity(): ConnectorIdentity | null {
   try {
-    if (existsSync(FILE)) {
-      const raw = JSON.parse(readFileSync(FILE, "utf8")) as ConnectorIdentity;
-      if (raw.deviceId && raw.deviceToken && raw.developerId && raw.organizationId) {
-        return raw;
-      }
+    if (!existsSync(FILE)) return null;
+    const raw = JSON.parse(readFileSync(FILE, "utf8")) as Partial<ConnectorIdentity>;
+    if (raw.deviceToken) {
+      setSecret(TOKEN_SECRET, raw.deviceToken);
+      writeMetadata({ ...raw, deviceToken: undefined });
+    }
+    const deviceToken = raw.deviceToken ?? getSecret(TOKEN_SECRET);
+    if (raw.deviceId && deviceToken && raw.developerId && raw.organizationId) {
+      return { ...(raw as ConnectorIdentity), deviceToken };
     }
   } catch {
     /* ignore corrupt file */
@@ -36,12 +48,21 @@ export function loadIdentity(): ConnectorIdentity | null {
   return null;
 }
 
+function writeMetadata(meta: Partial<ConnectorIdentity>): void {
+  mkdirSync(DIR, { recursive: true, mode: 0o700 });
+  const { deviceToken: _omit, ...rest } = meta;
+  const tmp = `${FILE}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(rest, null, 2), { mode: 0o600 });
+  renameSync(tmp, FILE);
+}
+
 export function saveIdentity(id: ConnectorIdentity): void {
-  mkdirSync(DIR, { recursive: true });
-  writeFileSync(FILE, JSON.stringify(id, null, 2), { mode: 0o600 });
+  setSecret(TOKEN_SECRET, id.deviceToken);
+  writeMetadata(id);
 }
 
 export function clearIdentity(): void {
+  deleteSecret(TOKEN_SECRET);
   try {
     if (existsSync(FILE)) unlinkSync(FILE);
   } catch {

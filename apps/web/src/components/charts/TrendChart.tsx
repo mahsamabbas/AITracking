@@ -1,5 +1,6 @@
 "use client";
 
+import { useChartAnimation } from "@/lib/use-reduced-motion";
 import {
   Area,
   AreaChart,
@@ -23,6 +24,7 @@ export function TrendChart({
   height?: number;
   emptyVariant?: EmptyVariant;
 }) {
+  const anim = useChartAnimation();
   const hasTime = data.some((d) => d.activeMs > 0 || d.idleMs > 0);
   const hasSessions = data.some((d) => d.sessions > 0);
   const isEmpty = !hasTime && !hasSessions;
@@ -91,7 +93,7 @@ export function TrendChart({
             ) : null
           }
         />
-        <Area
+        <Area {...anim}
           type="monotone"
           dataKey="idleMs"
           stroke="var(--chart-idle)"
@@ -99,7 +101,7 @@ export function TrendChart({
           fill="url(#gIdle)"
           name="Idle"
         />
-        <Area
+        <Area {...anim}
           type="monotone"
           dataKey="activeMs"
           stroke="var(--chart-1)"

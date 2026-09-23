@@ -1,4 +1,4 @@
-import { formatDelta, percentChange } from "@/lib/format";
+import { percentChange } from "@/lib/format";
 import { InfoDot } from "./InfoDot";
 
 export function StatTile({
@@ -27,8 +27,7 @@ export function StatTile({
     current !== undefined && previous !== undefined
       ? percentChange(current, previous)
       : undefined;
-  const up = delta != null && delta > 0;
-  const good = delta == null || delta === 0 ? null : invertDelta ? !up : up;
+  void invertDelta; // kept for API compatibility; deltas are always neutral now
 
   const bar =
     accent === "teal"
@@ -42,7 +41,7 @@ export function StatTile({
             : "bg-brand-600";
 
   return (
-    <div className="card relative overflow-hidden p-5">
+    <div className="card relative overflow-hidden p-5 transition-shadow duration-fast hover:shadow-pop">
       <span className={`absolute inset-y-0 left-0 w-[3px] ${bar}`} aria-hidden />
       <div className="flex items-center gap-1.5">
         <p className="label">{label}</p>
@@ -56,16 +55,20 @@ export function StatTile({
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         {delta !== undefined ? (
-          <span
-            className={`num text-xs font-medium ${
-              good === null
-                ? "text-ink-500"
-                : good
-                  ? "text-teal-700 dark:text-teal-400"
-                  : "text-rose-700 dark:text-rose-400"
-            }`}
-          >
-            {formatDelta(delta)}
+          // Direction is shown with an arrow and a neutral colour. A drop in AI
+          // usage is not bad news about a person, so nothing is painted red.
+          <span className="num inline-flex items-center gap-0.5 text-xs font-medium text-ink-700">
+            {delta == null || delta === 0 ? (
+              <span aria-hidden>→</span>
+            ) : delta > 0 ? (
+              <span aria-hidden>↑</span>
+            ) : (
+              <span aria-hidden>↓</span>
+            )}
+            <span className="sr-only">
+              {delta == null ? "new this period" : delta > 0 ? "up" : delta < 0 ? "down" : "unchanged"}
+            </span>
+            {delta == null ? "new" : `${Math.abs(Math.round(delta))}%`}
           </span>
         ) : null}
         {hint ? <span className="hint">{hint}</span> : null}

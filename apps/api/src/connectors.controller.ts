@@ -30,26 +30,23 @@ import {
   ensureEmployee,
   listPortalUsers,
   listDeveloperDevices,
-  DEV_ORG,
 } from "@techlio/server-core";
 import { eq } from "drizzle-orm";
-import { DEV_DEVELOPER, DEV_DEVICE } from "./constants.js";
 import { EventTypes } from "@techlio/event-schema";
 import { randomUUID } from "node:crypto";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
+/**
+ * Resolves a device to its owner inside the caller's organisation. An unknown
+ * device is a 404 — it is never attributed to a default developer.
+ */
 async function resolveDeviceDeveloper(
   organizationId: string,
   deviceId: string,
 ): Promise<{ developerId: string; organizationId: string }> {
   const row = await getDevice(organizationId, deviceId);
-  if (row) {
-    return { developerId: row.developerId, organizationId: row.organizationId };
-  }
-  if (deviceId === DEV_DEVICE) {
-    return { developerId: DEV_DEVELOPER, organizationId: DEV_ORG };
-  }
-  return { developerId: DEV_DEVELOPER, organizationId };
+  if (!row) throw new NotFoundException("device_not_found");
+  return { developerId: row.developerId, organizationId: row.organizationId };
 }
 
 @Controller("v1/connectors")
@@ -215,7 +212,7 @@ export class ConnectorsController {
     await recordLiveHeartbeat({
       deviceId: id,
       organizationId: verified.organizationId!,
-      developerId: verified.developerId ?? DEV_DEVELOPER,
+      developerId: verified.developerId!,
       version: body.version ?? "unknown",
       queueDepth: body.queueDepth ?? 0,
       paused: Boolean(body.paused),

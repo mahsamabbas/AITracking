@@ -14,11 +14,16 @@ import pg from "pg";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sqlDir = join(root, "infra", "sql");
 
-const ENV_CANDIDATES = [
-  join(root, "apps/api/.env.production.local"),
-  join(root, "apps/api/.env.local"),
-  join(root, ".vercel-api/.env.local"),
-];
+// Local by default. Production env files are only read with --production
+// (used by scripts/migrate-prod.sh), so a routine `pnpm db:migrate` can never
+// migrate the production database by accident.
+const PRODUCTION = process.argv.includes("--production");
+const ENV_CANDIDATES = PRODUCTION
+  ? [
+      join(root, "apps/api/.env.production.local"),
+      join(root, ".vercel-api/.env.local"),
+    ]
+  : [join(root, "apps/api/.env.local")];
 
 function parseDotenv(filePath) {
   const out = {};
@@ -194,7 +199,8 @@ function poolConfigFromEnv(env) {
     };
   }
 
-  const placeholderOnly = dsnKeys.some((key) => looksLikePlaceholder(env[key]));
+  // Only a variable that is *set* to a placeholder counts; unset is not an error.
+  const placeholderOnly = dsnKeys.some((key) => Boolean(env[key]) && looksLikePlaceholder(env[key]));
   return {
     host: "localhost",
     port: 5432,
@@ -245,6 +251,13 @@ if (checkOnly) {
   process.exit(0);
 }
 
+if (config.source === "placeholder env file" && !PRODUCTION) {
+  console.warn(
+    "WARN: apps/api/.env.local holds placeholder values (e.g. [SENSITIVE]); using the local Docker Postgres instead.",
+  );
+  config.source = "local default";
+}
+
 if (config.source === "placeholder env file") {
   const bad = ["DATABASE_URL", "POSTGRES_URL"].find((k) =>
     looksLikePlaceholder(env[k] ?? ""),
@@ -261,11 +274,9 @@ if (config.source === "placeholder env file") {
   process.exit(1);
 }
 
-if (config.source === "local default") {
-  console.warn(
-    "WARN: No production Postgres URL found. Using localhost. Pull Vercel env with:",
-  );
-  console.warn("  cd apps/api && vercel env pull .env.production.local --environment=production --yes");
+if (config.source === "local default" && PRODUCTION) {
+  console.error("ERROR: --production was given but no production Postgres URL was found. Refusing to fall back to localhost.");
+  process.exit(1);
 }
 
 const { source: _source, envFile: _envFile, ...poolOptions } = config;

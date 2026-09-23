@@ -291,6 +291,8 @@ function sessionConditions(f: SessionListFilters) {
 export async function listSessions(f: SessionListFilters): Promise<{
   sessions: SessionRow[];
   total: number;
+  /** Totals over every matching session, not just the returned page. */
+  matched: { activeMs: number; fileChanges: number; testsRun: number };
 }> {
   const where = sessionConditions(f);
   const [sessions, countRows] = await Promise.all([
@@ -302,11 +304,25 @@ export async function listSessions(f: SessionListFilters): Promise<{
       .limit(f.limit ?? 25)
       .offset(f.offset ?? 0),
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({
+        count: sql<number>`count(*)::int`,
+        activeMs: sql<string>`coalesce(sum(${agentSessions.activeDurationMs}), 0)`,
+        fileChanges: sql<string>`coalesce(sum(${agentSessions.fileChanges}), 0)`,
+        testsRun: sql<string>`coalesce(sum(${agentSessions.testsRun}), 0)`,
+      })
       .from(agentSessions)
       .where(where),
   ]);
-  return { sessions, total: countRows[0]?.count ?? 0 };
+  const agg = countRows[0];
+  return {
+    sessions,
+    total: agg?.count ?? 0,
+    matched: {
+      activeMs: Number(agg?.activeMs ?? 0),
+      fileChanges: Number(agg?.fileChanges ?? 0),
+      testsRun: Number(agg?.testsRun ?? 0),
+    },
+  };
 }
 
 export interface SessionDetail {

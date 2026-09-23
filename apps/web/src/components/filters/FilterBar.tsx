@@ -1,14 +1,29 @@
 "use client";
 
+/**
+ * Filters stick just below the page header while the content scrolls, so the
+ * active range and filters stay visible next to the numbers they shape.
+ */
 export function FilterBar({
   children,
   right,
+  sticky = true,
 }: {
   children: React.ReactNode;
   right?: React.ReactNode;
+  sticky?: boolean;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-2.5">
+    <div
+      role="group"
+      aria-label="Filters"
+      className={`mb-5 flex flex-wrap items-center gap-2.5 ${
+        sticky
+          ? // Sticky only on wide screens; on phones the wrapped filters would cover the page.
+            "lg:sticky lg:top-[var(--header-h,72px)] lg:z-20 lg:-mx-8 lg:bg-canvas/90 lg:px-8 lg:py-2 lg:backdrop-blur"
+          : ""
+      }`}
+    >
       {children}
       {right ? <div className="ml-auto flex items-center gap-2">{right}</div> : null}
     </div>

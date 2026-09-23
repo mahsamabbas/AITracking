@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnectorSetupPhase } from "@/lib/connector-local";
 import { developerNeedsLocalConnector } from "@/lib/connector-setup";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import { initialsOf } from "@/lib/format";
 import type { Role } from "@/lib/types";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BiometricSetup } from "@/components/BiometricSetup";
 
@@ -137,6 +138,19 @@ export function AppShell({
 
   useEffect(() => setMenuOpen(false), [path]);
 
+  // Publish the sticky header's height so filter bars can stick right below it.
+  const headerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const apply = () =>
+      document.documentElement.style.setProperty("--header-h", `${el.offsetHeight}px`);
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
   if (path === "/login") return <>{children}</>;
 
   if (!ready) {
@@ -181,7 +195,7 @@ export function AppShell({
                     : undefined
               }
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex min-h-[40px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-fast ${
                 onboardingLocked && item.href === "/setup-connector" && !active
                   ? "bg-amber-50 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700"
                   : ""
@@ -238,6 +252,12 @@ export function AppShell({
 
   return (
     <div className="flex min-h-[100dvh] bg-canvas">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-ink-900 focus:shadow-modal"
+      >
+        Skip to content
+      </a>
       <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex flex-col overflow-hidden border-r border-line bg-card lg:flex">
         {sidebarInner}
       </aside>
@@ -247,45 +267,54 @@ export function AppShell({
           <button
             type="button"
             aria-label="Close menu"
-            className="absolute inset-0 bg-slate-950/40"
+            className="backdrop-in absolute inset-0 bg-slate-950/40"
             onClick={() => setMenuOpen(false)}
           />
-          <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col overflow-hidden bg-card shadow-pop">
+          <aside className="drawer-in absolute left-0 top-0 flex h-full w-[260px] flex-col overflow-hidden bg-card shadow-modal">
             {sidebarInner}
           </aside>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-line bg-card/85 backdrop-blur">
+        <header ref={headerRef} className="sticky top-0 z-30 border-b border-line bg-card/85 backdrop-blur">
           <div className={`mx-auto w-full ${maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                className="btn-ghost mt-0.5 h-9 w-9 shrink-0 px-0 lg:hidden"
-                aria-label="Open menu"
-                onClick={() => setMenuOpen(true)}
-              >
-                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M3 6h14M3 10h14M3 14h14" />
-                </svg>
-              </button>
-              <div className="min-w-0 flex-1">
-                {breadcrumbs}
-                <h1 className="h-page truncate">{title ?? "Overview"}</h1>
-                {subtitle ? <p className="muted mt-0.5">{subtitle}</p> : null}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {actions}
-                <ThemeToggle />
-              </div>
-            </div>
+            <PageHeader
+              title={title ?? "Overview"}
+              subtitle={subtitle}
+              breadcrumbs={breadcrumbs}
+              leading={
+                <button
+                  type="button"
+                  className="btn-ghost mt-0.5 h-11 w-11 shrink-0 px-0 lg:hidden"
+                  aria-label="Open menu"
+                  onClick={() => setMenuOpen(true)}
+                >
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M3 6h14M3 10h14M3 14h14" />
+                  </svg>
+                </button>
+              }
+              actions={
+                <>
+                  {actions}
+                  <ThemeToggle />
+                </>
+              }
+            />
           </div>
         </header>
 
-        <main className={`mx-auto w-full ${maxWidth} flex-1 px-4 py-6 sm:px-6 lg:px-8`}>
-          <BiometricSetup />
-          {children}
+        <main
+          id="main"
+          tabIndex={-1}
+          className={`mx-auto w-full ${maxWidth} flex-1 px-4 py-6 focus:outline-none sm:px-6 lg:px-8`}
+        >
+          {/* Keyed by route so only the content animates in, never the shell. */}
+          <div key={path} className="enter">
+            <BiometricSetup />
+            {children}
+          </div>
         </main>
 
         <footer className="border-t border-line px-4 py-4 sm:px-6 lg:px-8">

@@ -67,8 +67,9 @@ export async function finalizeHourForDeveloper(
   const toolIntervals: TimeInterval[] = [];
   const sessionTimes = new Map<string, number[]>();
   const eventIds: string[] = [];
-  let tokenInput = 0;
-  let tokenOutput = 0;
+  // null = no event in the hour reported token data (not the same as 0).
+  let tokenInput: number | null = null;
+  let tokenOutput: number | null = null;
   let testsCompleted = 0;
   let buildsCompleted = 0;
   let fileChanges = 0;
@@ -99,8 +100,8 @@ export async function finalizeHourForDeveloper(
     if (p.event_type?.includes("tool")) {
       toolIntervals.push({ startMs: start, endMs: end });
     }
-    tokenInput += p.metadata?.token_input ?? 0;
-    tokenOutput += p.metadata?.token_output ?? 0;
+    if (p.metadata?.token_input != null) tokenInput = (tokenInput ?? 0) + p.metadata.token_input;
+    if (p.metadata?.token_output != null) tokenOutput = (tokenOutput ?? 0) + p.metadata.token_output;
     if (p.event_type === "test_completed") testsCompleted++;
     if (p.event_type === "build_completed") buildsCompleted++;
     if (

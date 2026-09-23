@@ -13,6 +13,11 @@ pnpm dev
 pnpm dev:worker
 ```
 
+For a new production organisation follow **Greenfield organisation** in
+`docs/DEPLOY.md`: migrate → `pnpm admin:create` → add people → issue connector
+credentials → employee installs and activates → verify online within minutes.
+Never seed a hosted database.
+
 Check:
 
 ```bash
@@ -22,7 +27,22 @@ curl -fsS http://localhost:3000
 curl -fsS http://127.0.0.1:9477/health
 ```
 
-Do not use `pnpm db:seed` in production. Demo data is for local validation only.
+`pnpm db:seed` refuses to run without `TECHLIO_DEV_MODE=1` or against any
+non-local database host. Demo data is for local validation only.
+
+## Connector on an employee machine
+
+| Task | macOS | Windows | Linux |
+|------|-------|---------|-------|
+| Status | `~/.techlio/connector/techlio-connector --status` | `%USERPROFILE%\.techlio\connector\techlio-connector.exe --status` | same as macOS |
+| Service | LaunchAgent `com.techlio.connector` | Task Scheduler `TechlioConnector` | `systemctl --user status techlio-connector` |
+| Logs | `~/.techlio-connector/connector.log` | Task history + stdout | `journalctl --user -u techlio-connector` |
+| Uninstall | `… --uninstall` (keeps credentials and unsent events) | same | same |
+| Full removal | `… --uninstall --purge` | same | same |
+
+Credentials live in the OS credential store (Keychain / DPAPI / Secret
+Service). `/health` reports `credentialStore`; `"file"` means no store was
+available and 0600 files were used — acceptable only on single-user machines.
 
 ## Backup
 

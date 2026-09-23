@@ -57,9 +57,11 @@ companion. It deliberately includes stale/offline/paused connectors, a person
 with no telemetry, unassigned sessions, mid-session coverage gaps, failed tests
 and builds, and weekend/idle patterns.
 
-Disabled unless `DEMO_CONNECTOR_KEEPALIVE=1`. Local `pnpm dev` does not
-fake connector online states. Alex is the live machine identity: only a
-Cursor device slot is seeded, with no generated sessions.
+The seed is local-only (dev mode + local DB host, else it refuses). Seeded
+heartbeats go stale on their own — there is no keepalive and no `demo_state`.
+It does not fabricate Claude token totals, because real hooks cannot report
+them. Alex is the live machine identity: only a Cursor device slot is seeded.
+Production is an empty org until real devices report (docs/DEPLOY.md).
 
 ## Local run
 
@@ -77,3 +79,22 @@ That script is only for maintainers working in this monorepo.
 **Live agent events:** on startup the connector installs Claude Code and Cursor hooks. They report tool and model timing only — not prompts, command text, or file contents. Dashboard health checks are not printed. Claude’s website chat is outside Claude Code and does not emit these events.
 
 **Backlog:** [pending.md](pending.md).
+
+## UI information architecture and motion (2026-09-23)
+
+Spec: `apps/web/UX_SPEC.md`. Rules to preserve when editing any screen:
+
+- Command center `/` → People (`/employees`, `/employees/[id]`) → Drill-down
+  (tool, sessions, session) → Connector onboarding → Admin. Breadcrumbs on
+  every drill-down page.
+- Analytics pages start with `ContextBar` (subject · range · org timezone ·
+  *Data as of* · refresh · Live). `useApi` exposes `fetchedAt`.
+- KPI deltas are neutral arrows. No red/green on people metrics.
+- Filters stick below the header on `lg+` only (`--header-h` is set by AppShell).
+- Employee hub order: identity → KPIs → trend → tools → projects/files → AI
+  subscription → hourly → sessions → patterns/detail.
+- Motion tokens `--motion-fast/normal/slow`; `.enter`, `.stagger`,
+  `.drawer-in`, `.pulse-online` (online connector only), `useChartAnimation()`.
+  Everything is instant under `prefers-reduced-motion`.
+- Focus is always visible (`--focus-ring`); never reintroduce
+  `outline: none` without a replacement.

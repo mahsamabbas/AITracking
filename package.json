@@ -19,12 +19,13 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrate:prod": "bash scripts/migrate-prod.sh",
     "db:migrate:check": "node scripts/migrate.mjs --check",
-    "db:seed": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/seed.ts",
+    "db:seed": "pnpm --filter @techlio/server-core run build && TECHLIO_DEV_MODE=1 pnpm --filter @techlio/api exec tsx src/scripts/seed.ts",
     "db:reset": "pnpm db:migrate && pnpm db:seed",
     "env:restore": "bash scripts/restore-env-from-vercel.sh",
     "env:check": "node scripts/check-env-files.mjs",
     "deploy:all": "bash scripts/deploy-all.sh",
-    "deploy:all:connector": "bash scripts/deploy-all.sh --with-connector"
+    "deploy:all:connector": "bash scripts/deploy-all.sh --with-connector",
+    "admin:create": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/create-admin.ts"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

@@ -2,7 +2,6 @@ import { Controller, Get, Query, Req, Res, UnauthorizedException } from "@nestjs
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { listRecentEvents } from "./services/ingest.js";
 import { verifyUserToken } from "./auth/jwt.js";
-import { DEV_ORG } from "./constants.js";
 
 @Controller("v1/stream")
 export class StreamController {
@@ -16,15 +15,12 @@ export class StreamController {
     const raw = header?.startsWith("Bearer ")
       ? header.slice(7)
       : accessToken;
-    let organizationId = DEV_ORG;
-    if (raw) {
-      try {
-        organizationId = verifyUserToken(raw).organizationId;
-      } catch {
-        throw new UnauthorizedException("invalid_token");
-      }
-    } else if (process.env.ALLOW_DEV_HEADER_AUTH === "0") {
-      throw new UnauthorizedException("token_required");
+    if (!raw) throw new UnauthorizedException("token_required");
+    let organizationId: string;
+    try {
+      organizationId = verifyUserToken(raw).organizationId;
+    } catch {
+      throw new UnauthorizedException("invalid_token");
     }
 
     reply.raw.writeHead(200, {

@@ -30,9 +30,14 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     label: "Claude Code",
     tier: "A",
     hourly: true,
-    missing: [],
-    emptyState: "",
-    note: "Observed through Claude Code hooks — full session, model, and tool telemetry.",
+    // Hooks carry no token counts and no per-call model timing. Token totals
+    // need Claude Code OpenTelemetry, which this connector build does not
+    // ingest (its OTLP routes return 501).
+    missing: ["token_totals", "model_call_timing"],
+    emptyState:
+      "Claude Code hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Claude Code hooks: sessions, agent turns (prompt → stop), tool calls, and file edits. Model duration is the whole agent turn, including tool time.",
   },
   codex: {
     id: "codex",
@@ -57,11 +62,11 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     label: "Cursor",
     tier: "A",
     hourly: true,
-    missing: ["token_totals"],
+    missing: ["token_totals", "model_call_timing"],
     emptyState:
       "Cursor hooks report prompt, tool, and file activity with timing. Token totals are not exposed by Cursor.",
     note:
-      "Observed through Cursor agent hooks — model request timing, tool calls, and file edits. Token counts are unavailable.",
+      "Observed through Cursor agent hooks: agent turns (prompt → stop), tool calls, and file edits. Model duration is the whole agent turn. Daily request counts come from the Cursor Admin API only when an organisation key is configured.",
   },
   github_copilot: {
     id: "github_copilot",

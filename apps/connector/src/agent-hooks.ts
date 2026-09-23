@@ -83,6 +83,12 @@ function commandFor(scriptPath: string, provider: "claude_code" | "cursor"): str
   return `"${node}" "${scriptPath}" ${provider}`;
 }
 
+/** True for any hook entry this connector wrote, in script or packaged form. */
+function isTechlioHook(entry: unknown): boolean {
+  const text = JSON.stringify(entry);
+  return text.includes(SCRIPT_NAME) || text.includes("--hook") || text.includes("techlio-connector");
+}
+
 function readJson(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
   try {
@@ -115,17 +121,13 @@ function installClaude(scriptPath: string): void {
     : {}) as Record<string, unknown>;
   const command = commandFor(scriptPath, "claude_code");
   for (const eventName of CLAUDE_EVENTS) {
-    const existing = Array.isArray(hooks[eventName]) ? hooks[eventName] : [];
-    const already = JSON.stringify(existing).includes(SCRIPT_NAME);
-    hooks[eventName] = already
-      ? existing
-      : [
-          ...existing,
-          {
-            matcher: ".*",
-            hooks: [{ type: "command", command }],
-          },
-        ];
+    const existing = Array.isArray(hooks[eventName]) ? (hooks[eventName] as unknown[]) : [];
+    // Replace (never append) our entry, so restarts and path changes cannot
+    // register the reporter twice and double-count every agent action.
+    hooks[eventName] = [
+      ...existing.filter((entry) => !isTechlioHook(entry)),
+      { matcher: ".*", hooks: [{ type: "command", command }] },
+    ];
   }
   settings.hooks = hooks;
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
@@ -140,11 +142,8 @@ function installCursor(scriptPath: string): void {
     : {}) as Record<string, unknown>;
   const command = commandFor(scriptPath, "cursor");
   for (const eventName of CURSOR_EVENTS) {
-    const existing = Array.isArray(hooks[eventName]) ? hooks[eventName] : [];
-    const already = JSON.stringify(existing).includes(SCRIPT_NAME);
-    hooks[eventName] = already
-      ? existing
-      : [...existing, { command }];
+    const existing = Array.isArray(hooks[eventName]) ? (hooks[eventName] as unknown[]) : [];
+    hooks[eventName] = [...existing.filter((entry) => !isTechlioHook(entry)), { command }];
   }
   settings.version = 1;
   settings.hooks = hooks;
@@ -169,4 +168,21 @@ export function ensureAgentHooks(): { claude: boolean; cursor: boolean } {
     cursor = false;
   }
   return { claude, cursor };
+}
+
+/** Remove every hook this connector installed; user hooks are kept. */
+export function removeAgentHooks(): void {
+  for (const path of [join(homedir(), ".claude", "settings.json"), join(homedir(), ".cursor", "hooks.json")]) {
+    if (!existsSync(path)) continue;
+    const settings = readJson(path);
+    const hooks = (settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {}) as Record<string, unknown>;
+    for (const [name, entries] of Object.entries(hooks)) {
+      if (!Array.isArray(entries)) continue;
+      const kept = entries.filter((entry) => !isTechlioHook(entry));
+      if (kept.length) hooks[name] = kept;
+      else delete hooks[name];
+    }
+    settings.hooks = hooks;
+    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  }
 }

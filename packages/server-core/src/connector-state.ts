@@ -37,15 +37,11 @@ export function rollupConnectorState(input: {
   return connectorStateOf(input.paused, input.lastHeartbeat);
 }
 
-/**
- * Empty activity in a date range is not the same as "the collector is down".
- * Prefer live (non-demo) devices when any exist.
- */
+/** Empty activity in a date range is not the same as "the collector is down". */
 export function emptyActivityVariant(
-  connectors: { state: ConnectorState; isDemo?: boolean }[],
+  connectors: { state: ConnectorState }[],
 ): "no-activity" | "paused" | "connector-offline" {
-  const live = connectors.filter((c) => !c.isDemo);
-  const pool = live.length > 0 ? live : connectors;
+  const pool = connectors;
   if (pool.some((c) => c.state === "online" || c.state === "stale")) {
     return "no-activity";
   }

@@ -28,7 +28,7 @@ export function AlertList({ alerts, limit }: { alerts: AlertItem[]; limit?: numb
   }
   const rows = limit != null ? alerts.slice(0, limit) : alerts;
   return (
-    <ul className={`divide-y divide-line ${rows.length > 5 ? "scroll-y-sm" : ""}`}>
+    <ul aria-live="polite" className={`divide-y divide-line ${rows.length > 5 ? "scroll-y-sm" : ""}`}>
       {rows.map((a, i) => (
         <li key={`${a.code}-${i}`} className="flex items-start gap-3 px-5 py-3">
           <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${TONE[a.severity]}`} />

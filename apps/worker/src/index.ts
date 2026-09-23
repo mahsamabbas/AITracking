@@ -1,43 +1,49 @@
 import { Queue, Worker } from "bullmq";
 import {
+  ensureProviderPullDevice,
   finalizeHourForDeveloper,
   ingestBatch,
   listHourlyTargets,
+  listOrganizationIds,
   purgeEventsOlderThan,
+  resolvePullOrganization,
+  resolveProviderEmployee,
 } from "@techlio/server-core";
 import {
-  analyticsRowToEvent,
   copilotRowToEvent,
   cursorRowToEvent,
   downloadCopilotUsersReport,
   fetchCopilotUsersReportUrl,
   fetchCursorDailyUsage,
-  fetchCursorTeamAgentEdits,
-  fetchCursorTeamDau,
-  fetchCursorUserAgentEdits,
   parseCopilotUserDayReport,
 } from "@techlio/puller";
+import type { ActivityEvent } from "@techlio/event-schema";
 
-const connection = {
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: Number(process.env.REDIS_PORT ?? 6379),
-};
+function redisConnection(): { host: string; port: number; password?: string; tls?: object } {
+  const url = process.env.REDIS_URL;
+  if (url) {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: Number(parsed.port || 6379),
+      password: parsed.password || undefined,
+      ...(parsed.protocol === "rediss:" ? { tls: {} } : {}),
+    };
+  }
+  return {
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: Number(process.env.REDIS_PORT ?? 6379),
+  };
+}
 
-const ORG = "550e8400-e29b-41d4-a716-446655440010";
-const DEV = "550e8400-e29b-41d4-a716-446655440011";
-const DEVICE = "550e8400-e29b-41d4-a716-446655440012";
+const connection = redisConnection();
+
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 90);
 const CURSOR_API_KEY = process.env.CURSOR_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? process.env.GITHUB_COPILOT_TOKEN;
 const GITHUB_ORG = process.env.GITHUB_ORG;
-
-const pullCtx = {
-  organizationId: ORG,
-  developerId: DEV,
-  deviceId: DEVICE,
-  connectorVersion: "0.1.0",
-  consentVersion: "1",
-};
+const PULL_VERSION = "puller-0.2.0";
+const CONSENT_VERSION = process.env.TECHLIO_CONSENT_VERSION ?? "1";
 
 const hourlyQueue = new Queue("hourly-finalize", { connection });
 
@@ -99,8 +105,10 @@ async function runRetention(): Promise<void> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
   try {
-    const count = await purgeEventsOlderThan(ORG, cutoff);
-    if (count > 0) console.log("Retention purged", count, "events");
+    for (const organizationId of await listOrganizationIds()) {
+      const count = await purgeEventsOlderThan(organizationId, cutoff);
+      if (count > 0) console.log("Retention purged", count, "events", { organizationId });
+    }
   } catch (err) {
     console.warn("Retention job skipped", err);
   }
@@ -108,90 +116,134 @@ async function runRetention(): Promise<void> {
 
 setInterval(() => void runRetention(), 24 * 60 * 60 * 1000);
 
-async function pullCursorTierB(): Promise<void> {
+/**
+ * Attributes one provider row to the employee it belongs to, or skips it.
+ * A row is never assigned to a default person.
+ */
+async function attribute(
+  organizationId: string,
+  provider: "cursor" | "github_copilot",
+  who: { email?: string; login?: string },
+  build: (ctx: {
+    organizationId: string;
+    developerId: string;
+    deviceId: string;
+    connectorVersion: string;
+    consentVersion: string;
+  }) => ActivityEvent,
+): Promise<ActivityEvent | null> {
+  const employeeId = await resolveProviderEmployee({
+    organizationId,
+    provider,
+    email: who.email,
+    login: who.login,
+  });
+  if (!employeeId) return null;
+  const deviceId = await ensureProviderPullDevice({
+    organizationId,
+    employeeId,
+    provider,
+    label: provider === "cursor" ? "Cursor Admin API (daily)" : "GitHub Copilot report (daily)",
+  });
+  return build({
+    organizationId,
+    developerId: employeeId,
+    deviceId,
+    connectorVersion: PULL_VERSION,
+    consentVersion: CONSENT_VERSION,
+  });
+}
+
+async function ingestPerDevice(organizationId: string, events: ActivityEvent[]) {
+  // ingestBatch verifies each event's device, so batch per device.
+  const byDevice = new Map<string, ActivityEvent[]>();
+  for (const e of events) {
+    const list = byDevice.get(e.device_id) ?? [];
+    list.push(e);
+    byDevice.set(e.device_id, list);
+  }
+  let accepted = 0;
+  let rejected = 0;
+  for (const [deviceId, list] of byDevice) {
+    for (let i = 0; i < list.length; i += 500) {
+      const r = await ingestBatch(organizationId, { events: list.slice(i, i + 500) }, deviceId);
+      accepted += r.accepted;
+      rejected += r.rejected;
+    }
+  }
+  return { accepted, rejected };
+}
+
+async function pullCursorTierB(organizationId: string): Promise<void> {
   if (!CURSOR_API_KEY) {
-    console.log(
-      "Cursor Tier B puller idle — set CURSOR_API_KEY for Admin + Analytics APIs",
-    );
+    console.log("Cursor Tier B puller idle — CURSOR_API_KEY not set");
     return;
   }
   const end = Date.now();
-  const start = end - 24 * 60 * 60 * 1000;
-  const events: ReturnType<typeof cursorRowToEvent>[] = [];
-
+  const start = end - 2 * 24 * 60 * 60 * 1000;
+  let rows;
   try {
-    const rows = await fetchCursorDailyUsage(CURSOR_API_KEY, start, end);
-    events.push(...rows.map((row) => cursorRowToEvent(row, pullCtx)));
+    rows = await fetchCursorDailyUsage(CURSOR_API_KEY, start, end);
   } catch (err) {
     console.warn("Cursor daily-usage-data pull failed", err);
+    return;
   }
-
-  try {
-    const dau = await fetchCursorTeamDau(CURSOR_API_KEY, "7d", "now");
-    for (const row of dau) {
-      events.push(analyticsRowToEvent(row, "team_dau", pullCtx));
-    }
-  } catch (err) {
-    console.warn("Cursor analytics DAU pull failed", err);
+  const events: ActivityEvent[] = [];
+  let unmapped = 0;
+  for (const row of rows) {
+    const event = await attribute(organizationId, "cursor", { email: row.email }, (ctx) =>
+      cursorRowToEvent(row, ctx),
+    );
+    if (event) events.push(event);
+    else unmapped++;
   }
-
-  try {
-    const edits = await fetchCursorTeamAgentEdits(CURSOR_API_KEY, "7d", "now");
-    for (const row of edits) {
-      events.push(analyticsRowToEvent(row, "team_agent_edits", pullCtx));
-    }
-  } catch (err) {
-    console.warn("Cursor analytics agent-edits pull failed", err);
-  }
-
-  try {
-    const byUser = await fetchCursorUserAgentEdits(CURSOR_API_KEY, "7d", "now");
-    for (const row of byUser) {
-      events.push(analyticsRowToEvent(row, "user_agent_edits", pullCtx));
-    }
-  } catch (err) {
-    console.warn("Cursor by-user agent-edits pull failed", err);
-  }
-
-  if (events.length === 0) return;
-  const result = await ingestBatch(ORG, { events });
-  console.log("Cursor Tier B pull", { events: events.length, ...result });
+  const result = events.length ? await ingestPerDevice(organizationId, events) : { accepted: 0, rejected: 0 };
+  // Counts only — provider emails are not written to logs.
+  console.log("Cursor Tier B pull", { rows: rows.length, attributed: events.length, unmapped, ...result });
 }
 
-async function pullCopilotTierB(): Promise<void> {
+async function pullCopilotTierB(organizationId: string): Promise<void> {
   if (!GITHUB_TOKEN || !GITHUB_ORG) {
-    console.log(
-      "Copilot Tier B puller idle — set GITHUB_TOKEN and GITHUB_ORG",
-    );
+    console.log("Copilot Tier B puller idle — GITHUB_TOKEN and GITHUB_ORG not set");
     return;
   }
   const day = new Date();
   day.setUTCDate(day.getUTCDate() - 1);
   const dayStr = day.toISOString().slice(0, 10);
   try {
-    const url = await fetchCopilotUsersReportUrl(
-      GITHUB_TOKEN,
-      GITHUB_ORG,
-      dayStr,
-    );
+    const url = await fetchCopilotUsersReportUrl(GITHUB_TOKEN, GITHUB_ORG, dayStr);
     if (!url) {
       console.warn("Copilot report URL not available for", dayStr);
       return;
     }
-    const text = await downloadCopilotUsersReport(url);
-    const rows = parseCopilotUserDayReport(text);
-    const events = rows.map((row) => copilotRowToEvent(row, pullCtx));
-    if (events.length === 0) return;
-    const result = await ingestBatch(ORG, { events });
-    console.log("Copilot Tier B pull", { events: events.length, ...result });
+    const rows = parseCopilotUserDayReport(await downloadCopilotUsersReport(url));
+    const events: ActivityEvent[] = [];
+    let unmapped = 0;
+    for (const row of rows) {
+      const event = await attribute(organizationId, "github_copilot", { login: row.login }, (ctx) =>
+        copilotRowToEvent(row, ctx),
+      );
+      if (event) events.push(event);
+      else unmapped++;
+    }
+    const result = events.length ? await ingestPerDevice(organizationId, events) : { accepted: 0, rejected: 0 };
+    console.log("Copilot Tier B pull", { rows: rows.length, attributed: events.length, unmapped, ...result });
   } catch (err) {
     console.warn("Copilot pull failed", err);
   }
 }
 
 async function pullAllTierB(): Promise<void> {
-  await pullCursorTierB();
-  await pullCopilotTierB();
+  if (!CURSOR_API_KEY && !(GITHUB_TOKEN && GITHUB_ORG)) return;
+  const organizationId = await resolvePullOrganization();
+  if (!organizationId) {
+    console.warn(
+      "Tier B pull skipped — set TECHLIO_PULL_ORG_ID; provider keys cannot be assigned to an organisation automatically when several exist.",
+    );
+    return;
+  }
+  await pullCursorTierB(organizationId);
+  await pullCopilotTierB(organizationId);
 }
 
 void pullAllTierB();

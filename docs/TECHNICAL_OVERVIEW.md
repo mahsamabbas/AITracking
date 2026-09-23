@@ -50,7 +50,10 @@ The product is an **operational visibility service**. It is **not**:
 
 ## 3. People, roles, and demo logins
 
-The local prototype uses JWT sign-in at http://localhost:3000/login (no SSO yet).
+The local stack uses JWT sign-in at http://localhost:3000/login (no SSO yet).
+The accounts below exist **only in local dev mode** (`TECHLIO_DEV_MODE=1`, set
+by `pnpm dev`); hosted APIs refuse them. Production bootstraps with
+`pnpm admin:create` (docs/DEPLOY.md).
 
 | Portal | Person | Email | Password | Lands on |
 |--------|--------|-------|----------|----------|
@@ -423,9 +426,9 @@ SQL lives in `infra/sql/`. ORM is **Drizzle** in `packages/server-core/src/schem
 | `audit_log` | Login, register, pause, export, user create, ingest counts |
 | `activity_exports` | Generated CSV/text payloads |
 
-`connector_health.demo_state` exists only so seeded connectors keep demonstrating
-the state they were meant to show; real connectors leave it `NULL` and are never
-touched by the demo keepalive.
+`devices.kind` is `connector` for real installations and `provider_pull` for
+Tier B report sources; only connectors count toward connector health.
+`employee_provider_identities` maps Cursor emails and GitHub logins to employees.
 
 **There are no timesheet, billing, invoice, or ranking tables.** Do not add them.
 

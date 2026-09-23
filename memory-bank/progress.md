@@ -70,3 +70,28 @@ pilot, production hardening, and the §19 live integration tests remain.
 - Employee page renders hourly cards from `/v1/developers/:id/timeline`.
 - Session history filters by work item, coverage state, and clock hour.
 - Managers can download CSV or a real PDF summary from the organisation overview.
+
+## 2026-09-23 production-truth audit
+
+Full findings, truth map, and proof checklist: `docs/PRODUCTION_TRUTH_AUDIT.md`.
+
+- **Auth:** header auth, published demo passwords, `dev-device-token`, and the
+  default JWT secret are gone outside `TECHLIO_DEV_MODE=1` (refused on hosted
+  runtimes). Migration 008 disables planted accounts; `pnpm admin:create`
+  bootstraps production. Passwords are scrypt.
+- **Demo separation:** keepalive, `demo_state`, `isDemo` removed (009). Seed is
+  local-only and no longer fabricates Claude tokens or Cursor token budgets.
+- **Accuracy:** Tier B rows attributed per person (010) or skipped; Cursor
+  puller uses real API fields; AI-plan cards report only measured values in
+  matching units; heartbeat-only phantom sessions removed (011); retention is
+  org-scoped; late events recalc inline without Redis; directory/session
+  summaries computed by the API.
+- **Connector:** OS credential store, atomic queue, CSRF + DNS-rebinding
+  guard, pause persisted and uploaded while paused, hook dedupe, LaunchAgent /
+  Task Scheduler / systemd with `--status` and `--uninstall`, release signing
+  tooling.
+- **Ops:** `db:migrate` is local-only; production needs `--production`.
+  DEPLOY.md rewritten around a greenfield org with no seed.
+
+Still open or blocked: see `pending.md` (legal, certificates, production
+credential rotation, SSO, §19 CI suite, Claude OTel tokens).

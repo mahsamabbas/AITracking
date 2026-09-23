@@ -45,21 +45,15 @@ describe("rollupConnectorState", () => {
 });
 
 describe("emptyActivityVariant", () => {
-  it("does not call a live Cursor collector offline because a demo Claude device exists", () => {
-    expect(
-      emptyActivityVariant([
-        { state: "online", isDemo: false },
-        { state: "offline", isDemo: true },
-      ]),
-    ).toBe("no-activity");
+  it("reports no activity when any connector is reporting", () => {
+    expect(emptyActivityVariant([{ state: "online" }, { state: "offline" }])).toBe("no-activity");
   });
 
-  it("is connector-offline when nothing live has reported in", () => {
-    expect(
-      emptyActivityVariant([
-        { state: "offline", isDemo: true },
-        { state: "offline", isDemo: false },
-      ]),
-    ).toBe("connector-offline");
+  it("reports paused, not offline, when collection is paused", () => {
+    expect(emptyActivityVariant([{ state: "paused" }, { state: "offline" }])).toBe("paused");
+  });
+
+  it("is connector-offline when nothing has reported in", () => {
+    expect(emptyActivityVariant([{ state: "offline" }])).toBe("connector-offline");
   });
 });

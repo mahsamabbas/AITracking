@@ -17,16 +17,17 @@ else
 fi
 
 vercel env ls production 2>/dev/null | grep -q '^ SKIP_REDIS ' || printf '%s\n' '1' | vercel env add SKIP_REDIS production
-vercel env ls production 2>/dev/null | grep -q '^ ALLOW_DEV_HEADER_AUTH ' || printf '%s\n' '0' | vercel env add ALLOW_DEV_HEADER_AUTH production
 
-vercel env pull "$ROOT/apps/api/.env.local" --environment=production --yes
+# Production values go to .env.production.local only. Never to .env.local:
+# local `pnpm dev` loads .env.local and must not point at the production DB.
+vercel env pull "$ROOT/apps/api/.env.production.local" --environment=production --yes
 
 echo "==> Web project: tracking-app-api-t9yd"
 cd "$ROOT/apps/web"
 vercel link --project tracking-app-api-t9yd --yes 2>/dev/null || vercel link --project tracking-app-api-t9yd
 vercel env rm NEXT_PUBLIC_API_URL production --yes 2>/dev/null || true
 printf '%s\n' "$API_URL" | vercel env add NEXT_PUBLIC_API_URL production
-vercel env pull "$ROOT/apps/web/.env.local" --environment=production --yes
+vercel env pull "$ROOT/apps/web/.env.production.local" --environment=production --yes
 
 echo "Done. Redeploy from repo root (not apps/web or .vercel-api):"
 echo "  $ROOT/scripts/deploy-vercel.sh all"

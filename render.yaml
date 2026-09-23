@@ -14,8 +14,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ALLOW_DEV_HEADER_AUTH
-        value: "0"
       - key: SKIP_REDIS
         value: "1"
       - key: JWT_SECRET

@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   EventTypes,
   providerCapability,
@@ -9,11 +9,13 @@ import {
   type ActivityEvent,
 } from "@techlio/event-schema";
 import { claudeHookToEvents, type ClaudeHookPayload } from "@techlio/provider-adapters";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { getSecret, setSecret, backend as secretBackend } from "./secret-store.js";
 import { ensureAgentHooks } from "./agent-hooks.js";
 import { config } from "./config.js";
 import {
   clearIdentity,
+  identityDir,
   loadIdentity,
   publicIdentity,
   type ConnectorIdentity,
@@ -24,7 +26,24 @@ import { loadOrCreateSigningKey, publicSigningKey } from "./signing.js";
 import { sanitizeEvent } from "./redaction.js";
 import { uploadBatch } from "./uploader.js";
 
-let paused = false;
+// Pause is the employee's choice and must survive restarts and reboots.
+const STATE_FILE = join(identityDir(), "state.json");
+function loadPaused(): boolean {
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, "utf8")).paused === true;
+  } catch {
+    return false;
+  }
+}
+function savePaused(value: boolean): void {
+  try {
+    mkdirSync(identityDir(), { recursive: true, mode: 0o700 });
+    writeFileSync(STATE_FILE, JSON.stringify({ paused: value, at: new Date().toISOString() }), { mode: 0o600 });
+  } catch {
+    /* best effort; in-memory state still applies */
+  }
+}
+let paused = loadPaused();
 /** Actual host agent — declared by the IDE companion, not hardcoded as Claude. */
 let hostProvider = config.provider;
 let contextLabel: string | undefined;
@@ -85,7 +104,16 @@ function defaultStatus(
 
 const signingKey = loadOrCreateSigningKey(config.signingKeyHex);
 mkdirSync(dirname(config.dbPath), { recursive: true });
-const queue = new EncryptedQueue(config.dbPath, "techlio-local-queue");
+function queueSecret(): string {
+  const existing = getSecret("queue-key");
+  if (existing) return existing;
+  const fresh = randomBytes(32).toString("hex");
+  setSecret("queue-key", fresh);
+  return fresh;
+}
+// "techlio-local-queue" was a shared literal in older builds; it is accepted
+// only to read rows queued before this upgrade, never to write new ones.
+const queue = new EncryptedQueue(config.dbPath, queueSecret(), ["techlio-local-queue"]);
 
 function apiBase(): string {
   return identity?.apiBaseUrl ?? config.apiBaseUrl;
@@ -142,9 +170,21 @@ function baseEvent(
   };
 }
 
+let reportedLostRows = 0;
+
 async function flushQueue(): Promise<void> {
-  if (paused || !identity || flushing) return;
+  // Pausing stops *collection*, not upload: the coverage-gap and pause events
+  // queued at pause time must still reach the server (FR-005). No new agent
+  // events are queued while paused.
+  if (!identity || flushing) return;
   const pending = queue.peekBatch();
+  if (queue.lostRows > reportedLostRows) {
+    // Queued events that could not be read are gone; say so instead of
+    // letting the interval look like inactivity (FR-019).
+    reportedLostRows = queue.lostRows;
+    const lost = baseEvent(EventTypes.upload_failed, { status: "failed" });
+    if (lost) queue.enqueue([lost]);
+  }
   const batch = pending.events.map(stamp);
   if (batch.length === 0) return;
   flushing = true;
@@ -237,8 +277,21 @@ function dashboardOriginAllowed(origin: string): boolean {
 
 const app = Fastify({ logger: false });
 
+const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+
 app.addHook("onRequest", async (req, reply) => {
+  // DNS-rebinding guard: only loopback Host headers reach this API.
+  if (!LOOPBACK_HOST.test(String(req.headers.host ?? ""))) {
+    return reply.code(403).send({ error: "host_not_allowed" });
+  }
   const origin = req.headers.origin;
+  // CSRF guard: a browser always sends Origin on cross-site requests, so any
+  // request from a website that is not the Techlio dashboard is refused —
+  // including "simple" form POSTs that skip CORS preflight. Local tools (the
+  // hook runner, the IDE companion) send no Origin and are unaffected.
+  if (typeof origin === "string" && !dashboardOriginAllowed(origin)) {
+    return reply.code(403).send({ error: "origin_not_allowed" });
+  }
   if (typeof origin === "string" && dashboardOriginAllowed(origin)) {
     reply.header("Access-Control-Allow-Origin", origin);
     reply.header("Vary", "Origin");
@@ -257,6 +310,8 @@ app.get("/health", async () => {
   return {
     paused,
     queueDepth: queue.depth(),
+    lostQueueRows: queue.lostRows,
+    credentialStore: secretBackend(),
     version: config.connectorVersion,
     provider: hostProvider,
     ...publicIdentity(identity),
@@ -354,6 +409,7 @@ function enqueueCoverageGap(reason: "paused" | "offline"): void {
 
 app.post("/pause", async () => {
   paused = true;
+  savePaused(true);
   enqueueCoverageGap("paused");
   void postApiHeartbeat();
   return { paused: true };
@@ -361,6 +417,7 @@ app.post("/pause", async () => {
 
 app.post("/resume", async () => {
   paused = false;
+  savePaused(false);
   const resumed = baseEvent(EventTypes.connector_resumed, {
     metadata: { connector_paused: false },
   });
@@ -628,7 +685,24 @@ app
     if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
     console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
   })
-  .catch((err) => {
+  .catch(async (err: NodeJS.ErrnoException) => {
+    if (err?.code === "EADDRINUSE") {
+      // Another process owns the port. If it is a Techlio connector, this copy
+      // is a duplicate (e.g. launched manually while the service runs) and
+      // exits cleanly; exit code 0 tells launchd/systemd not to respawn it.
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/health`);
+        const body = (await r.json()) as { version?: string };
+        if (body.version) {
+          console.log(`Techlio connector is already running on 127.0.0.1:${port}. Nothing to do.`);
+          process.exit(0);
+        }
+      } catch {
+        /* not ours */
+      }
+      console.error(`Port ${port} is used by another program. Set CONNECTOR_PORT to change it.`);
+      process.exit(78); // EX_CONFIG: do not respawn
+    }
     console.error(err);
     process.exit(1);
   });

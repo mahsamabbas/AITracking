@@ -110,29 +110,24 @@ export async function listEmployeeDirectory(
       GROUP BY s.developer_id
     ),
     health AS (
-      -- Person-level badge follows the live collector. Frozen demo devices
-      -- (demo_state = 'offline') are ignored so a seeded Claude row cannot
-      -- mark someone disconnected while Cursor is actually heartbeating.
+      -- Person-level badge is the worst state across live connector rows.
       SELECT d.developer_id,
              MAX(ch.paused)                                         AS paused,
              MAX(ch.last_heartbeat)                                 AS last_heartbeat,
              bool_or(
-               ch.demo_state IS DISTINCT FROM 'offline'
-               AND ch.last_heartbeat IS NULL
+               ch.last_heartbeat IS NULL
              )                                                      AS any_offline,
              bool_or(
-               ch.demo_state IS DISTINCT FROM 'offline'
-               AND ch.last_heartbeat < NOW() - INTERVAL '5 minutes'
+               ch.last_heartbeat < NOW() - INTERVAL '5 minutes'
              )                                                      AS any_stale,
              bool_or(
-               ch.demo_state IS DISTINCT FROM 'offline'
-               AND ch.paused IS DISTINCT FROM 1
+               ch.paused IS DISTINCT FROM 1
                AND ch.last_heartbeat IS NOT NULL
                AND ch.last_heartbeat >= NOW() - INTERVAL '5 minutes'
              )                                                      AS any_online
       FROM devices d
       LEFT JOIN connector_health ch ON ch.device_id = d.id
-      WHERE d.organization_id = ${f.organizationId} AND d.revoked_at IS NULL
+      WHERE d.organization_id = ${f.organizationId} AND d.revoked_at IS NULL AND d.kind = 'connector'
       GROUP BY d.developer_id
     )
     SELECT e.id, e.display_name, e.email, e.team, e.title, e.status,
@@ -726,26 +721,22 @@ export async function coverageSummary(
       WITH h AS (
         SELECT d.developer_id,
                bool_or(
-                 ch.demo_state IS DISTINCT FROM 'offline'
-                 AND ch.paused = 1
+                 ch.paused = 1
                ) AS paused,
                bool_or(
-                 ch.demo_state IS DISTINCT FROM 'offline'
-                 AND ch.paused IS DISTINCT FROM 1
+                 ch.paused IS DISTINCT FROM 1
                  AND ch.last_heartbeat IS NOT NULL
                  AND ch.last_heartbeat >= NOW() - INTERVAL '5 minutes'
                ) AS online,
                bool_or(
-                 ch.demo_state IS DISTINCT FROM 'offline'
-                 AND ch.last_heartbeat IS NOT NULL
+                 ch.last_heartbeat IS NOT NULL
                  AND ch.last_heartbeat < NOW() - INTERVAL '5 minutes'
                ) AS stale,
                bool_or(
-                 ch.demo_state IS DISTINCT FROM 'offline'
-                 AND ch.last_heartbeat IS NULL
+                 ch.last_heartbeat IS NULL
                ) AS offline
         FROM devices d LEFT JOIN connector_health ch ON ch.device_id = d.id
-        WHERE d.organization_id = ${organizationId} AND d.revoked_at IS NULL
+        WHERE d.organization_id = ${organizationId} AND d.revoked_at IS NULL AND d.kind = 'connector'
           ${developerIdIn("d.developer_id", developerIds)}
         GROUP BY d.developer_id
       )
@@ -837,7 +828,7 @@ export async function organizationAnalytics(input: {
       SELECT COUNT(*)::int AS total,
              COUNT(*) FILTER (
                WHERE EXISTS (SELECT 1 FROM devices d
-                             WHERE d.developer_id = e.id AND d.revoked_at IS NULL)
+                             WHERE d.developer_id = e.id AND d.revoked_at IS NULL AND d.kind = 'connector')
              )::int AS connected
       FROM employees e
       WHERE e.organization_id = ${input.organizationId} AND e.status = 'active'
@@ -928,7 +919,6 @@ export interface EmployeeDevice {
   queueDepth: number | null;
   paused: boolean;
   state: "online" | "stale" | "paused" | "offline";
-  isDemo: boolean;
 }
 
 export async function employeeDevices(
@@ -944,17 +934,15 @@ export async function employeeDevices(
     queue_depth: number | null;
     paused: number | null;
     health_provider: string | null;
-    demo_state: string | null;
   }>(sql`
     SELECT d.id, d.provider, d.label,
            ch.version, ch.last_heartbeat, ch.queue_depth, ch.paused,
-           ch.provider AS health_provider, ch.demo_state
+           ch.provider AS health_provider
     FROM devices d
     LEFT JOIN connector_health ch ON ch.device_id = d.id
     WHERE d.organization_id = ${organizationId}
       AND d.developer_id = ${developerId}
-      AND d.revoked_at IS NULL
-      AND ch.demo_state IS DISTINCT FROM 'offline'
+      AND d.revoked_at IS NULL AND d.kind = 'connector'
     ORDER BY d.created_at ASC
   `);
   return res.rows.map((r) => ({
@@ -966,7 +954,6 @@ export async function employeeDevices(
     queueDepth: r.queue_depth,
     paused: r.paused === 1,
     state: connectorStateOf(r.paused, r.last_heartbeat),
-    isDemo: r.demo_state != null,
   }));
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useChartAnimation } from "@/lib/use-reduced-motion";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartFrame, TooltipShell } from "./ChartFrame";
 import { CHART_COLORS } from "@/lib/vocab";
@@ -27,13 +28,14 @@ export function DonutChart({
   emptyBody?: string;
   emptyVariant?: EmptyVariant;
 }) {
+  const anim = useChartAnimation();
   const total = data.reduce((s, d) => s + d.value, 0);
   return (
     <div className="flex flex-wrap items-center gap-4">
       <div className="relative min-w-[160px] flex-1">
         <ChartFrame height={height} isEmpty={total === 0} emptyBody={emptyBody} emptyVariant={emptyVariant}>
           <PieChart>
-            <Pie
+            <Pie {...anim}
               data={data}
               dataKey="value"
               nameKey="name"

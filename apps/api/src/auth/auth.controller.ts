@@ -10,7 +10,6 @@ import {
   authenticatePortalUser,
   homePathForRole,
   listDeveloperDevices,
-  seedPortalUsers,
 } from "@techlio/server-core";
 import { signUserToken, verifyUserToken } from "./jwt.js";
 
@@ -18,7 +17,6 @@ import { signUserToken, verifyUserToken } from "./jwt.js";
 export class AuthController {
   @Post("login")
   async login(@Body() body: { email?: string; password?: string }) {
-    await seedPortalUsers();
     const email = body.email ?? "";
     const password = body.password ?? "";
     const user = await authenticatePortalUser(email, password);

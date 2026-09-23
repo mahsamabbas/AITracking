@@ -1,8 +1,9 @@
 import { desc, eq } from "drizzle-orm";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { db } from "./db.js";
 import { portalUsers, auditLog, employees } from "./schema.js";
 import type { Role } from "./roles.js";
+import { devAffordancesEnabled } from "./runtime.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
 export const DEV_DEVELOPER_ALEX = "550e8400-e29b-41d4-a716-446655440011";
@@ -57,8 +58,32 @@ export const DEMO_USERS: {
   },
 ];
 
-function hashPassword(password: string): string {
+/** scrypt with a per-user salt: `scrypt$<saltHex>$<hashHex>`. */
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 32);
+  return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
+}
+
+/** Legacy unsalted SHA-256 hashes are still verified, then upgraded on login. */
+function legacyHash(password: string): string {
   return createHash("sha256").update(`techlio:${password}`).digest("hex");
+}
+
+export function verifyPassword(password: string, stored: string): { ok: boolean; legacy: boolean } {
+  if (stored.startsWith("scrypt$")) {
+    const [, saltHex, hashHex] = stored.split("$");
+    if (!saltHex || !hashHex) return { ok: false, legacy: false };
+    const expected = Buffer.from(hashHex, "hex");
+    const actual = scryptSync(password, Buffer.from(saltHex, "hex"), expected.length);
+    return { ok: timingSafeEqual(actual, expected), legacy: false };
+  }
+  if (/^[0-9a-f]{64}$/.test(stored)) {
+    const a = Buffer.from(legacyHash(password), "hex");
+    const b = Buffer.from(stored, "hex");
+    return { ok: timingSafeEqual(a, b), legacy: true };
+  }
+  return { ok: false, legacy: false }; // disabled sentinel or unknown format
 }
 
 export type PortalUserPublic = {
@@ -71,6 +96,7 @@ export type PortalUserPublic = {
 };
 
 export async function seedPortalUsers(): Promise<void> {
+  if (!devAffordancesEnabled()) return;
   try {
     for (const u of DEMO_USERS) {
       await db
@@ -84,7 +110,11 @@ export async function seedPortalUsers(): Promise<void> {
           role: u.role,
           developerId: u.developerId ?? null,
         })
-        .onConflictDoNothing();
+        // Dev only: restores demo passwords that migration 008 disabled.
+        .onConflictDoUpdate({
+          target: portalUsers.email,
+          set: { passwordHash: hashPassword(u.password) },
+        });
     }
   } catch {
     /* table may not exist until migration 004 */
@@ -95,13 +125,19 @@ export async function authenticatePortalUser(
   email: string,
   password: string,
 ): Promise<PortalUserPublic | null> {
-  const hash = hashPassword(password);
   const rows = await db
     .select()
     .from(portalUsers)
     .where(eq(portalUsers.email, email.toLowerCase().trim()));
   const row = rows[0];
-  if (row && row.passwordHash === hash) {
+  const check = row ? verifyPassword(password, row.passwordHash) : { ok: false, legacy: false };
+  if (row && check.ok) {
+    if (check.legacy) {
+      await db
+        .update(portalUsers)
+        .set({ passwordHash: hashPassword(password) })
+        .where(eq(portalUsers.id, row.id));
+    }
     await db.insert(auditLog).values({
       organizationId: row.organizationId,
       actorId: row.id,
@@ -124,17 +160,8 @@ export async function authenticatePortalUser(
     return toPublic(row);
   }
 
-  const demo = DEMO_USERS.find((u) => u.email === email.toLowerCase().trim());
-  if (demo && demo.password === password) {
-    return {
-      id: demo.id,
-      email: demo.email,
-      displayName: demo.displayName,
-      role: demo.role,
-      organizationId: DEV_ORG,
-      developerId: demo.developerId ?? null,
-    };
-  }
+  // No hardcoded-credential fallback: a user exists in portal_users or does
+  // not sign in at all.
   return null;
 }
 

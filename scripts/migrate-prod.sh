@@ -22,7 +22,7 @@ if corrupted_env "$API_DIR/.env.local" || corrupted_env "$API_DIR/.env.productio
   echo "Or copy POSTGRES_URL from Vercel → tracking-app-api → Settings → Environment Variables"
   echo "  (click the eye icon), then in Terminal:"
   echo "  export DATABASE_URL='postgresql://...'"
-  echo "  node \"$ROOT/scripts/migrate.mjs\""
+  echo "  node \"$ROOT/scripts/migrate.mjs\" --production"
   echo ""
   echo "This run will try vercel env run without your broken .env.local (moved aside)."
   BACKUP_SUFFIX=".bak-before-migrate-$(date +%s)"
@@ -37,4 +37,4 @@ fi
 echo "==> Running migrate with Vercel production env (tracking-app-api)"
 cd "$API_DIR"
 exec vercel env run --environment production --project tracking-app-api -- \
-  node "$ROOT/scripts/migrate.mjs"
+  node "$ROOT/scripts/migrate.mjs" --production

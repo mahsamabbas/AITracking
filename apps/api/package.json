@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/main.ts",
+    "dev": "TECHLIO_DEV_MODE=1 tsx watch src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run --passWithNoTests",
     "lint": "echo ok"

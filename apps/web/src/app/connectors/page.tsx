@@ -166,7 +166,7 @@ export default function ConnectorsPage() {
                       <ProviderBadge provider={c.provider} size="sm" />
                     </td>
                     <td>
-                      <ConnectorBadge state={c.state} demo={c.isDemo} />
+                      <ConnectorBadge state={c.state} />
                     </td>
                     <td className="num text-sm text-ink-500">{formatRelative(c.lastHeartbeat)}</td>
                     <td className="num text-right text-sm text-ink-500">{c.queueDepth ?? "—"}</td>

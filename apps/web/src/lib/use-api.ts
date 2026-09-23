@@ -10,6 +10,8 @@ export interface QueryState<T> {
   status: number | null;
   loading: boolean;
   refreshing: boolean;
+  /** When the current `data` was received — shown as "Data as of …". */
+  fetchedAt: Date | null;
   reload: () => void;
 }
 
@@ -28,14 +30,25 @@ export function useApi<T>(
   const [status, setStatus] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const [nonce, setNonce] = useState(0);
   const hasData = useRef(false);
+  const lastPath = useRef<string | null>(null);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     if (!ready || !token || !path) return;
     let cancelled = false;
+
+    // New path (e.g. a filter changed): drop the old payload so stale numbers
+    // are never shown under new filter labels, and show the loading skeleton.
+    if (lastPath.current !== path) {
+      lastPath.current = path;
+      hasData.current = false;
+      setData(null);
+      setFetchedAt(null);
+    }
 
     const run = async (background: boolean) => {
       if (background) setRefreshing(true);
@@ -44,6 +57,7 @@ export function useApi<T>(
         const result = await apiGet<T>(path, token);
         if (cancelled) return;
         setData(result);
+        setFetchedAt(new Date());
         hasData.current = true;
         setError(null);
         setStatus(200);
@@ -59,7 +73,8 @@ export function useApi<T>(
       }
     };
 
-    void run(false);
+    // A reload with data already on screen is a refresh, not a first paint.
+    void run(hasData.current);
     if (options?.pollMs) {
       const id = setInterval(() => void run(true), options.pollMs);
       return () => {
@@ -72,10 +87,5 @@ export function useApi<T>(
     };
   }, [path, token, ready, nonce, options?.pollMs]);
 
-  useEffect(() => {
-    hasData.current = false;
-    setData(null);
-  }, [path]);
-
-  return { data, error, status, loading, refreshing, reload };
+  return { data, error, status, loading, refreshing, fetchedAt, reload };
 }

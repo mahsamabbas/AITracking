@@ -2,8 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens
+ * ─────────────
+ * Colour   --color-*   RGB triplets consumed by Tailwind (`bg-card`, `text-ink-500`, …).
+ *                      html.dark redefines them; components never hardcode dark colours.
+ * Charts   --chart-*   Series colours. Never the only carrier of meaning: every chart
+ *                      pairs colour with a legend label, and tooltips name the series.
+ * State    --state-*   Connector states, mirroring CONNECTOR_STATE tones in lib/vocab.ts:
+ *                      online → ok, stale/paused → warn, offline → bad.
+ * Motion   --motion-*  fast 150ms (hover/focus) · normal 250ms (drawers, tabs)
+ *                      · slow 400ms (chart draw, page enter). All collapse to 0 under
+ *                      prefers-reduced-motion — state changes stay instant.
+ * Elevation --shadow-* 1 resting card · 2 hover/popover · 3 drawer/modal.
+ */
 @layer base {
   :root {
+    --motion-fast: 150ms;
+    --motion-normal: 250ms;
+    --motion-slow: 400ms;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.04);
+    --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.08);
+    --shadow-3: 0 12px 32px rgba(16, 24, 40, 0.16);
+    --state-ok: 13 148 136;
+    --state-warn: 217 119 6;
+    --state-bad: 225 29 72;
+    --state-idle: 100 116 139;
+    --focus-ring: 99 102 241;
     --color-canvas: 246 247 249;
     --color-card: 255 255 255;
     --color-line: 229 231 235;
@@ -50,7 +76,30 @@
     --chart-idle: #475569;
     --chart-grid: #2a3140;
     --chart-axis: #9ca3af;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 6px 16px rgba(0, 0, 0, 0.4);
+    --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.55);
+    --state-ok: 45 212 191;
+    --state-warn: 251 191 36;
+    --state-bad: 251 113 133;
+    --state-idle: 148 163 184;
+    --focus-ring: 165 180 252;
     color-scheme: dark;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-fast: 0ms;
+      --motion-normal: 0ms;
+      --motion-slow: 0ms;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
   html,
   body {
@@ -62,8 +111,11 @@
   ::selection {
     @apply bg-brand-100 text-brand-900;
   }
+  /* Keyboard focus must always be visible (WCAG 2.4.7). */
   *:focus-visible {
-    @apply outline-none;
+    outline: 2px solid rgb(var(--focus-ring));
+    outline-offset: 2px;
+    border-radius: 6px;
   }
   html.dark input[type="date"],
   html.dark input[type="time"] {
@@ -75,6 +127,9 @@
   /* ---------- surfaces ---------- */
   .card {
     @apply rounded-xl border border-line bg-card shadow-card;
+  }
+  .card-interactive {
+    @apply card transition-[box-shadow,border-color] duration-fast ease-out-soft hover:border-line-strong hover:shadow-pop;
   }
   .card-pad {
     @apply card p-5;
@@ -134,7 +189,11 @@
 
   /* ---------- controls ---------- */
   .btn {
-    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  /* Primary actions on touch layouts get a 44px target. */
+  .btn-touch {
+    @apply max-lg:h-11 max-lg:px-4;
   }
   .code-snippet {
     @apply mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-slate-600 bg-slate-900 px-3 py-2.5 font-mono text-xs leading-relaxed text-slate-50 shadow-inner;
@@ -153,7 +212,7 @@
     @apply btn px-2 text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/10;
   }
   .field {
-    @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-line focus:outline-none;
+    @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 transition-colors duration-fast placeholder:text-ink-400 focus:border-brand-500;
   }
   .seg {
     @apply inline-flex rounded-lg border border-line bg-card p-0.5;
@@ -205,7 +264,57 @@
   .card-table {
     @apply flex min-h-0 flex-col overflow-hidden;
   }
+  /* Sticky headers must be opaque or scrolled rows show through them. */
   .table-scroll .tbl thead th {
-    @apply sticky top-0 z-10 shadow-[0_1px_0_0_var(--line)];
+    @apply sticky top-0 z-10 bg-canvas shadow-[0_1px_0_0_rgb(var(--color-line))] dark:bg-card;
   }
+}
+
+@layer utilities {
+  /* Page enter: main content only, never the shell. */
+  .enter {
+    animation: enter var(--motion-slow) var(--ease-out) both;
+  }
+  /* Sibling stagger (opacity only). Set --i on each child, max 5. */
+  .stagger > * {
+    animation: fade var(--motion-slow) var(--ease-out) both;
+    animation-delay: calc(min(var(--i, 0), 5) * 40ms);
+  }
+  .pulse-online {
+    animation: pulse-online 2.4s ease-in-out infinite;
+  }
+  .drawer-in {
+    animation: drawer-in var(--motion-normal) var(--ease-out) both;
+  }
+  .backdrop-in {
+    animation: fade var(--motion-normal) ease-out both;
+  }
+  .toast-in {
+    animation: toast-in var(--motion-normal) var(--ease-out) both;
+  }
+  .crossfade {
+    animation: fade var(--motion-normal) ease-out both;
+  }
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(12px, -8px); }
+  to { opacity: 1; transform: none; }
+}
+/* Soft halo on the online dot only — never on people or scores. */
+@keyframes pulse-online {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--state-ok) / 0.45); }
+  50% { box-shadow: 0 0 0 4px rgb(var(--state-ok) / 0); }
 }

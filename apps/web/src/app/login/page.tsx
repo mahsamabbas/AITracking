@@ -10,6 +10,13 @@ import {
   loadEnrollment,
 } from "@/lib/biometric";
 
+/**
+ * Local-only demo accounts. The panel renders only when the build sets
+ * NEXT_PUBLIC_SHOW_DEMO_LOGINS=1 (apps/web/.env.development.local). Production
+ * builds show a plain sign-in form; those accounts are disabled server-side
+ * outside dev mode anyway.
+ */
+const SHOW_DEMO = process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS === "1";
 const DEMO = [
   { role: "Manager", email: "manager@techlio.local", password: "manager123", desc: "Team analytics, employees, sessions" },
   { role: "Administrator", email: "admin@techlio.local", password: "admin123", desc: "Plus users, connectors, policy" },
@@ -19,8 +26,8 @@ const DEMO = [
 
 export default function LoginPage() {
   const { login, unlockWithBiometric, locked } = useAuth();
-  const [email, setEmail] = useState("manager@techlio.local");
-  const [password, setPassword] = useState("manager123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -151,8 +158,9 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {SHOW_DEMO ? (
       <div className="hidden flex-col justify-center bg-slate-950 px-10 py-12 lg:flex">
-        <p className="label text-brand-200">Demo accounts</p>
+        <p className="label text-brand-200">Local demo accounts</p>
         <h2 className="mt-2 text-xl font-semibold text-white">
           Four portals, one dataset
         </h2>
@@ -181,6 +189,16 @@ export default function LoginPage() {
           ))}
         </ul>
       </div>
+      ) : (
+        <div className="hidden flex-col justify-center bg-slate-950 px-10 py-12 lg:flex">
+          <p className="label text-brand-200">Techlio</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">Agent activity, not timekeeping</h2>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
+            Every screen, API, and query is scoped by role. Developers see exactly what is collected
+            about them — no more, no less. Missing telemetry is never treated as inactivity.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

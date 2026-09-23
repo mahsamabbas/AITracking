@@ -16,6 +16,7 @@ import {
   SearchFilter,
   SelectFilter,
 } from "@/components/filters/FilterBar";
+import { ContextBar } from "@/components/ui/ContextBar";
 import {
   RangePicker,
   rangeLabel,
@@ -54,7 +55,16 @@ export default function EmployeesPage() {
   const [sort, setSort] = useState<SortKey>("activity");
 
   const meta = useApi<FilterMeta>("/v1/meta/filters");
-  const query = useApi<{ employees: EmployeeRow[] }>(
+  const query = useApi<{
+    employees: EmployeeRow[];
+    summary?: {
+      listed: number;
+      withActivity: number;
+      activeMs: number;
+      sessions: number;
+      coverageWarnings: number;
+    };
+  }>(
     `/v1/employees${qs({
       ...rangeParams(range),
       search: search || undefined,
@@ -67,13 +77,13 @@ export default function EmployeesPage() {
 
   const rows = query.data?.employees ?? [];
 
-  const summary = useMemo(() => {
-    const activeMs = rows.reduce((s, r) => s + r.activeMs, 0);
-    const sessions = rows.reduce((s, r) => s + r.sessions, 0);
-    const withActivity = rows.filter((r) => r.sessions > 0).length;
-    const warnings = rows.filter((r) => r.coverageWarning).length;
-    return { activeMs, sessions, withActivity, warnings };
-  }, [rows]);
+  const summary = query.data?.summary ?? {
+    listed: rows.length,
+    withActivity: 0,
+    activeMs: 0,
+    sessions: 0,
+    coverageWarnings: 0,
+  };
 
   const chips = [
     search ? { label: `Search: ${search}`, onRemove: () => setSearch("") } : null,
@@ -98,6 +108,13 @@ export default function EmployeesPage() {
       title="Employees"
       subtitle={`AI tool usage per person · ${rangeLabel(range)}`}
     >
+      <ContextBar
+        subject={"Organisation · all employees"}
+        rangeLabel={rangeLabel(range)}
+        fetchedAt={query.fetchedAt}
+        refreshing={query.refreshing}
+        onRefresh={() => { query.reload() }}
+      />
       <FilterBar
         right={
           <SelectFilter
@@ -134,14 +151,20 @@ export default function EmployeesPage() {
           width="w-[170px]"
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
-        <SelectFilter
-          label="Connector"
-          value={connectorState}
-          onChange={setConnectorState}
-          allLabel="Any status"
-          width="w-[140px]"
-          options={CONNECTOR_STATES}
-        />
+        <div className="seg" role="radiogroup" aria-label="Connector state">
+          {[{ value: "", label: "All" }, ...CONNECTOR_STATES].map((o) => (
+            <button
+              key={o.value || "all"}
+              type="button"
+              role="radio"
+              aria-checked={connectorState === o.value}
+              className={connectorState === o.value ? "seg-item-on" : "seg-item"}
+              onClick={() => setConnectorState(o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </FilterBar>
 
       <ActiveFilters chips={chips} onClear={clearAll} />
@@ -170,9 +193,9 @@ export default function EmployeesPage() {
           />
           <StatTile
             label="Coverage warnings"
-            value={summary.warnings}
+            value={summary.coverageWarnings}
             hint="stale, paused, or offline connectors"
-            accent={summary.warnings > 0 ? "amber" : "slate"}
+            accent={summary.coverageWarnings > 0 ? "amber" : "slate"}
           />
         </section>
       )}
@@ -196,7 +219,7 @@ export default function EmployeesPage() {
             <LoadingBlock rows={6} />
           ) : rows.length === 0 ? (
             <EmptyState
-              variant={chips.length > 0 ? "no-results" : "no-activity"}
+              variant={chips.length > 0 ? "no-results" : "no-employees"}
               action={
                 chips.length > 0 ? (
                   <button type="button" className="btn-ghost" onClick={clearAll}>
@@ -210,15 +233,15 @@ export default function EmployeesPage() {
               <table className="tbl min-w-[960px]">
                 <thead>
                   <tr>
-                    <th>Employee</th>
+                    <SortHeader label="Employee" sortKey="name" current={sort} onSort={setSort} />
                     <th>Connector</th>
                     <th>AI tools used</th>
-                    <th className="text-right">AI active time</th>
+                    <SortHeader label="AI active time" sortKey="activity" current={sort} onSort={setSort} align="right" />
                     <th className="text-right">Productive</th>
-                    <th className="text-right">Sessions</th>
+                    <SortHeader label="Sessions" sortKey="sessions" current={sort} onSort={setSort} align="right" />
                     <th className="text-right">Avg session</th>
                     <th>Trend</th>
-                    <th>Last active</th>
+                    <SortHeader label="Last active" sortKey="recent" current={sort} onSort={setSort} />
                     <th className="text-right">This hour</th>
                     <th aria-label="Open" />
                   </tr>
@@ -330,5 +353,40 @@ export default function EmployeesPage() {
         effort — planning, review, meetings, and manual coding are invisible to this system.
       </p>
     </AppShell>
+  );
+}
+
+/** Column header that sorts server-side; exposes the state via aria-sort. */
+function SortHeader({
+  label,
+  sortKey,
+  current,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey;
+  onSort: (k: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = current === sortKey;
+  // The API sorts names ascending and every metric descending.
+  const direction = sortKey === "name" ? "ascending" : "descending";
+  return (
+    <th aria-sort={active ? direction : "none"} className={align === "right" ? "text-right" : undefined}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 uppercase tracking-[0.06em] transition-colors duration-fast hover:text-ink-900 ${
+          active ? "text-ink-900" : ""
+        }`}
+      >
+        {label}
+        <span aria-hidden className={active ? "text-brand-600" : "text-ink-400 opacity-0"}>
+          {direction === "ascending" ? "↑" : "↓"}
+        </span>
+      </button>
+    </th>
   );
 }

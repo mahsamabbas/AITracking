@@ -1,6 +1,6 @@
 # Delivery phase audit
 
-Reviewed: 2026-09-21  
+Reviewed: 2026-09-21 · provider section corrected 2026-09-23  
 Source: `memory-bank/requirements.md` (readable PRD v0.2 extract), implementation,
 tests, infrastructure, and memory bank.
 
@@ -54,9 +54,12 @@ Still required:
 
 Provider truth:
 
-- Claude Code hooks are the only credible Tier A implementation.
-- Cursor currently supplies companion file/task signals and optional daily Admin
-  API aggregates; it does not expose Cursor's internal model/tool stream.
+- Claude Code and Cursor are both observed through agent hooks (sessions,
+  agent turns, tool calls, file edits). Neither hook stream carries token
+  totals, and "model duration" is the agent turn (prompt → stop). Claude token
+  totals need OpenTelemetry ingestion, which is not built (routes return 501).
+- Cursor daily request counts come from the Admin API via the worker, attributed
+  per employee by email (see `docs/PRODUCTION_TRUTH_AUDIT.md`).
 - Codex and Gemini adapters are planned, not implemented. Their OTLP routes now
   reject with `501` instead of silently discarding telemetry.
 - GitHub Copilot is daily aggregate telemetry when enterprise credentials exist.

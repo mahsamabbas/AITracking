@@ -15,6 +15,7 @@ import {
   FilterBar,
   SelectFilter,
 } from "@/components/filters/FilterBar";
+import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
@@ -54,6 +55,7 @@ function SessionsInner() {
     employee: EmployeeProfile;
     sessions: SessionRow[];
     total: number;
+    matched?: { activeMs: number; fileChanges: number; testsRun: number };
     page: number;
     pageSize: number;
   }>(
@@ -77,12 +79,7 @@ function SessionsInner() {
     return map;
   }, [meta.data?.projects]);
 
-  const pageTotals = useMemo(() => {
-    const active = rows.reduce((s, r) => s + r.activeDurationMs, 0);
-    const files = rows.reduce((s, r) => s + r.fileChanges, 0);
-    const tests = rows.reduce((s, r) => s + r.testsRun, 0);
-    return { active, files, tests };
-  }, [rows]);
+  const matched = query.data?.matched;
 
   const chips = [
     provider ? { label: `Tool: ${providerLabel(provider)}`, onRemove: () => setProvider("") } : null,
@@ -137,6 +134,13 @@ function SessionsInner() {
         </Link>
       }
     >
+      <ContextBar
+        subject={`${query.data?.employee.displayName ?? "Employee"} · sessions`}
+        rangeLabel={rangeLabel(range)}
+        fetchedAt={query.fetchedAt}
+        refreshing={query.refreshing}
+        onRefresh={() => { query.reload() }}
+      />
       <FilterBar>
         <RangePicker value={range} onChange={setRange} />
         <SelectFilter
@@ -211,16 +215,16 @@ function SessionsInner() {
             accent="brand"
           />
           <StatTile
-            label="Agent active (this page)"
-            value={formatDuration(pageTotals.active, { compact: true })}
+            label="Agent active (all matched)"
+            value={matched ? formatDuration(matched.activeMs, { compact: true }) : "—"}
             hint="merged model + tool time"
             accent="teal"
           />
           <StatTile
-            label="Output (this page)"
-            value={formatNumber(pageTotals.files)}
+            label="Output (all matched)"
+            value={matched ? formatNumber(matched.fileChanges) : "—"}
             unit="file changes"
-            hint={`${pageTotals.tests} tests run`}
+            hint={matched ? `${formatNumber(matched.testsRun)} tests run` : undefined}
             accent="slate"
           />
         </section>

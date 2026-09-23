@@ -1,5 +1,6 @@
 "use client";
 
+import { useChartAnimation } from "@/lib/use-reduced-motion";
 import { useMemo } from "react";
 import {
   Area,
@@ -27,6 +28,7 @@ export function ChangeTrendChart({
   height?: number;
   fill?: boolean;
 }) {
+  const anim = useChartAnimation();
   const merged = useMemo(() => {
     const usage = new Map((aiUsageByDay ?? []).map((d) => [d.date, d.activeMs]));
     return data.map((d) => ({
@@ -103,7 +105,7 @@ export function ChangeTrendChart({
             return <TooltipShell title={formatDate(String(label))} rows={rows} />;
           }}
         />
-        <Area
+        <Area {...anim}
           yAxisId="files"
           type="monotone"
           dataKey="fileChanges"
@@ -113,7 +115,7 @@ export function ChangeTrendChart({
           dot={maxChanges > 0 && merged.length < 16}
         />
         {showAi ? (
-          <Line
+          <Line {...anim}
             yAxisId="ai"
             type="monotone"
             dataKey="activeMs"

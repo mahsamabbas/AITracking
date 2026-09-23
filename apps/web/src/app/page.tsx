@@ -22,6 +22,7 @@ import { AlertList } from "@/components/domain/AlertList";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { FilterBar, SelectFilter } from "@/components/filters/FilterBar";
+import { ContextBar } from "@/components/ui/ContextBar";
 import {
   RangePicker,
   rangeLabel,
@@ -168,16 +169,18 @@ export default function OverviewPage() {
         ) : null
       }
     >
-      <FilterBar
-        right={
-          live.data?.generatedAt ? (
-            <span className="flex items-center gap-1.5 text-2xs text-ink-500">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-500" />
-              Live · updated {formatRelative(live.data.generatedAt)}
-            </span>
-          ) : null
-        }
-      >
+      <ContextBar
+        subject={isSelfScope ? user?.displayName ?? "You" : "Organisation"}
+        rangeLabel={rangeLabel(range)}
+        fetchedAt={analytics.fetchedAt}
+        live={Boolean(live.data?.generatedAt)}
+        refreshing={analytics.refreshing || live.refreshing}
+        onRefresh={() => {
+          analytics.reload();
+          live.reload();
+        }}
+      />
+      <FilterBar>
         <RangePicker value={range} onChange={setRange} />
         {canViewTeam(user?.role) ? (
           <>
@@ -233,7 +236,7 @@ export default function OverviewPage() {
               <div className="flex flex-wrap items-center gap-3 p-5">
                 {liveConnectors.map((c) => (
                   <span key={c.deviceId} className="flex items-center gap-1.5">
-                    <ConnectorBadge state={c.state} demo={c.isDemo} />
+                    <ConnectorBadge state={c.state} />
                     <ProviderBadge provider={c.provider} size="sm" />
                     <span className="hint">{formatRelative(c.lastHeartbeat)}</span>
                   </span>
@@ -560,7 +563,7 @@ export default function OverviewPage() {
                             <ProviderBadge provider={c.provider} size="sm" />
                           </td>
                           <td>
-                            <ConnectorBadge state={c.state} demo={c.isDemo} />
+                            <ConnectorBadge state={c.state} />
                           </td>
                           <td className="num text-sm text-ink-500">
                             {formatRelative(c.lastHeartbeat)}
