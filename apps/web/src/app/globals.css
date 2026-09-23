@@ -140,11 +140,20 @@
   ::selection {
     @apply bg-brand-100 text-brand-900;
   }
-  /* Keyboard focus must always be visible (WCAG 2.4.7). */
-  *:focus-visible {
+  /* Keyboard focus on controls — not on text fields (outline stacks on .field borders). */
+  *:focus-visible:not(input):not(textarea):not(select) {
     outline: 2px solid rgb(var(--focus-ring));
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
   html.dark input[type="date"],
   html.dark input[type="time"] {
@@ -245,7 +254,10 @@
     @apply btn px-2 text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/10;
   }
   .field {
-    @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 transition-colors duration-fast placeholder:text-ink-400 focus:border-brand-500;
+    @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 outline-none transition-colors duration-fast placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0;
+  }
+  .field:focus-visible {
+    border-color: rgb(var(--color-brand-500));
   }
   .seg {
     @apply inline-flex rounded-lg border border-line bg-card p-0.5;
