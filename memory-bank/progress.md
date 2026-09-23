@@ -112,3 +112,30 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - **Ops:** `/v1/health` reports schema version; schema drift answers 503 with the fix instead of 500.
 - **Tests:** adapters 9, server-core 44, puller 5; live `ai-progress` + `tier-b` suites (`LIVE_STACK=1`).
 - Docs: `docs/phase0/provider-capability-matrix.md`, `docs/ai-progress-data-lineage.md`.
+
+## 2026-09-23/24 connector as a service, analytics, review fixes
+
+- **Connector packaging:** macOS `.pkg` → `/Library/Application Support/Techlio/Connector`
+  + LaunchAgent (no app bundle, no Dock icon) + Swift menu-bar app
+  (`apps/connector/macos/TechlioStatus.swift`). Windows `.exe` is GUI-subsystem, hidden
+  logon task (Run-key fallback), self-supervising worker, Settings → Apps entry, and a
+  PowerShell/WinForms tray (`--tray`, task `TechlioConnectorTray`). Both: pause/resume,
+  **stop/start** (stop = `telemetry_gap_started{gap_reason:"stopped"}` + clean exit 0;
+  start closes the gap).
+- **One connector per OS user:** port 9477–9486 chosen per user and recorded in
+  `~/.techlio-connector/port`; hooks, OTel endpoint, menu-bar/tray, IDE companion read it;
+  the dashboard discovers only the signed-in person's (or an unactivated) connector.
+- **Tracking fixes:** Claude Code file edits now counted (path from `tool_input.file_path`,
+  never content); heartbeats no longer stretch sessions/hourly spans; parallel tool calls
+  paired by `tool_use_id`; ingest enforces device ↔ developer and Tier B only from
+  `provider_pull`; per-event validation; auditors see no live sessions; user tool configs
+  never overwritten; transient Keychain/DPAPI failures never regenerate keys.
+- **Analytics:** `/leaderboard` (admins + managers only, owner decision 2026-09-23);
+  12-month activity calendar and per-day **Workday** graph (working span, AI active, idle,
+  exploration, editing, files per hour, periods, breaks, coverage gaps) on each employee.
+- **Ops:** production DB has all 12 migrations (verified 2026-09-24). Demo/stray people
+  removal: `scripts/purge-demo-data.mjs` (dry run by default; `--keep a,b` keep-list mode;
+  `--confirm` deletes in one transaction). Dry run on production 2026-09-24: keep talha,
+  Bilal, Rizwan, hassan bajwa; remove 12 seeded `@techlio.local` people + `random@techlio.com`
+  (~198k events) — **awaiting the owner's `--confirm` run**.
+- **Tests:** server-core 46, provider-adapters 12, connector 6, event-schema 6.

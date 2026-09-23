@@ -12,6 +12,13 @@
  *   node scripts/purge-demo-data.mjs                 # dry run: lists what would go
  *   node scripts/purge-demo-data.mjs --confirm       # deletes, in one transaction
  *
+ * Keep-list mode — remove EVERY employee except the named people (matched,
+ * case-insensitively, against display name or the part of the email before @):
+ *   node scripts/purge-demo-data.mjs --keep talha,bilal,rizwan,hassan
+ * Every name must match at least one person, or nothing is deleted (a typo must
+ * never wipe someone real). Only employees and their activity are removed;
+ * administrator / manager / auditor logins are always kept.
+ *
  * Production: export the Neon URL first (see docs/DEPLOY.md), then add --production:
  *   read -rs DATABASE_URL && export DATABASE_URL
  *   node scripts/purge-demo-data.mjs --production            # dry run
@@ -22,6 +29,14 @@ import pg from "pg";
 const PRODUCTION = process.argv.includes("--production");
 const CONFIRM = process.argv.includes("--confirm");
 const DEMO_DOMAIN = "%@techlio.local";
+const keepArg = process.argv.find((a, i) => process.argv[i - 1] === "--keep" || a.startsWith("--keep="));
+const KEEP = keepArg
+  ? keepArg.replace(/^--keep=/, "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean)
+  : null;
+if (process.argv.includes("--keep") && !KEEP?.length) {
+  console.error("--keep needs names, e.g. --keep talha,bilal. Nothing was changed.");
+  process.exit(1);
+}
 
 const looksReal = (url) => Boolean(url) && /^postgres(ql)?:\/\//.test(url) && !url.includes("[SENSITIVE]");
 
@@ -73,21 +88,34 @@ const host = new URL(connectionString).host;
 
 async function main() {
   await client.connect();
-  const people = (
-    await client.query(
-      `SELECT id, display_name, email FROM employees WHERE email ILIKE $1 ORDER BY display_name`,
-      [DEMO_DOMAIN],
-    )
-  ).rows;
-  const kept = (
-    await client.query(
-      `SELECT display_name, email FROM employees WHERE email IS NULL OR email NOT ILIKE $1 ORDER BY display_name`,
-      [DEMO_DOMAIN],
-    )
-  ).rows;
+  const everyone = (await client.query(`SELECT id, display_name, email FROM employees ORDER BY display_name`)).rows;
+  let people;
+  let kept;
+  if (KEEP) {
+    const matches = (e, term) =>
+      String(e.display_name ?? "").toLowerCase().includes(term) ||
+      String(e.email ?? "").toLowerCase().split("@")[0].includes(term);
+    const unmatched = KEEP.filter((term) => !everyone.some((e) => matches(e, term)));
+    if (unmatched.length) {
+      console.error(`No employee matches: ${unmatched.join(", ")}. Nothing was changed.`);
+      console.error("Employees found:");
+      for (const e of everyone) console.error(`  ${e.display_name} <${e.email ?? "no email"}>`);
+      process.exitCode = 1;
+      return;
+    }
+    for (const term of KEEP) {
+      const hits = everyone.filter((e) => matches(e, term));
+      if (hits.length > 1) console.warn(`Note: "${term}" matches ${hits.length} people; all of them are kept.`);
+    }
+    kept = everyone.filter((e) => KEEP.some((term) => matches(e, term)));
+    people = everyone.filter((e) => !kept.includes(e));
+  } else {
+    people = everyone.filter((e) => String(e.email ?? "").toLowerCase().endsWith("@techlio.local"));
+    kept = everyone.filter((e) => !people.includes(e));
+  }
 
-  console.log(`==> Demo data on ${host}${CONFIRM ? "" : " (dry run)"}`);
-  console.log(`Remove ${people.length} demo people:`);
+  console.log(`==> Employee data on ${host}${CONFIRM ? "" : " (dry run)"}${KEEP ? ` — keeping only: ${KEEP.join(", ")}` : ""}`);
+  console.log(`Remove ${people.length} people:`);
   for (const p of people) console.log(`  - ${p.display_name} <${p.email}>`);
   console.log(`Keep ${kept.length} people:`);
   for (const p of kept) console.log(`  + ${p.display_name} <${p.email ?? "no email"}>`);
@@ -125,11 +153,11 @@ async function main() {
     await run(`DELETE FROM employees WHERE id = ANY($1)`);
     await client.query(
       `INSERT INTO audit_log (organization_id, action, detail, created_at)
-       SELECT id, 'data.demo_people_removed', $1::jsonb, NOW() FROM organizations`,
-      [JSON.stringify({ people: people.length, rows: counts })],
+       SELECT id, 'data.employees_removed', $1::jsonb, NOW() FROM organizations`,
+      [JSON.stringify({ people: people.map((p) => p.email ?? p.display_name), keep: KEEP, rows: counts })],
     );
     await client.query("COMMIT");
-    console.log(`\nRemoved ${people.length} demo people and their data.`);
+    console.log(`\nRemoved ${people.length} people and their data. Kept: ${kept.map((k) => k.display_name).join(", ")}.`);
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

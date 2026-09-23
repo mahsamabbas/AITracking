@@ -1,10 +1,12 @@
 # Tech context
 
 - **Monorepo:** pnpm + Turborepo, TypeScript
-- **Connector:** separate per-machine service (localhost :9477). Employees download
+- **Connector:** per-user background service (localhost, port 9477–9486 chosen per
+  OS user, recorded in `~/.techlio-connector/port`). Employees download
   a Windows `.exe` (GUI-subsystem, registers a hidden logon task) or a macOS
   `.pkg` (universal; installs a LaunchAgent, no app bundle)
-  from the dashboard — they do not run `pnpm` or clone this repo. Encrypted file
+  from the dashboard — they do not run `pnpm` or clone this repo. Status icon: Swift
+  menu-bar app (macOS) / PowerShell tray (Windows) with pause, stop/start. Encrypted file
   queue, Ed25519 signing, Claude hooks + IDE companion.
 - **API:** NestJS + Fastify, `@techlio/server-core` + Postgres + Drizzle
 - **Worker:** BullMQ + Redis, hourly finalize at :05 UTC

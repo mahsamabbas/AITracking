@@ -1,6 +1,6 @@
 # Active context
 
-**Date:** 2026-09-18
+**Date:** 2026-09-24 (see "Current state" at the end)
 
 ## Shape of the product
 
@@ -98,3 +98,21 @@ Spec: `apps/web/UX_SPEC.md`. Rules to preserve when editing any screen:
   Everything is instant under `prefers-reduced-motion`.
 - Focus is always visible (`--focus-ring`); never reintroduce
   `outline: none` without a replacement.
+
+## Current state (2026-09-24)
+
+- **Production:** API `tracking-app-api-three.vercel.app`, web `tracking-app-api-t9yd.vercel.app`,
+  Neon Postgres with migrations 001–012 applied. Real people: talha, Bilal, Rizwan, hassan bajwa.
+  Seeded demo people are still present until the owner runs
+  `node scripts/purge-demo-data.mjs --production --keep talha,bilal,rizwan,hassan --confirm`.
+  The only administrator login is still `admin@techlio.local`; create a real admin
+  (`pnpm admin:create`) before removing it. **Rotate the Neon password** — it was shared in a
+  chat session on 2026-09-24.
+- **Deploy order for the current branch:** API first (event schema gained
+  `gap_reason:"stopped"`), then web, then reinstall connectors (`.pkg` / `.exe`) on every machine.
+- **Employee hub order now:** identity → 12-month activity calendar → Workday (selected day) →
+  coverage callouts → KPIs → trend → AI progress → … (UX_SPEC §4 order otherwise unchanged).
+- **Leaderboard** exists by owner decision (admins/managers only) — rule 8 in systemPatterns.md
+  was updated accordingly.
+- **Untested on real hardware:** Windows tray, Windows install/uninstall/self-restart, the
+  signed `.pkg`; installers are unsigned until Apple/Authenticode certificates exist.

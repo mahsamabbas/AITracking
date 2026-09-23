@@ -1,7 +1,7 @@
 # Pending work vs PRD v0.2
 
 Source: [requirements.md](requirements.md) · Audit: [docs/PRODUCTION_TRUTH_AUDIT.md](../docs/PRODUCTION_TRUTH_AUDIT.md)
-Last reviewed: 2026-09-23 (production-truth audit).
+Last reviewed: 2026-09-24.
 
 Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 (needs an external decision, purchase, or evidence). Nothing is "partial".
@@ -17,7 +17,10 @@ Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 | Legal/HR approval of notice, consent, retention, access, pause, dispute, jurisdiction (SEC-007/010) | **Blocked — legal** | Notice is still a draft (`docs/policy/monitoring-notice-draft.md`); it now also discloses the manager/admin AI usage leaderboard. Do not start a pilot without sign-off |
 | Phase 0 live Claude Code validation, recorded | **Open** | Hooks are proven live locally (2026-09-23); a sanitized, documented pilot session is still required |
 | §19 live integration tests (offline queue, heartbeat stop, pause, late event, invalid signature, replay, provider-missing UI) in CI | **Open** | `ai-progress.live.test.ts` and `tier-b.live.test.ts` cover connector → API → dashboard for Claude/Cursor/Antigravity and Tier B (`LIVE_STACK=1`); not yet in CI, and offline/replay/signature cases remain |
-| Production database behind deployed code (2026-09-23) | **Blocked — owner action** | Prod runs the audit-pass build without migrations 008+; `devices` queries fail. Run `admin:create`, then `pnpm db:migrate:prod`. `/v1/health` now reports `schema.upToDate` and drift returns 503 with the fix |
+| Production database behind deployed code (2026-09-23) | **Done** | Verified 2026-09-24: migrations 001–012 applied in production |
+| Remove seeded demo people from production | **Blocked — owner action** | Dry run done 2026-09-24 (12 `@techlio.local` + `random@techlio.com`). Run `node scripts/purge-demo-data.mjs --production --keep talha,bilal,rizwan,hassan --confirm` |
+| Rotate the Neon database password | **Blocked — owner action** | Shared in a chat session 2026-09-24; rotate in Neon, update Vercel env |
+| Real administrator in production | **Blocked — owner action** | Only `admin@techlio.local` exists; `pnpm admin:create --email …` then disable the demo admin |
 | TLS + managed encryption at rest for Postgres, Redis, backups, exports (SEC-003) | **Blocked — infrastructure** | Neon/Vercel provide TLS + at-rest encryption; needs written confirmation and a backup-encryption decision |
 | SSO/OIDC (FR-001) | **Open** | ~3–5 d; password login remains, now scrypt-hashed |
 | Signed connector installers | **Blocked — certificates** | Apple Developer ID + notarization, Authenticode. Tooling done (`--release`) |
