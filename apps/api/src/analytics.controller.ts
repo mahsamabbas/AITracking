@@ -12,6 +12,9 @@ import type { FastifyRequest } from "fastify";
 import {
   activityTotals,
   aiProgress,
+  aiUsageLeaderboard,
+  LEADERBOARD_SORTS,
+  type LeaderboardSort,
   aiProgressTimeline,
   catalogCapability,
   effectiveCapabilities,
@@ -137,6 +140,42 @@ export class AnalyticsController {
         missing: p.missing,
         emptyState: p.emptyState,
       })),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // AI usage leaderboard — administrators and managers only. Developers and
+  // auditors never see other people's usage.
+  // -------------------------------------------------------------------------
+  @Get("leaderboard")
+  async leaderboard(
+    @Req() req: FastifyRequest,
+    @Query() q: RangeQuery & { team?: string; provider?: string; sort?: string },
+  ) {
+    const user = userFromRequest(req);
+    requireRoles(user, ["administrator", "manager"]);
+    const { range, preset } = rangeFrom(q);
+    const sort: LeaderboardSort = LEADERBOARD_SORTS.includes(q.sort as LeaderboardSort)
+      ? (q.sort as LeaderboardSort)
+      : "active";
+    const rows = await aiUsageLeaderboard({
+      organizationId: user.organizationId,
+      range,
+      team: q.team || undefined,
+      provider: q.provider || undefined,
+      sort,
+    });
+    return {
+      rows,
+      sort,
+      summary: {
+        listed: rows.length,
+        withActivity: rows.filter((r) => r.sessions > 0 || r.providerRequests != null).length,
+        activeMs: rows.reduce((sum, r) => sum + r.activeMs, 0),
+        sessions: rows.reduce((sum, r) => sum + r.sessions, 0),
+      },
+      preset,
+      range: { from: range.from.toISOString(), to: range.to.toISOString() },
     };
   }
 

@@ -20,6 +20,17 @@
         "cd apps/web && NEXT_DIST_DIR=.next-dev npx next dev -p 3000"
       ],
       "port": 3000
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@techlio/api",
+        "run",
+        "dev"
+      ],
+      "port": 3001
     }
   ]
 }

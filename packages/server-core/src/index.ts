@@ -21,4 +21,5 @@ export * from "./connector-state.js";
 export * from "./runtime.js";
 export * from "./provider-identities.js";
 export * from "./ai-progress.js";
+export * from "./leaderboard.js";
 export * from "./schema-version.js";

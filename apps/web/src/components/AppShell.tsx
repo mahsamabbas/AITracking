@@ -51,6 +51,13 @@ const NAV: NavItem[] = [
     match: (p) => p.startsWith("/employees") || p.startsWith("/sessions"),
   },
   {
+    // Other people's AI usage: administrators and managers only (API enforces it too).
+    href: "/leaderboard",
+    label: "Leaderboard",
+    roles: ["manager", "administrator"],
+    icon: icon("M6.5 17v-5h-3v5M11.5 17V7h-3v10M16.5 17v-8h-3v8M3 17h14"),
+  },
+  {
     href: "/setup-connector",
     label: "Install agent",
     roles: ["developer"],
