@@ -77,7 +77,16 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
      shows a confirmation, and exits. The service supervises itself — it
      restarts its worker 10 s after any crash — because Task Scheduler only
      retries a task that fails to launch. The executable is
-     GUI-subsystem, so no console opens. Remove from **Settings → Apps**.
+     GUI-subsystem, so no console opens. A tray icon next to the clock (task
+     `TechlioConnectorTray`, a hidden PowerShell/WinForms icon — no extra
+     runtime) shows the state and offers Pause/Resume, Stop/Start connector,
+     Open dashboard, and Show log. Remove from **Settings → Apps**.
+   - **Stopping (both platforms):** "Stop connector…" asks for confirmation,
+     records a *stopped by employee* coverage gap (shown on the Workday card,
+     never counted as idle), flushes queued events, and exits cleanly so the OS
+     does not restart it. It stays off until the employee clicks Start or signs
+     in again. Deploy the API before the new connector: `gap_reason: "stopped"`
+     is new in the event schema.
    - Logs: `~/.techlio-connector/connector.log`. Health: `techlio-connector --status`.
    - **One connector per OS user.** Each user signed in to a computer gets their
      own port in 9477–9486, recorded in `~/.techlio-connector/port`. Hooks, the

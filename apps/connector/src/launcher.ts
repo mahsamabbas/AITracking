@@ -129,7 +129,7 @@ function logToFile(path: string): void {
  * 10 s after any exit (crash, or port held by another connector — exit 75).
  * Ends only when the task is stopped or the process is killed on uninstall.
  */
-async function superviseWorker(): Promise<never> {
+async function superviseWorker(): Promise<void> {
   const { spawn } = await import("node:child_process");
   for (;;) {
     const code = await new Promise<number | null>((resolve) => {
@@ -140,6 +140,12 @@ async function superviseWorker(): Promise<never> {
       child.on("exit", (exitCode) => resolve(exitCode));
       child.on("error", () => resolve(null));
     });
+    if (code === 0) {
+      // Exit 0 = stopped on purpose (tray "Stop connector"). Stay stopped until
+      // the employee starts it again or signs in again.
+      console.log("Connector stopped by the employee; not restarting.");
+      process.exit(0);
+    }
     console.log(`Connector worker exited (code ${code}); restarting in 10s.`);
     await new Promise((resolve) => setTimeout(resolve, 10_000));
   }
@@ -158,6 +164,12 @@ async function main(): Promise<void> {
   }
   if (process.argv.includes("--status")) {
     await service.printStatus();
+    return;
+  }
+  if (process.argv.includes("--tray")) {
+    // Windows notification-area icon (macOS uses the Swift menu-bar app).
+    const { runWindowsTray } = await import("./windows-tray.js");
+    await runWindowsTray();
     return;
   }
   if (process.argv.includes("--service") && process.platform === "win32" && !process.argv.includes("--worker")) {

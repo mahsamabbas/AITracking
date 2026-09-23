@@ -176,7 +176,7 @@ export function WorkdayPanel({
                           <span>
                             {clockIn(g.start, d.timezone)} – {g.end ? clockIn(g.end, d.timezone) : "still"}
                           </span>
-                          <span>{g.reason === "paused" ? "paused" : "offline"}</span>
+                          <span>{g.reason === "paused" ? "paused" : g.reason === "stopped" ? "stopped by employee" : "offline"}</span>
                         </li>
                       ))}
                     </ul>

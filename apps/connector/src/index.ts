@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   EventTypes,
@@ -482,6 +482,43 @@ app.post("/resume", async () => {
   return { paused: false };
 });
 
+// ---------------------------------------------------------------------------
+// Stop — the employee turns the connector off from the tray / menu bar. The
+// stop is recorded as a coverage gap (never as idle time), queued events are
+// flushed, and the process exits 0 so launchd / the Windows supervisor /
+// systemd leave it stopped until the employee starts it or signs in again.
+// ---------------------------------------------------------------------------
+const STOPPED_MARKER = join(identityDir(), "stopped-at");
+
+app.post("/stop", async (req, reply) => {
+  // Only local apps (tray, menu bar) may stop collection; websites cannot.
+  if (req.headers.origin) return reply.code(403).send({ error: "origin_not_allowed" });
+  const gap = baseEvent(EventTypes.telemetry_gap_started, { metadata: { gap_reason: "stopped" } });
+  const stopped = baseEvent(EventTypes.connector_stopped, { metadata: { queue_depth: queue.depth() } });
+  const batch = [gap, stopped].filter((e): e is ActivityEvent => e !== null);
+  if (batch.length) queue.enqueue(batch);
+  await Promise.race([flushQueue(), new Promise((resolve) => setTimeout(resolve, 5_000))]);
+  writeFileSync(STOPPED_MARKER, new Date().toISOString(), { mode: 0o600 });
+  console.log("Stopped by the employee from the tray / menu bar.");
+  setTimeout(() => process.exit(0), 250);
+  return { stopping: true };
+});
+
+/** Started again after an employee stop: close the recorded gap. */
+function closeStoppedGap(): void {
+  if (!existsSync(STOPPED_MARKER)) return;
+  const started = baseEvent(EventTypes.connector_started, {});
+  const ended = baseEvent(EventTypes.telemetry_gap_ended, { metadata: { gap_reason: "stopped" } });
+  const batch = [started, ended].filter((e): e is ActivityEvent => e !== null);
+  if (batch.length) queue.enqueue(batch);
+  try {
+    unlinkSync(STOPPED_MARKER);
+  } catch {
+    /* already removed */
+  }
+  void flushQueue();
+}
+
 app.post("/hooks/extension", async (req) => {
   if (paused) return { accepted: 0, unpaired: !identity };
   if (!identity) return { accepted: 0, unpaired: true };
@@ -870,6 +907,7 @@ void (async () => {
         );
       }
       console.log(`Techlio connector is running at http://127.0.0.1:${port} for ${osUser()}`);
+      closeStoppedGap();
       const hooks = ensureAgentHooks();
       console.log("Dashboard pings are hidden. Agent events print below as they happen.");
       if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");

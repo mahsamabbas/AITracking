@@ -37,7 +37,8 @@ export const MetadataSchema = z
     daily_only: z.boolean().optional(),
     queue_depth: z.number().int().nonnegative().optional(),
     connector_paused: z.boolean().optional(),
-    gap_reason: z.enum(["paused", "offline", "heartbeat_missing"]).optional(),
+    /** "stopped" = the employee stopped the connector from the tray / menu bar. */
+    gap_reason: z.enum(["paused", "offline", "heartbeat_missing", "stopped"]).optional(),
     /** Tier B provider pull (Cursor Admin / Analytics, Copilot reports) */
     aggregate_kind: z
       .enum([

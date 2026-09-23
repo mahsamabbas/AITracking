@@ -21,9 +21,12 @@ private func connectorBase() -> String {
     return "http://127.0.0.1:9477"
 }
 private let logPath = NSString(string: "~/.techlio-connector/connector.log").expandingTildeInPath
+/// Written by the connector when the employee stops it; removed when it starts.
+private let stoppedMarker = NSString(string: "~/.techlio-connector/stopped-at").expandingTildeInPath
 
 private enum ConnectorState {
     case notRunning
+    case stopped
     case notActivated
     case paused(name: String?)
     case collecting(name: String?, queued: Int)
@@ -52,7 +55,8 @@ final class StatusController: NSObject, NSMenuDelegate {
         var request = URLRequest(url: URL(string: "\(connectorBase())/health")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
         request.httpMethod = "GET"
         URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
-            var next: ConnectorState = .notRunning
+            var next: ConnectorState =
+                FileManager.default.fileExists(atPath: stoppedMarker) ? .stopped : .notRunning
             var version: String?
             if let data, (response as? HTTPURLResponse)?.statusCode == 200,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -89,6 +93,9 @@ final class StatusController: NSObject, NSMenuDelegate {
         case .notActivated:
             symbol = "exclamationmark.circle"
             tooltip = "Techlio connector: running, not activated"
+        case .stopped:
+            symbol = "stop.circle"
+            tooltip = "Techlio connector: stopped by you"
         case .notRunning:
             symbol = "xmark.circle"
             tooltip = "Techlio connector: not running"
@@ -116,9 +123,12 @@ final class StatusController: NSObject, NSMenuDelegate {
         case .notActivated:
             title = "Techlio Connector — Running"
             detail.append("Not activated on this Mac yet")
+        case .stopped:
+            title = "Techlio Connector — Stopped"
+            detail.append("Stopped by you; nothing is recorded")
         case .notRunning:
             title = "Techlio Connector — Not running"
-            detail.append("The background service is stopped")
+            detail.append("The background service is not running")
         }
         menu.addItem(disabled(title))
         detail.forEach { menu.addItem(disabled($0)) }
@@ -128,18 +138,19 @@ final class StatusController: NSObject, NSMenuDelegate {
         switch state {
         case .notActivated:
             menu.addItem(action("Activate this Mac…", #selector(openMyConnectors)))
+            menu.addItem(action("Stop connector…", #selector(stopConnector)))
         case .collecting:
             menu.addItem(action("Pause collection", #selector(pause)))
+            menu.addItem(action("Stop connector…", #selector(stopConnector)))
         case .paused:
             menu.addItem(action("Resume collection", #selector(resume)))
-        case .notRunning:
-            menu.addItem(action("Start connector", #selector(restartService)))
+            menu.addItem(action("Stop connector…", #selector(stopConnector)))
+        case .stopped, .notRunning:
+            menu.addItem(action("Start connector", #selector(startConnector)))
         }
+        menu.addItem(.separator())
         menu.addItem(action("Open Techlio dashboard", #selector(openDashboard)))
         menu.addItem(action("Show log", #selector(openLog)))
-        if case .notRunning = state {} else {
-            menu.addItem(action("Restart connector", #selector(restartService)))
-        }
         menu.addItem(.separator())
         menu.addItem(action("Hide menu bar icon", #selector(hideIcon)))
     }
@@ -180,12 +191,41 @@ final class StatusController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(URL(fileURLWithPath: logPath))
     }
 
-    @objc private func restartService() {
+    /// Stops collection until the employee starts it again or signs in again.
+    /// The connector records the stop as a gap the dashboard shows, then exits;
+    /// launchd does not restart a clean exit.
+    @objc private func stopConnector() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Stop the Techlio connector?"
+        alert.informativeText = "AI agent activity on this Mac will not be recorded until you start it again or sign in again. The stop is shown on the dashboard as a period when collection was off."
+        alert.addButton(withTitle: "Stop")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        post("/stop")
+    }
+
+    @discardableResult
+    private func launchctl(_ args: [String]) -> Int32 {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        task.arguments = ["kickstart", "-k", "gui/\(getuid())/\(serviceLabel)"]
+        task.arguments = args
         try? task.run()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.refresh() }
+        task.waitUntilExit()
+        return task.terminationStatus
+    }
+
+    @objc private func startConnector() {
+        let domain = "gui/\(getuid())"
+        if launchctl(["kickstart", "\(domain)/\(serviceLabel)"]) != 0 {
+            // Not loaded (e.g. booted out): load the installed agent, then start it.
+            let system = "/Library/LaunchAgents/\(serviceLabel).plist"
+            let user = NSString(string: "~/Library/LaunchAgents/\(serviceLabel).plist").expandingTildeInPath
+            let plist = FileManager.default.fileExists(atPath: system) ? system : user
+            launchctl(["bootstrap", domain, plist])
+            launchctl(["kickstart", "\(domain)/\(serviceLabel)"])
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.refresh() }
     }
 
     /// Only the icon goes away (until next sign-in); collection keeps running.

@@ -42,7 +42,9 @@ const LINUX_UNIT = "techlio-connector.service";
 // Defaults baked into the packaged build; overridable at install time.
 const API_URL = process.env.TECHLIO_API_URL ?? "https://tracking-app-api-three.vercel.app";
 const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app-api-t9yd.vercel.app";
-const VSIX_URL = `${DASHBOARD.split(",")[0]}/downloads/techlio-companion.vsix`;
+export const DASHBOARD_URL = DASHBOARD.split(",")[0];
+const VSIX_URL = `${DASHBOARD_URL}/downloads/techlio-companion.vsix`;
+const WIN_TRAY_TASK = "TechlioConnectorTray";
 
 /** Paths written by the macOS .pkg installer (pack-connector.mjs). */
 export const MAC_SYSTEM_DIR = "/Library/Application Support/Techlio/Connector";
@@ -181,13 +183,11 @@ function registerWindowsUninstall(dest: string): void {
   for (const [name, type, data] of values) reg(["add", WIN_UNINSTALL_KEY, "/v", name, "/t", type, "/d", data, "/f"]);
 }
 
-function registerWindows(dest: string): boolean {
-  registerWindowsUninstall(dest);
-  // The executable is GUI-subsystem (bun --windows-hide-console), so the task
-  // runs it directly with no console window.
+/** A hidden per-user logon task running `dest args` (UTF-16 XML as schtasks requires). */
+function createLogonTask(name: string, description: string, dest: string, args: string): boolean {
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Techlio AI activity connector</Description></RegistrationInfo>
+  <RegistrationInfo><Description>${description}</Description></RegistrationInfo>
   <Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>
   <Principals><Principal id="Author"><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings>
@@ -201,34 +201,46 @@ function registerWindows(dest: string): boolean {
   <Actions Context="Author">
     <Exec>
       <Command>${dest}</Command>
-      <Arguments>--service</Arguments>
+      <Arguments>${args}</Arguments>
       <WorkingDirectory>${installDir()}</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>`;
-  const xmlPath = join(tmpdir(), "techlio-connector-task.xml");
+  const xmlPath = join(tmpdir(), `techlio-${name}.xml`);
   // Task Scheduler requires UTF-16 LE with BOM for XML definitions.
   writeFileSync(xmlPath, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, "utf16le")]));
   try {
-    execFileSync("schtasks", ["/Create", "/TN", WIN_TASK, "/XML", xmlPath, "/F"], QUIET);
-    execFileSync("schtasks", ["/Run", "/TN", WIN_TASK], QUIET);
-    reg(["delete", WIN_RUN_KEY, "/v", WIN_TASK, "/f"]);
+    execFileSync("schtasks", ["/Create", "/TN", name, "/XML", xmlPath, "/F"], QUIET);
+    execFileSync("schtasks", ["/Run", "/TN", name], QUIET);
+    reg(["delete", WIN_RUN_KEY, "/v", name, "/f"]);
     return true;
   } catch {
     // Some managed PCs block Task Scheduler for standard users. Start at
     // sign-in from the Run key instead and launch it now, detached.
-    if (!reg(["add", WIN_RUN_KEY, "/v", WIN_TASK, "/t", "REG_SZ", "/d", `"${dest}" --service`, "/f"])) return false;
-    startDetached(dest);
+    if (!reg(["add", WIN_RUN_KEY, "/v", name, "/t", "REG_SZ", "/d", `"${dest}" ${args}`, "/f"])) return false;
+    startDetached(dest, args);
     return true;
   } finally {
     rmSync(xmlPath, { force: true });
   }
 }
 
+function registerWindows(dest: string): boolean {
+  registerWindowsUninstall(dest);
+  // The executable is GUI-subsystem (no console window). The service and the
+  // tray icon are separate tasks, so "Stop connector" in the tray (or quitting
+  // the tray) never takes the other one down.
+  const service = createLogonTask(WIN_TASK, "Techlio AI activity connector", dest, "--service");
+  createLogonTask(WIN_TRAY_TASK, "Techlio connector tray icon", dest, "--tray");
+  return service;
+}
+
 function unregisterWindows(): void {
-  spawnSync("schtasks", ["/End", "/TN", WIN_TASK], QUIET);
-  spawnSync("schtasks", ["/Delete", "/TN", WIN_TASK, "/F"], QUIET);
-  reg(["delete", WIN_RUN_KEY, "/v", WIN_TASK, "/f"]);
+  for (const task of [WIN_TASK, WIN_TRAY_TASK]) {
+    spawnSync("schtasks", ["/End", "/TN", task], QUIET);
+    spawnSync("schtasks", ["/Delete", "/TN", task, "/F"], QUIET);
+    reg(["delete", WIN_RUN_KEY, "/v", task, "/f"]);
+  }
   reg(["delete", WIN_UNINSTALL_KEY, "/f"]);
   // A Run-key copy (and the supervised worker) is not owned by Task
   // Scheduler; stop every copy by image name.
@@ -237,9 +249,9 @@ function unregisterWindows(): void {
   spawnSync("taskkill", ["/F", "/IM", exeName(), "/FI", `PID ne ${process.pid}`], QUIET);
 }
 
-/** Last resort: run the service for this session, detached and windowless. */
-function startDetached(dest: string): void {
-  const child = spawn(dest, ["--service"], {
+/** Last resort: run the service (or tray) for this session, detached and windowless. */
+function startDetached(dest: string, args = "--service"): void {
+  const child = spawn(dest, [args], {
     cwd: installDir(),
     detached: true,
     stdio: "ignore",
@@ -398,7 +410,11 @@ export async function installBackgroundService(): Promise<void> {
     : "Next: open the Techlio dashboard → My connectors → Activate.";
   announce(
     registered
-      ? `Techlio connector is running in the background (v${health.version}). There is no window to keep open; it starts automatically when you sign in.\n\n${next}`
+      ? `Techlio connector is running in the background (v${health.version}). There is no window to keep open; it starts automatically when you sign in.\n\n${
+          os === "win32"
+            ? "Its icon is next to the clock (click ^ if hidden): right-click it to pause, stop, or start collection."
+            : "Its icon is in the menu bar: click it to pause, stop, or start collection."
+        }\n\n${next}`
       : `Techlio connector is running in the background for this session, but this computer did not allow it to start automatically at sign-in. Ask IT to allow it.\n\n${next}`,
   );
 }
