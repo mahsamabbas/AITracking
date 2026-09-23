@@ -79,11 +79,13 @@ export async function ensureProviderPullDevice(input: {
 export async function resolvePullOrganization(): Promise<string | null> {
   const fromEnv = process.env.TECHLIO_PULL_ORG_ID?.trim();
   if (fromEnv) return fromEnv;
-  const orgs = await db.execute<{ id: string }>(sql`SELECT id FROM organizations LIMIT 2`);
+  const orgs = await db.execute<{ id: string }>(
+    sql`SELECT id FROM organizations WHERE kind = 'customer' AND disabled_at IS NULL LIMIT 2`,
+  );
   return orgs.rows.length === 1 ? orgs.rows[0].id : null;
 }
 
 export async function listOrganizationIds(): Promise<string[]> {
-  const res = await db.execute<{ id: string }>(sql`SELECT id FROM organizations`);
+  const res = await db.execute<{ id: string }>(sql`SELECT id FROM organizations WHERE kind = 'customer'`);
   return res.rows.map((r) => r.id);
 }

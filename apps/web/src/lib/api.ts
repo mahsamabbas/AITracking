@@ -38,8 +38,21 @@ export async function apiPost<T>(
   token: string | null,
   body?: unknown,
 ): Promise<T> {
+  return apiSend<T>("POST", path, token, body);
+}
+
+export async function apiPatch<T>(path: string, token: string | null, body?: unknown): Promise<T> {
+  return apiSend<T>("PATCH", path, token, body);
+}
+
+async function apiSend<T>(
+  method: "POST" | "PATCH",
+  path: string,
+  token: string | null,
+  body?: unknown,
+): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

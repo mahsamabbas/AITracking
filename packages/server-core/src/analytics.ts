@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
-import { PRODUCTIVE_CLASSIFICATIONS } from "./activity.js";
+import { AGENT_REPORTED_SQL, PRODUCTIVE_CLASSIFICATIONS } from "./activity.js";
 import {
   connectorStateOf,
   rollupConnectorState,
@@ -1055,6 +1055,8 @@ function eventScope(f: ScopeFilters, range: DateRange) {
       FILE_CHANGE_TYPES.map((t) => sql`${t}`),
       sql`, `,
     )})`,
+    // Only edits an AI agent reported — never a person's own saves.
+    sql.raw(AGENT_REPORTED_SQL("e")),
   ];
   if (f.developerId) parts.push(sql`e.developer_id = ${f.developerId}`);
   if (f.developerIds?.length) {

@@ -1,3 +1,4 @@
+import { AGENT_REPORTED_SQL } from "./activity.js";
 import { sql } from "drizzle-orm";
 import { PROVIDER_CAPABILITIES, providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
@@ -346,6 +347,9 @@ export async function aiProgressTimeline(input: {
         AND e.event_type IN ('model_request_completed','tool_completed','file_created','file_modified','file_deleted',
                              'test_completed','build_completed','lint_completed','typecheck_completed',
                              'telemetry_gap_started','connector_paused','upload_failed')
+        -- File changes and checks count only when an AI agent reported them.
+        AND (e.event_type NOT LIKE 'file_%' AND e.event_type NOT IN ('test_completed','build_completed','lint_completed','typecheck_completed')
+             OR ${sql.raw(AGENT_REPORTED_SQL("e"))})
       GROUP BY 1, 2, 3, 4
     `),
     db.execute<{

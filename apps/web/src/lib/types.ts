@@ -1,4 +1,4 @@
-export type Role = "manager" | "developer" | "administrator" | "auditor";
+export type Role = "manager" | "developer" | "administrator" | "auditor" | "super_admin";
 
 export interface Totals {
   activeMs: number;
@@ -277,6 +277,9 @@ export interface ActivityEventRow {
   duration_ms?: number;
   activity_type?: string;
   metadata?: Record<string, unknown>;
+  /** Present on organisation-wide feeds. */
+  developer_id?: string;
+  developer_name?: string | null;
 }
 
 export interface SessionDetail {

@@ -85,11 +85,11 @@ describe("computeSessionMetrics", () => {
         duration_ms: 10 * S,
         metadata: { tool_category: "file_write" },
       }),
-      ev("file_modified", T0 + 31 * S, { metadata: { path_category: "src/api" } }),
+      ev("file_modified", T0 + 31 * S, { metadata: { path_category: "src/api", tool_name: "Edit", telemetry_source: "hook" } }),
       ev("test_completed", T0 + 90 * S, {
         duration_ms: 20 * S,
         status: "succeeded",
-        metadata: { test_passed: 42, test_failed: 0 },
+        metadata: { telemetry_source: "hook",  test_passed: 42, test_failed: 0 },
       }),
       ev("session_ended", T0 + 2 * M),
     ];
@@ -105,7 +105,7 @@ describe("computeSessionMetrics", () => {
   it("classifies file changes without checks as assisted editing", () => {
     const events = [
       ev("session_started", T0),
-      ev("file_modified", T0 + 20 * S),
+      ev("file_modified", T0 + 20 * S, { metadata: { tool_name: "Edit", telemetry_source: "hook" } }),
       ev("session_ended", T0 + M),
     ];
     expect(computeSessionMetrics(events).classification).toBe("assisted_editing");
@@ -219,5 +219,20 @@ describe("computeSessionMetrics", () => {
       ev("tool_completed", T0 + 10 * M, { duration_ms: 20 * S, metadata: { tool_category: "shell" } }),
     ];
     expect(computeSessionMetrics(events).coverageState).toBe("gap");
+  });
+
+  it("never counts a person's own saves or task runs (IDE companion) as AI work", () => {
+    const events = [
+      ev("model_request_completed", T0 + 30 * S, { duration_ms: 30 * S }),
+      // Companion events carry no tool name / agent source.
+      ev("file_modified", T0 + 5 * M, { metadata: { file_path: "src/a.ts" } }),
+      ev("test_completed", T0 + 6 * M, { duration_ms: 20 * S, metadata: { test_passed: 3 } }),
+      ev("session_heartbeat", T0 + 60 * M),
+    ];
+    const m = computeSessionMetrics(events);
+    expect(m.fileChanges).toBe(0);
+    expect(m.testsRun).toBe(0);
+    expect(m.elapsedSpanMs).toBe(0);
+    expect(m.classification).toBe("exploration");
   });
 });

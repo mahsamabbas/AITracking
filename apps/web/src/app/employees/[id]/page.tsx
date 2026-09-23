@@ -22,6 +22,7 @@ import {
 import { TrendChart } from "@/components/charts/TrendChart";
 import { ActivityCalendar, type ActivityCalendarData } from "@/components/charts/ActivityCalendar";
 import { WorkdayPanel } from "@/components/domain/WorkdayPanel";
+import { ActivityFeed } from "@/components/domain/ActivityFeed";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
@@ -106,13 +107,6 @@ export default function EmployeeDetailPage() {
     return map;
   }, [d?.projects]);
 
-  const recentEvents = useMemo<ActivityEventRow[]>(
-    () =>
-      (live.data?.recentEvents ?? [])
-        .filter((e) => e.event_type !== "heartbeat_sent")
-        .slice(0, 12),
-    [live.data?.recentEvents],
-  );
 
   const classificationSlices = (d?.classifications ?? []).map((c) => {
     const info = classificationOf(c.classification);
@@ -650,19 +644,7 @@ export default function EmployeeDetailPage() {
               )}
             </Card>
 
-            <Card>
-              <CardHeader
-                title="Live activity feed"
-                subtitle="IDE companion events — connector heartbeats are omitted"
-              />
-              <CardBody className="pt-1">
-                <EventTimeline
-                  events={recentEvents}
-                  limit={80}
-                  emptyBody="Connector heartbeats are hidden here. Saves, edits, and sessions from any Cursor window with the Techlio companion will appear — chat-only Cursor use is not sent by the IDE."
-                />
-              </CardBody>
-            </Card>
+            <ActivityFeed range={range} developerId={employeeId} />
           </section>
         </>
       )}

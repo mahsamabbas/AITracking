@@ -10,6 +10,7 @@ import { activityEvents, agentSessions, projects, workItems } from "./schema.js"
 import {
   IDLE_THRESHOLD_MS,
   activityTypeOf,
+  isEditorOnlyEvent,
   type SessionClassification,
 } from "./activity.js";
 
@@ -79,7 +80,9 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
     const start = new Date(e.occurred_at).getTime();
     if (Number.isNaN(start)) continue;
     const type = activityTypeOf(e.event_type);
-    if (type === "connector") continue;
+    if (type === "connector" || e.event_type === "session_heartbeat") continue;
+    // A person's own saves/typing (IDE companion) are not AI work.
+    if (isEditorOnlyEvent(e)) continue;
     if (type !== "coverage") {
       times.push(start);
       agentEvents++;

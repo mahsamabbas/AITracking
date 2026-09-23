@@ -1,4 +1,5 @@
-import { activityTypeOf } from "./activity.js";
+import type { ActivityEvent } from "@techlio/event-schema";
+import { activityTypeOf, isAgentReported, isEditorOnlyEvent } from "./activity.js";
 import {
   computeHourlyDurations,
   DEFAULT_IDLE_THRESHOLD_MS,
@@ -93,6 +94,8 @@ export async function finalizeHourForDeveloper(
         token_output?: number;
       };
     };
+    // A person's own saves / task runs (IDE companion) are not AI work.
+    if (isEditorOnlyEvent(p as unknown as ActivityEvent) || p.event_type === "session_heartbeat") continue;
     // occurred_at is the completion time: a call spans [t - duration, t], the
     // same convention as computeSessionMetrics, so hourly and session totals agree.
     const at = new Date(p.occurred_at ?? row.occurredAt).getTime();
@@ -110,9 +113,10 @@ export async function finalizeHourForDeveloper(
     if (p.event_type === "test_completed") testsCompleted++;
     if (p.event_type === "build_completed") buildsCompleted++;
     if (
-      p.event_type === "file_created" ||
-      p.event_type === "file_modified" ||
-      p.event_type === "file_deleted"
+      (p.event_type === "file_created" ||
+        p.event_type === "file_modified" ||
+        p.event_type === "file_deleted") &&
+      isAgentReported(p as { metadata?: { tool_name?: unknown; telemetry_source?: unknown } })
     ) {
       fileChanges++;
     }

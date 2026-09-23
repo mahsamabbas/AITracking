@@ -30,6 +30,7 @@ const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
   manager: "info",
   developer: "ok",
   auditor: "neutral",
+  super_admin: "warn",
 };
 
 const ASSIGNABLE_TOOLS = [

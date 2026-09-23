@@ -1,6 +1,7 @@
 import type { Role } from "./types";
 
 export function homePathForRole(role?: Role | null, developerId?: string | null): string {
+  if (role === "super_admin") return "/platform";
   if (role === "developer") {
     return developerId ? `/employees/${developerId}` : "/";
   }
@@ -37,6 +38,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   administrator: "Administrator",
   developer: "Developer",
   auditor: "Security / auditor",
+  super_admin: "Platform super admin",
 };
 
 export const ROLE_SCOPE: Record<Role, string> = {
@@ -48,4 +50,6 @@ export const ROLE_SCOPE: Record<Role, string> = {
     "See the metadata collected about you, and activate connector keys your administrator assigned.",
   auditor:
     "Read-only access history, connector configuration, and retention. Not individual timelines.",
+  super_admin:
+    "Create and manage organisations and their administrators. No access to any organisation's activity.",
 };

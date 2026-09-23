@@ -16,6 +16,10 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   timezone: text("timezone").notNull().default("UTC"),
   aiPlanLimits: jsonb("ai_plan_limits"),
+  /** "customer" tenants hold monitored people; the "platform" org holds super admins only. */
+  kind: text("kind").notNull().default("customer"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
 });
 
 /** The monitored people. `id` is the developer_id carried on every event. */

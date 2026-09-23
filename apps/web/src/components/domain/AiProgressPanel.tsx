@@ -122,16 +122,7 @@ function ProviderProgressCard({ p, employeeId }: { p: ProviderProgress; employee
             </p>
           </div>
         </div>
-        <Badge
-          tone={p.capability.source === "connector" ? "ok" : "neutral"}
-          title={
-            p.capability.source === "connector"
-              ? `Capabilities reported by this person's connector ${formatRelative(p.capability.reportedAt)} (observed via ${p.capability.observedVia.join(", ") || "—"}).`
-              : "No recent connector report — showing the static provider catalog."
-          }
-        >
-          {p.capability.source === "connector" ? "Live capability" : "Catalog capability"}
-        </Badge>
+
       </div>
 
       <dl className="mt-4 grid grid-cols-3 gap-x-3 gap-y-3">
@@ -152,37 +143,23 @@ function ProviderProgressCard({ p, employeeId }: { p: ProviderProgress; employee
         />
         <Stat label="Tool calls" value={formatNumber(p.toolCalls)} />
         <Stat label="File changes" value={formatNumber(p.fileChanges)} />
-        <Stat
-          label="Tests · builds"
-          value={
-            p.testsRun + p.buildsRun === 0
-              ? "None run"
-              : `${p.testsRun} · ${p.buildsRun}${failures ? ` (${failures} failed)` : ""}`
-          }
-          unavailable={p.testsRun + p.buildsRun === 0}
-        />
-        <Stat
-          label="Tokens in / out"
-          value={
-            noTokens
-              ? "Not available from provider"
-              : `${formatNumber(p.tokenInput)} / ${formatNumber(p.tokenOutput)}`
-          }
-          unavailable={noTokens}
-        />
-        <div className="col-span-2 min-w-0">
-          <dt className="text-2xs text-ink-500">Models</dt>
-          <dd className="mt-0.5 truncate text-xs text-ink-700">
-            {p.models.length ? p.models.map((m) => m.model).join(", ") : "Not reported"}
-          </dd>
-        </div>
+        {/* Only what the agent actually reported: no placeholders for data a provider does not send. */}
+        {p.testsRun + p.buildsRun > 0 ? (
+          <Stat
+            label="Tests · builds"
+            value={`${p.testsRun} · ${p.buildsRun}${failures ? ` (${failures} failed)` : ""}`}
+          />
+        ) : null}
+        {noTokens ? null : (
+          <Stat label="Tokens in / out" value={`${formatNumber(p.tokenInput)} / ${formatNumber(p.tokenOutput)}`} />
+        )}
+        {p.models.length ? (
+          <div className="col-span-2 min-w-0">
+            <dt className="text-2xs text-ink-500">Models</dt>
+            <dd className="mt-0.5 truncate text-xs text-ink-700">{p.models.map((m) => m.model).join(", ")}</dd>
+          </div>
+        ) : null}
       </dl>
-
-      {p.capability.unavailable.length ? (
-        <p className="hint mt-3 border-t border-line pt-2">
-          Not available from {p.label}: {p.capability.unavailable.join(" · ")}.
-        </p>
-      ) : null}
 
       <Link
         href={`/employees/${employeeId}/tools/${p.provider}`}

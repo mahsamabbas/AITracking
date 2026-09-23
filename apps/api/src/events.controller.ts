@@ -1,13 +1,14 @@
 import {
   BadRequestException,
   Body,
+  ForbiddenException,
   Controller,
   Headers,
   HttpCode,
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
-import { devAffordancesEnabled, getDevice, verifyDeviceToken } from "@techlio/server-core";
+import { devAffordancesEnabled, getDevice, organizationDisabled, verifyDeviceToken } from "@techlio/server-core";
 import { ingestBatch } from "./services/ingest.js";
 import { verifyBatchSignature } from "./signatures.js";
 
@@ -36,6 +37,9 @@ export class EventsController {
     if (!orgId || (events?.[0]?.organization_id && events[0].organization_id !== orgId)) {
       throw new UnauthorizedException("org_mismatch");
     }
+
+    // A disabled organisation (platform super admin) stops accepting activity.
+    if (await organizationDisabled(orgId)) throw new ForbiddenException("organization_disabled");
 
     const device = await getDevice(orgId, deviceId);
     const isLocalDevBypass = token === "dev-device-token" && devAffordancesEnabled();

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { ActivityFeed } from "@/components/domain/ActivityFeed";
 import { TableScroll } from "@/components/ui/TableScroll";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
@@ -429,16 +430,18 @@ export default function OverviewPage() {
                     ["Model calls", formatNumber(t!.modelRequests)],
                     ["Tool calls", formatNumber(t!.toolCalls)],
                     ["File changes", formatNumber(t!.fileChanges)],
-                    ["Tests run", formatNumber(t!.testsRun)],
-                    ["Failed tests", formatNumber(t!.testsFailed)],
-                    ["Builds run", formatNumber(t!.buildsRun)],
-                    ["Failed builds", formatNumber(t!.buildsFailed)],
-                    [
-                      "Tokens in / out",
-                      t!.tokenInput == null
-                        ? "Not available"
-                        : `${formatNumber(t!.tokenInput)} / ${formatNumber(t!.tokenOutput)}`,
-                    ],
+                    // Checks and tokens appear only when an agent reported them.
+                    ...(t!.testsRun + t!.buildsRun > 0
+                      ? [
+                          ["Tests run", formatNumber(t!.testsRun)],
+                          ["Failed tests", formatNumber(t!.testsFailed)],
+                          ["Builds run", formatNumber(t!.buildsRun)],
+                          ["Failed builds", formatNumber(t!.buildsFailed)],
+                        ]
+                      : []),
+                    ...(t!.tokenInput != null
+                      ? [["Tokens in / out", `${formatNumber(t!.tokenInput)} / ${formatNumber(t!.tokenOutput)}`]]
+                      : []),
                   ].map(([label, value]) => (
                     <div key={label} className="bg-card px-3 py-2.5">
                       <dt className="label">{label}</dt>
@@ -510,51 +513,8 @@ export default function OverviewPage() {
 
           {/* ---------------- Live strip ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader
-                title="Latest sessions"
-                subtitle="Sessions with activity in the last 24 hours"
-              />
-              {(live.data?.activeSessions ?? []).length === 0 ? (
-                <EmptyState
-                  compact
-                  title="No recent sessions"
-                  body="No agent session has reported activity in the last 24 hours."
-                />
-              ) : (
-                <ul
-                  className={`divide-y divide-line ${
-                    (live.data?.activeSessions.length ?? 0) > 6 ? "scroll-y-sm" : ""
-                  }`}
-                >
-                  {live.data!.activeSessions.map((s) => (
-                    <li key={s.sessionId} className="flex items-center gap-3 px-5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/employees/${s.developerId}`}
-                            className="truncate text-sm font-medium text-ink-900 hover:text-brand-600"
-                          >
-                            {s.displayName}
-                          </Link>
-                          <ProviderBadge provider={s.provider} size="sm" />
-                        </div>
-                        <p className="hint truncate">
-                          {s.project ?? "No task selected"} · {s.eventCount} events ·{" "}
-                          {formatRelative(s.lastEventAt ?? s.startedAt)}
-                        </p>
-                      </div>
-                      <Link
-                        href={`/sessions/${s.sessionId}`}
-                        className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
-                      >
-                        Open
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+            {/* Follows the page's range: "Today" is the whole day, "7 days" the whole week. */}
+            <ActivityFeed range={range} provider={provider || undefined} team={team || undefined} showPerson title="Activity feed" />
 
             <Card>
               <CardHeader

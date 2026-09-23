@@ -178,7 +178,7 @@ export default function EmployeeToolPage() {
               value={modelRequestsAvailable ? formatNumber(t.modelRequests) : "Not available"}
               hint={
                 t.tokenInput == null
-                  ? "Token totals not available from provider"
+                  ? undefined
                   : `${formatNumber(t.tokenInput)} in / ${formatNumber(t.tokenOutput)} out tokens`
               }
               accent="slate"

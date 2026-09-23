@@ -1,3 +1,4 @@
+import { organizationDisabled } from "./platform.js";
 import { desc, eq } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { db } from "./db.js";
@@ -131,6 +132,8 @@ export async function authenticatePortalUser(
     .where(eq(portalUsers.email, email.toLowerCase().trim()));
   const row = rows[0];
   const check = row ? verifyPassword(password, row.passwordHash) : { ok: false, legacy: false };
+  // A disabled organisation (platform super admin switch) cannot sign in.
+  if (row && check.ok && (await organizationDisabled(row.organizationId))) return null;
   if (row && check.ok) {
     if (check.legacy) {
       await db

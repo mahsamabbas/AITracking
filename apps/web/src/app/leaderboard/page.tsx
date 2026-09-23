@@ -103,6 +103,13 @@ export default function LeaderboardPage() {
   }
 
   const rows = query.data?.rows ?? [];
+  // Show only metrics some provider actually reported: Cursor sends no tokens,
+  // and provider requests exist only when a Tier B report is configured.
+  const hasTokens = rows.some((r) => r.tokenInput != null || r.tokenOutput != null);
+  const hasProviderRequests = rows.some((r) => r.providerRequests != null);
+  const columns = COLUMNS.filter(
+    (c) => (c.key !== "tokens" || hasTokens) && (c.key !== "providerRequests" || hasProviderRequests),
+  );
   const sortLabel = COLUMNS.find((c) => c.key === sort)?.label ?? "AI active time";
 
   return (
@@ -127,7 +134,7 @@ export default function LeaderboardPage() {
             onChange={(v) => setSort((v || "active") as SortKey)}
             allLabel="AI active time"
             width="w-[180px]"
-            options={COLUMNS.filter((c) => c.key !== "active").map((c) => ({
+            options={columns.filter((c) => c.key !== "active").map((c) => ({
               value: c.key,
               label: c.label,
             }))}
@@ -177,7 +184,7 @@ export default function LeaderboardPage() {
                     <th className="w-14 text-right">#</th>
                     <th>Employee</th>
                     <th>AI tools</th>
-                    {COLUMNS.map((c) => (
+                    {columns.map((c) => (
                       <th
                         key={c.key}
                         className="text-right"
@@ -244,19 +251,19 @@ export default function LeaderboardPage() {
                         <td className="num text-right text-ink-700">{tierA ? formatNumber(r.modelRequests) : "—"}</td>
                         <td className="num text-right text-ink-700">{tierA ? formatNumber(r.toolCalls) : "—"}</td>
                         <td className="num text-right text-ink-700">{tierA ? formatNumber(r.fileChanges) : "—"}</td>
-                        <td
-                          className="num whitespace-nowrap text-right text-ink-700"
-                          title={
-                            tokens == null
-                              ? "Not reported by the provider — this is not zero"
-                              : `${formatNumber(r.tokenInput)} in · ${formatNumber(r.tokenOutput)} out`
-                          }
-                        >
-                          {tokens == null ? <span className="hint font-sans">Not reported</span> : formatNumber(tokens)}
-                        </td>
-                        <td className="num text-right text-ink-700">
-                          {r.providerRequests == null ? <span className="hint font-sans">—</span> : formatNumber(r.providerRequests)}
-                        </td>
+                        {hasTokens ? (
+                          <td
+                            className="num whitespace-nowrap text-right text-ink-700"
+                            title={tokens == null ? "This person's tools do not report tokens" : `${formatNumber(r.tokenInput)} in · ${formatNumber(r.tokenOutput)} out`}
+                          >
+                            {tokens == null ? "—" : formatNumber(tokens)}
+                          </td>
+                        ) : null}
+                        {hasProviderRequests ? (
+                          <td className="num text-right text-ink-700">
+                            {r.providerRequests == null ? "—" : formatNumber(r.providerRequests)}
+                          </td>
+                        ) : null}
                         <td className="whitespace-nowrap text-sm text-ink-500">{formatRelative(r.lastActiveAt)}</td>
                       </tr>
                     );
@@ -269,8 +276,8 @@ export default function LeaderboardPage() {
       </div>
 
       <p className="mt-4 text-2xs leading-relaxed text-ink-400">
-        Ranks describe observed AI agent usage only, not performance. Tools that do not report a
-        metric show “Not reported” and are ranked after people with a measured value. Planning,
+        Ranks describe observed AI agent usage only, not performance. People whose tools do not report
+        a metric (e.g. Cursor sends no tokens) show “—” and rank after measured values. Planning,
         review, meetings, and manual coding are invisible to this system.
       </p>
     </AppShell>

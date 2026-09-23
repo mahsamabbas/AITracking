@@ -15,6 +15,7 @@ import {
   aiUsageLeaderboard,
   activityCalendar,
   workday,
+  listActivityFeed,
   LEADERBOARD_SORTS,
   type LeaderboardSort,
   aiProgressTimeline,
@@ -421,6 +422,33 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
     return activityCalendar({ organizationId: user.organizationId, developerId: id });
+  }
+
+  /**
+   * Activity feed for the page's selected range: every agent event (no
+   * heartbeats), newest first, paged with `cursor`. Developers only ever see
+   * their own; auditors see no individual activity.
+   */
+  @Get("activity")
+  async activityFeed(
+    @Req() req: FastifyRequest,
+    @Query() q: RangeQuery & { developerId?: string; provider?: string; team?: string; cursor?: string; limit?: string },
+  ) {
+    const user = userFromRequest(req);
+    assertCanViewPeople(user);
+    if (q.developerId && !canViewDeveloper(user, q.developerId)) throw new ForbiddenException("out_of_scope");
+    const scoped = scopeDeveloperIds(user);
+    const { range, preset } = rangeFrom(q);
+    const feed = await listActivityFeed({
+      organizationId: user.organizationId,
+      range,
+      developerIds: q.developerId ? [q.developerId] : scoped,
+      provider: q.provider || undefined,
+      team: q.team || undefined,
+      cursor: q.cursor || undefined,
+      limit: Number(q.limit) || 50,
+    });
+    return { ...feed, preset };
   }
 
   /** One day, hour by hour: working periods, breaks, AI active / idle / exploration minutes. */

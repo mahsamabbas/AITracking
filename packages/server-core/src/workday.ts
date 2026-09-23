@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
-import { activityTypeOf, IDLE_THRESHOLD_MS } from "./activity.js";
+import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
 import { orgTimezone } from "./analytics.js";
 
 /**
@@ -104,18 +104,21 @@ export async function workday(input: {
       provider: string | null;
       status: string | null;
       file_path: string | null;
+      metadata: { tool_name?: unknown; telemetry_source?: unknown } | null;
       classification: string | null;
     }>(sql`
       SELECT e.occurred_at, e.event_type, e.payload->>'duration_ms' AS duration_ms,
              e.session_id, e.payload->>'provider' AS provider, e.payload->>'status' AS status,
              e.payload->'metadata'->>'file_path' AS file_path,
+             e.payload->'metadata' AS metadata,
              s.classification
       FROM activity_events e
       LEFT JOIN agent_sessions s ON s.id = e.session_id
       WHERE e.organization_id = ${organizationId}
         AND e.developer_id = ${developerId}
         AND e.occurred_at >= ${new Date(dayStart)} AND e.occurred_at < ${new Date(dayEnd)}
-        AND e.event_type <> 'heartbeat_sent'
+        -- Liveness pulses (connector heartbeat, IDE keep-alive) are not work.
+        AND e.event_type NOT IN ('heartbeat_sent', 'session_heartbeat')
       ORDER BY e.occurred_at
     `),
     // Gaps that overlap the day, including one that started before it.
@@ -150,6 +153,8 @@ export async function workday(input: {
   for (const e of eventRes.rows) {
     const kind = activityTypeOf(e.event_type);
     if (kind === "connector" || kind === "coverage") continue;
+    // A person's own saves / task runs (IDE companion) are not AI work.
+    if ((kind === "file_change" || kind === "engineering_check") && !isAgentReported({ metadata: e.metadata })) continue;
     const at = new Date(e.occurred_at).getTime();
     const duration = Number(e.duration_ms ?? 0) || 0;
     agentTimes.push(at);

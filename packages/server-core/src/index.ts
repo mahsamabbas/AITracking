@@ -23,4 +23,6 @@ export * from "./provider-identities.js";
 export * from "./ai-progress.js";
 export * from "./leaderboard.js";
 export * from "./workday.js";
+export * from "./activity-feed.js";
+export * from "./platform.js";
 export * from "./schema-version.js";

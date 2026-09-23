@@ -531,18 +531,12 @@ app.post("/hooks/extension", async (req) => {
       );
   }
   const eventType = String(body.event_type ?? "file_modified");
-  const allowed = new Set<string>([
-    EventTypes.file_modified,
-    EventTypes.file_created,
-    EventTypes.file_deleted,
-    EventTypes.test_completed,
-    EventTypes.build_completed,
-    EventTypes.lint_completed,
-    EventTypes.task_context_changed,
-    EventTypes.session_started,
-    EventTypes.session_heartbeat,
-    EventTypes.session_ended,
-  ]);
+  // The IDE companion sees a person's editor, not the AI agent: saves, typing,
+  // task runs and editor sessions are the person's own work and must never be
+  // reported as AI activity. Agent file edits come from the agents' hooks
+  // (Claude Code Write/Edit, Cursor afterFileEdit). The companion only names
+  // the workspace / task the person is working in.
+  const allowed = new Set<string>([EventTypes.task_context_changed]);
   if (!allowed.has(eventType)) {
     return { accepted: 0 };
   }

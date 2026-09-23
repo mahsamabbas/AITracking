@@ -1,4 +1,5 @@
 import { formatDuration, formatTime } from "@/lib/format";
+import { providerLabel } from "@/lib/providers";
 import { ACTIVITY_TYPE, eventLabel } from "@/lib/vocab";
 import type { ActivityEventRow } from "@/lib/types";
 import { EmptyState } from "@/components/ui/States";
@@ -7,7 +8,9 @@ function metaSummary(e: ActivityEventRow): string | null {
   const m = e.metadata ?? {};
   const parts: string[] = [];
   if (m.model_name) parts.push(String(m.model_name));
-  if (m.tool_category) parts.push(String(m.tool_category));
+  if (m.tool_name) parts.push(String(m.tool_name));
+  else if (m.tool_category) parts.push(String(m.tool_category));
+  if (m.file_path) parts.push(String(m.file_path));
   if (m.path_category) parts.push(String(m.path_category));
   if (m.test_passed != null) {
     parts.push(`${m.test_passed} passed${m.test_failed ? `, ${m.test_failed} failed` : ""}`);
@@ -25,12 +28,18 @@ export function EventTimeline({
   limit,
   emptyBody,
   scroll = true,
+  showPerson = false,
+  showProvider = false,
 }: {
   events: ActivityEventRow[];
   limit?: number;
   emptyBody?: string;
   /** Vertical scroll when the list is long (default on). */
   scroll?: boolean;
+  /** Organisation feeds: name the person each event belongs to. */
+  showPerson?: boolean;
+  /** Name the AI tool (Claude Code, Cursor, …) on each row. */
+  showProvider?: boolean;
 }) {
   const shown = limit ? events.slice(0, limit) : events;
   if (shown.length === 0) {
@@ -57,9 +66,15 @@ export function EventTimeline({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="num text-xs text-ink-400">{formatTime(e.occurred_at)}</span>
+                {showPerson && e.developer_name ? (
+                  <span className="text-sm font-semibold text-ink-900">{e.developer_name}</span>
+                ) : null}
                 <span className="text-sm font-medium text-ink-900">
                   {eventLabel(e.event_type)}
                 </span>
+                {showProvider && e.provider ? (
+                  <span className="text-xs text-ink-500">{providerLabel(e.provider)}</span>
+                ) : null}
                 {e.duration_ms ? (
                   <span className="num text-xs text-ink-500">
                     {formatDuration(e.duration_ms)}

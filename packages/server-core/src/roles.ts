@@ -1,4 +1,5 @@
-export type Role = "administrator" | "manager" | "developer" | "auditor";
+/** `super_admin` manages organisations on the platform; it has no access to any organisation's activity. */
+export type Role = "administrator" | "manager" | "developer" | "auditor" | "super_admin";
 
 export interface AuthUser {
   id: string;
@@ -70,12 +71,14 @@ export function canViewActivityEvents(user: AuthUser): boolean {
  * the same surface managers see — FR-004 requires parity, not a reduced view.
  */
 export function homePathForRole(role: Role, developerId?: string | null): string {
+  if (role === "super_admin") return "/platform";
   if (role === "developer") return developerId ? `/employees/${developerId}` : "/";
   if (role === "auditor") return "/audit";
   return "/";
 }
 
 export function navForRole(role: Role): string[] {
+  if (role === "super_admin") return ["/platform"];
   if (role === "developer") return ["/", "/employees/:self", "/my-connectors", "/policy"];
   if (role === "auditor") return ["/audit", "/connectors", "/policy"];
   if (role === "administrator") {

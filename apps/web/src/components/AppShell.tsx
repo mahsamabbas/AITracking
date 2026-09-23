@@ -29,6 +29,13 @@ const icon = (d: string) => (
 
 const NAV: NavItem[] = [
   {
+    // Multi-tenant console: the only screen a platform super admin sees.
+    href: "/platform",
+    label: "Organizations",
+    roles: ["super_admin"],
+    icon: icon("M3 17V7l5-3 5 3v10M13 17V10l4 2v5M6 9h1M6 12h1M9 9h1M9 12h1M2 17h16"),
+  },
+  {
     href: "/",
     label: "Overview",
     roles: ["manager", "administrator", "developer"],

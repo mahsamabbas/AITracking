@@ -24,6 +24,34 @@ export const ACTIVITY_TYPES: ActivityType[] = [
   "connector",
 ];
 
+/**
+ * True when an AI agent reported this file change or check — not an editor.
+ * Agent hooks name the tool (Claude Code Write/Edit, Cursor afterFileEdit) or
+ * mark their source; the IDE companion's save/typing events carry neither and
+ * are a person's own edits, which must never count as AI file changes.
+ */
+export function isAgentReported(event: {
+  metadata?: { tool_name?: unknown; telemetry_source?: unknown } | null;
+}): boolean {
+  const m = event.metadata ?? {};
+  return (
+    (typeof m.tool_name === "string" && m.tool_name.length > 0) ||
+    m.telemetry_source === "hook" ||
+    m.telemetry_source === "otel" ||
+    m.telemetry_source === "provider_api"
+  );
+}
+
+/** SQL twin of isAgentReported for an activity_events alias. */
+export const AGENT_REPORTED_SQL = (alias: string) =>
+  `(${alias}.payload->'metadata'->>'tool_name' IS NOT NULL OR ${alias}.payload->'metadata'->>'telemetry_source' IN ('hook','otel','provider_api'))`;
+
+/** Editor (IDE companion) file saves and task runs: not agent activity. */
+export function isEditorOnlyEvent(event: ActivityEvent): boolean {
+  const type = activityTypeOf(event.event_type);
+  return (type === "file_change" || type === "engineering_check") && !isAgentReported(event);
+}
+
 export function activityTypeOf(eventType: string): ActivityType {
   if (eventType.startsWith("model_")) return "model";
   if (eventType.startsWith("tool_")) return "tool";
