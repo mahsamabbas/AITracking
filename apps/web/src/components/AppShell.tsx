@@ -171,7 +171,7 @@ export function AppShell({
   const sidebarInner = (
     <>
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-solid text-sm font-bold text-white">
           T
         </span>
         <div className="min-w-0">

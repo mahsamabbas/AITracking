@@ -369,7 +369,7 @@ export default function EmployeeDetailPage() {
                     {
                       label: "In-session, agent idle",
                       ms: Math.max(0, t.elapsedMs - t.activeMs - t.idleMs),
-                      color: "#e2e8f0",
+                      color: "var(--chart-muted)",
                       help: "Inside the interactive span with no agent operation running — reading, typing, reviewing.",
                     },
                     {
@@ -590,7 +590,7 @@ export default function EmployeeDetailPage() {
                     <li key={g.from} className="flex items-center gap-3 px-5 py-2.5">
                       <span
                         className={`h-2 w-2 shrink-0 rounded-full ${
-                          g.reason === "coverage_gap" ? "bg-amber-500" : "bg-slate-300"
+                          g.reason === "coverage_gap" ? "bg-conn-warn" : "bg-conn-idle"
                         }`}
                       />
                       <div className="min-w-0 flex-1">

@@ -4,25 +4,30 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_DIR="$ROOT/apps/api"
 
+# An explicitly exported URL always wins. This is the reliable path when the
+# Vercel database variables are marked Sensitive: Vercel never returns
+# Sensitive values to the CLI (pull writes "[SENSITIVE]", env run injects none).
+EXPORTED_URL="${DATABASE_URL:-${POSTGRES_URL:-}}"
+if [[ -n "$EXPORTED_URL" && "$EXPORTED_URL" != *SENSITIVE* && "$EXPORTED_URL" == postgres* ]]; then
+  echo "==> Using DATABASE_URL from your shell"
+  exec node "$ROOT/scripts/migrate.mjs" --production
+fi
+
 corrupted_env() {
   local f="$1"
   [[ -f "$f" ]] && grep -q '\[SENSITIVE\]' "$f" 2>/dev/null
 }
 
 if corrupted_env "$API_DIR/.env.local" || corrupted_env "$API_DIR/.env.production.local"; then
-  echo "ERROR: apps/api/.env.local (or .env.production.local) contains literal [SENSITIVE] placeholders."
-  echo "       Cursor or an editor replaced real secrets — migrate cannot connect."
+  echo "NOTE: apps/api/.env*.local contain [SENSITIVE] placeholders."
+  echo "      Your database variables are marked Sensitive on Vercel, and Vercel never"
+  echo "      returns Sensitive values to the CLI — re-pulling cannot fix this."
   echo ""
-  echo "Fix (use macOS Terminal.app, not Cursor, for the pull):"
-  echo "  rm -f \"$API_DIR/.env.local\" \"$API_DIR/.env.production.local\""
-  echo "  cd \"$API_DIR\""
-  echo "  vercel env pull .env.production.local --environment=production --yes"
-  echo "  grep -q 'postgres' .env.production.local && echo 'OK: real Postgres URL in file'"
-  echo ""
-  echo "Or copy POSTGRES_URL from Vercel → tracking-app-api → Settings → Environment Variables"
-  echo "  (click the eye icon), then in Terminal:"
-  echo "  export DATABASE_URL='postgresql://...'"
-  echo "  node \"$ROOT/scripts/migrate.mjs\" --production"
+  echo "Reliable fix: copy the connection string from the Neon console"
+  echo "  (console.neon.tech → your project → Connect → connection string),"
+  echo "  then in this terminal:"
+  echo "    read -rs DATABASE_URL && export DATABASE_URL    # paste, press Enter"
+  echo "    pnpm db:migrate:prod"
   echo ""
   echo "This run will try vercel env run without your broken .env.local (moved aside)."
   BACKUP_SUFFIX=".bak-before-migrate-$(date +%s)"

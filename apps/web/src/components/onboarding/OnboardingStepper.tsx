@@ -21,7 +21,7 @@ export function OnboardingStepper() {
               key={label}
               className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
                 active
-                  ? "border-brand-600 bg-brand-600 text-white"
+                  ? "border-brand-solid bg-brand-solid text-white"
                   : done
                     ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
                     : "border-line bg-card text-ink-700"

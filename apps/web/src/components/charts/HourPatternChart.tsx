@@ -62,7 +62,7 @@ export function HourPatternChart({
                   ? "var(--chart-1)"
                   : d.activeMs > max * 0.25
                     ? "var(--chart-1)"
-                    : "#c7d2fe"
+                    : "var(--chart-soft)"
               }
               fillOpacity={d.activeMs > max * 0.6 ? 1 : d.activeMs > max * 0.25 ? 0.7 : 1}
             />

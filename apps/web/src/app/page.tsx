@@ -345,7 +345,7 @@ export default function OverviewPage() {
                     {
                       label: "Session, agent not running",
                       ms: Math.max(0, t!.elapsedMs - t!.activeMs - t!.idleMs),
-                      color: "#e2e8f0",
+                      color: "var(--chart-muted)",
                       help: "Time inside the interactive session with no model or tool operation executing — reading, typing, reviewing.",
                     },
                   ]}

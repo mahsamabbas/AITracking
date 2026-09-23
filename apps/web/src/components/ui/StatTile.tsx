@@ -38,7 +38,7 @@ export function StatTile({
           ? "bg-rose-500"
           : accent === "slate"
             ? "bg-slate-400"
-            : "bg-brand-600";
+            : "bg-brand-500";
 
   return (
     <div className="card relative overflow-hidden p-5 transition-shadow duration-fast hover:shadow-pop">

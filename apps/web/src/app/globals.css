@@ -46,6 +46,14 @@
     --color-brand-600: 79 70 229;
     --color-brand-700: 67 56 202;
     --color-brand-900: 49 46 129;
+    --color-brand-300: 165 180 252;
+    --color-brand-800: 55 48 163;
+    --color-brand-950: 30 27 75;
+    --color-raised: 250 251 252;
+    --color-brand-solid: 79 70 229;
+    --color-brand-solid-hover: 67 56 202;
+    --chart-muted: #e2e8f0;
+    --chart-soft: #c7d2fe;
     --chart-1: #4f46e5;
     --chart-2: #0d9488;
     --chart-3: #f59e0b;
@@ -56,29 +64,50 @@
     --chart-grid: #eef0f3;
     --chart-axis: #6b7280;
   }
+  /*
+   * Dark theme. Surfaces step up in lightness (canvas → card → raised) instead
+   * of relying on shadows; every text token clears WCAG AA 4.5:1 on both the
+   * canvas and cards (ink-400 5.0:1, ink-500 7.1:1, links 6.6:1).
+   */
   html.dark {
-    --color-canvas: 15 18 24;
-    --color-card: 23 27 34;
-    --color-line: 42 49 64;
-    --color-line-strong: 59 68 84;
-    --color-ink-900: 243 244 246;
-    --color-ink-700: 209 213 219;
-    --color-ink-500: 156 163 175;
-    --color-ink-400: 107 114 128;
-    --color-brand-50: 30 27 75;
-    --color-brand-100: 49 46 129;
-    --color-brand-200: 67 56 202;
+    --color-canvas: 12 14 19;
+    --color-card: 21 24 32;
+    --color-raised: 28 32 42;
+    --color-line: 40 45 58;
+    --color-line-strong: 58 65 82;
+    --color-ink-900: 236 238 242;
+    --color-ink-700: 203 208 217;
+    --color-ink-500: 156 164 178;
+    --color-ink-400: 128 137 152;
+    /* Brand scale is flipped: low numbers are deep tints, high numbers light text. */
+    --color-brand-50: 30 29 72;
+    --color-brand-100: 42 40 105;
+    --color-brand-200: 62 58 160;
+    --color-brand-300: 99 102 241;
     --color-brand-400: 129 140 248;
     --color-brand-500: 99 102 241;
-    --color-brand-600: 129 140 248;
-    --color-brand-700: 165 180 252;
-    --color-brand-900: 199 210 254;
+    --color-brand-600: 140 150 250;
+    --color-brand-700: 170 182 252;
+    --color-brand-800: 199 210 254;
+    --color-brand-900: 224 231 255;
+    --color-brand-950: 22 21 52;
+    /* Solid fills keep a deep indigo so white labels stay at 6.3:1. */
+    --color-brand-solid: 79 70 229;
+    --color-brand-solid-hover: 99 102 241;
+    --chart-1: #818cf8;
+    --chart-2: #2dd4bf;
+    --chart-3: #fbbf24;
+    --chart-4: #fb7185;
+    --chart-5: #a78bfa;
+    --chart-6: #38bdf8;
     --chart-idle: #475569;
-    --chart-grid: #2a3140;
-    --chart-axis: #9ca3af;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-2: 0 6px 16px rgba(0, 0, 0, 0.4);
-    --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.55);
+    --chart-muted: #2b3142;
+    --chart-soft: #3b3f8f;
+    --chart-grid: #232838;
+    --chart-axis: #9ca4b2;
+    --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 8px 20px rgba(0, 0, 0, 0.45);
+    --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.6);
     --state-ok: 45 212 191;
     --state-warn: 251 191 36;
     --state-bad: 251 113 133;
@@ -127,6 +156,10 @@
   /* ---------- surfaces ---------- */
   .card {
     @apply rounded-xl border border-line bg-card shadow-card;
+  }
+  /* Dark cards get a hairline top highlight so surfaces read as layered. */
+  html.dark .card {
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.018), transparent 120px);
   }
   .card-interactive {
     @apply card transition-[box-shadow,border-color] duration-fast ease-out-soft hover:border-line-strong hover:shadow-pop;
@@ -203,7 +236,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply btn bg-brand-solid text-white hover:bg-brand-solid-hover;
   }
   .btn-ghost {
     @apply btn border border-line bg-card text-ink-700 hover:bg-slate-50 dark:hover:bg-white/5;
@@ -221,7 +254,7 @@
     @apply rounded-[6px] px-2.5 py-1 text-xs font-medium text-ink-500 transition hover:text-ink-900;
   }
   .seg-item-on {
-    @apply seg-item bg-brand-600 text-white hover:text-white;
+    @apply seg-item bg-brand-solid text-white hover:text-white;
   }
 
   /* ---------- tables ---------- */
@@ -229,7 +262,7 @@
     @apply w-full border-collapse text-sm;
   }
   .tbl thead th {
-    @apply whitespace-nowrap border-b border-line bg-slate-50/70 px-4 py-2.5 text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500 dark:bg-white/5;
+    @apply whitespace-nowrap border-b border-line bg-slate-50/70 px-4 py-2.5 text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500 dark:bg-raised;
   }
   .tbl tbody td {
     @apply border-b border-line/70 px-4 py-3 align-middle;
@@ -238,7 +271,7 @@
     @apply border-b-0;
   }
   .row-link {
-    @apply cursor-pointer transition hover:bg-brand-50/50 dark:hover:bg-white/5;
+    @apply cursor-pointer transition-colors duration-fast hover:bg-brand-50/50 dark:hover:bg-raised;
   }
 
   /* ---------- misc ---------- */

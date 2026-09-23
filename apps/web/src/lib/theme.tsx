@@ -10,6 +10,8 @@ import {
 } from "react";
 
 export type Theme = "light" | "dark";
+/** What the user chose; "system" follows the OS and updates live. */
+export type ThemePreference = Theme | "system";
 
 const STORAGE_KEY = "techlio-theme";
 
@@ -19,14 +21,14 @@ function applyTheme(theme: Theme): void {
   root.style.colorScheme = theme;
 }
 
-function readStoredTheme(): Theme | null {
+function readPreference(): ThemePreference {
   try {
     const value = localStorage.getItem(STORAGE_KEY);
-    if (value === "light" || value === "dark") return value;
+    if (value === "light" || value === "dark" || value === "system") return value;
   } catch {
     /* private mode */
   }
-  return null;
+  return "system";
 }
 
 function systemTheme(): Theme {
@@ -34,30 +36,50 @@ function systemTheme(): Theme {
 }
 
 interface ThemeState {
+  /** The theme actually applied. */
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  preference: ThemePreference;
+  setPreference: (pref: ThemePreference) => void;
+  /** Cycles light → dark → system. */
+  cyclePreference: () => void;
+  /** Kept for existing callers: flips between light and dark. */
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeState>({
   theme: "light",
-  setTheme: () => {},
+  preference: "system",
+  setPreference: () => {},
+  cyclePreference: () => {},
   toggleTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
-    return readStoredTheme() ?? systemTheme();
-  });
+  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  const [system, setSystem] = useState<Theme>("light");
+  // The boot script in layout.tsx already applied the right class before paint.
+  // Do not touch the DOM until the stored preference has been read, or dark
+  // users would flash to light for a frame.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setThemeState(readStoredTheme() ?? systemTheme());
+    setPreferenceState(readPreference());
+    setSystem(systemTheme());
+    setReady(true);
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystem(mq.matches ? "dark" : "light");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    applyTheme(next);
+  const theme: Theme = preference === "system" ? system : preference;
+
+  useEffect(() => {
+    if (ready) applyTheme(theme);
+  }, [theme, ready]);
+
+  const setPreference = useCallback((next: ThemePreference) => {
+    setPreferenceState(next);
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
@@ -65,17 +87,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }, [setTheme, theme]);
+  const cyclePreference = useCallback(() => {
+    setPreference(preference === "light" ? "dark" : preference === "dark" ? "system" : "light");
+  }, [preference, setPreference]);
 
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  const toggleTheme = useCallback(() => {
+    setPreference(theme === "dark" ? "light" : "dark");
+  }, [setPreference, theme]);
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme],
+    () => ({ theme, preference, setPreference, cyclePreference, toggleTheme }),
+    [theme, preference, setPreference, cyclePreference, toggleTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

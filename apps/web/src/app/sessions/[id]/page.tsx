@@ -223,7 +223,7 @@ export default function SessionDetailPage() {
                       {
                         label: "Interactive, agent idle",
                         ms: Math.max(0, s.interactiveSpanMs - s.activeDurationMs),
-                        color: "#e2e8f0",
+                        color: "var(--chart-muted)",
                         help: "Inside the interactive span with no agent operation executing.",
                       },
                       {

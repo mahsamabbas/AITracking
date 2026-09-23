@@ -110,8 +110,8 @@ function ProviderProgressCard({ p, employeeId }: { p: ProviderProgress; employee
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold"
-            style={{ background: meta.soft, color: meta.ink }}
+            className="provider-badge flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold"
+                  style={{ "--provider-bg": meta.soft, "--provider-fg": meta.ink, "--provider-dot": meta.color } as React.CSSProperties}
           >
             {meta.label.slice(0, 2).toUpperCase()}
           </span>

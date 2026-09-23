@@ -81,7 +81,7 @@ export default function LoginPage() {
         </div>
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-solid text-sm font-bold text-white">
               T
             </span>
             <div>
@@ -159,7 +159,7 @@ export default function LoginPage() {
       </div>
 
       {SHOW_DEMO ? (
-      <div className="hidden flex-col justify-center bg-slate-950 px-10 py-12 lg:flex">
+      <div className="hidden flex-col justify-center border-line bg-slate-950 px-10 py-12 dark:border-l dark:bg-black/40 lg:flex">
         <p className="label text-brand-200">Local demo accounts</p>
         <h2 className="mt-2 text-xl font-semibold text-white">
           Four portals, one dataset
@@ -190,7 +190,7 @@ export default function LoginPage() {
         </ul>
       </div>
       ) : (
-        <div className="hidden flex-col justify-center bg-slate-950 px-10 py-12 lg:flex">
+        <div className="hidden flex-col justify-center border-line bg-slate-950 px-10 py-12 dark:border-l dark:bg-black/40 lg:flex">
           <p className="label text-brand-200">Techlio</p>
           <h2 className="mt-2 text-xl font-semibold text-white">Agent activity, not timekeeping</h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
