@@ -34,7 +34,7 @@ The application will not claim to measure all work performed by a developer; pla
 The application will not infer misconduct, honesty, productivity, or performance from low AI-agent usage.
 The MVP will not capture keystrokes, screenshots, private messages, complete source files, or complete prompts and responses by default.
 The MVP will not replace project management, code review, source control, payroll, time tracking, or invoicing tools.
-The MVP will not rank developers or create a hidden productivity score.
+The MVP will not create a hidden productivity score. **Decision 2026-09-23 (product owner):** an AI usage leaderboard — a visible table ranked by observed AI usage — is shown to administrators and managers only; employees and auditors cannot see it. It supersedes the earlier "no ranking" rule and must be covered by the legal/HR-approved monitoring notice before any pilot.
 4. Stakeholders and Roles
 Role | Primary responsibility | Permitted actions
 Administrator | Configures organization, users, connectors, and policy | Manage access, retention, integrations, and notification rules

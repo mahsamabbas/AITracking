@@ -148,6 +148,18 @@ function stamp(event: ActivityEvent): ActivityEvent {
   };
 }
 
+/** Connector/coverage events describe the device, not an agent session. */
+const DEVICE_LEVEL_EVENTS = new Set<string>([
+  "heartbeat_sent",
+  "connector_started",
+  "connector_stopped",
+  "connector_paused",
+  "connector_resumed",
+  "telemetry_gap_started",
+  "telemetry_gap_ended",
+  "upload_failed",
+]);
+
 function baseEvent(
   eventType: ActivityEvent["event_type"],
   extra?: Partial<ActivityEvent>,
@@ -168,7 +180,9 @@ function baseEvent(
     event_type: eventType,
     occurred_at: new Date().toISOString(),
     consent_version: config.consentVersion,
-    session_id: extra?.session_id ?? activeSessionId,
+    // Heartbeats etc. must not inherit the last agent session, or that session
+    // appears to last for as long as the laptop stays on.
+    session_id: extra?.session_id ?? (DEVICE_LEVEL_EVENTS.has(eventType) ? undefined : activeSessionId),
     status: extra?.status ?? defaultStatus(eventType),
     ...extra,
     metadata: Object.keys(meta).length ? meta : extra?.metadata,
@@ -194,13 +208,25 @@ async function flushQueue(): Promise<void> {
   if (batch.length === 0) return;
   flushing = true;
   try {
-    const ok = await uploadBatch(
+    const result = await uploadBatch(
       apiBase(),
       identity.deviceToken,
       signingKey,
       batch,
     );
-    if (ok) {
+    if (result.status === "invalid") {
+      // The API can never accept this batch; drop it but make the loss visible.
+      queue.acknowledge(pending.rowIds);
+      console.error(`dropped ${batch.length} event(s) the API rejected as malformed`);
+      const lost = baseEvent(EventTypes.upload_failed, { status: "failed" });
+      if (lost) queue.enqueue([lost]);
+      return;
+    }
+    if (result.status === "delivered") {
+      if (result.rejected > 0) {
+        const kinds = [...new Set(result.reasons.filter((r) => r !== "duplicate" && r !== "replay"))];
+        if (kinds.length) console.error(`API rejected ${result.rejected} event(s): ${kinds.join(", ")}`);
+      }
       queue.acknowledge(pending.rowIds);
       const agentEvents = batch.filter((event) => event.event_type !== "heartbeat_sent");
       if (agentEvents.length) {
@@ -334,6 +360,19 @@ app.get("/health", async () => {
 
 app.get("/identity", async () => publicIdentity(identity));
 
+/**
+ * The API the device token is sent to. A page may only point the connector at
+ * a different API in local development (both page and API on localhost);
+ * otherwise a local web page could redirect credentials and activity elsewhere.
+ */
+function trustedApiBase(requested: string | undefined, origin: string | string[] | undefined): string {
+  const bare = (url: string) => url.replace(/\/+$/, "");
+  if (!requested || bare(requested) === bare(config.apiBaseUrl)) return config.apiBaseUrl;
+  const local = (url: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url.replace(/\/$/, ""));
+  if (typeof origin === "string" && local(origin) && local(requested)) return requested;
+  throw new Error("api_not_allowed");
+}
+
 app.post("/claim", async (req, reply) => {
   const body = (req.body ?? {}) as {
     accessToken?: string;
@@ -359,7 +398,7 @@ app.post("/claim", async (req, reply) => {
       deviceToken: body.deviceToken,
       publicKey: await publicSigningKey(signingKey),
       displayName: body.displayName,
-      apiBaseUrl: body.apiBaseUrl ?? config.apiBaseUrl,
+      apiBaseUrl: trustedApiBase(body.apiBaseUrl, req.headers.origin),
       consentAccepted: true,
       consentVersion: config.consentVersion,
     });
@@ -375,7 +414,7 @@ app.post("/claim", async (req, reply) => {
         ? 401
         : message === "invalid_connector_key" || message === "not_your_key"
           ? 403
-          : message === "admin_issued_keys_required"
+          : message === "admin_issued_keys_required" || message === "api_not_allowed"
             ? 400
             : 502;
     return reply.code(code).send({ error: message });
@@ -518,8 +557,14 @@ function measuredDuration(
   provider: string,
   sessionId: string | undefined,
   toolName: string | undefined,
+  callId?: string,
 ): number | undefined {
   const map = kind === "model" ? modelStartedAt : toolStartedAt;
+  if (callId) {
+    const started = map.get(`call:${callId}`);
+    map.delete(`call:${callId}`);
+    if (started) return Math.max(1, Date.now() - started);
+  }
   const specific = `${provider}:${sessionId ?? "default"}:${kind === "tool" ? toolName ?? "tool" : "model"}`;
   const fallback = `${provider}:default:${kind === "tool" ? toolName ?? "tool" : "model"}`;
   const started = map.get(specific) ?? map.get(fallback);
@@ -534,7 +579,13 @@ function rememberStart(
   provider: string,
   sessionId: string | undefined,
   toolName: string | undefined,
+  callId?: string,
 ): void {
+  // Parallel calls of the same tool each have their own id; never overwrite one with another.
+  if (callId) {
+    (kind === "model" ? modelStartedAt : toolStartedAt).set(`call:${callId}`, Date.now());
+    return;
+  }
   const key = `${provider}:${sessionId ?? "default"}:${kind === "tool" ? toolName ?? "tool" : "model"}`;
   (kind === "model" ? modelStartedAt : toolStartedAt).set(key, Date.now());
 }
@@ -644,7 +695,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
     rememberStart("model", provider, sessionId, undefined);
   }
   if (payload.hook_event_name === "tool_started" || payload.hook_event_name === "PreToolUse" || payload.hook_event_name === "preToolUse") {
-    rememberStart("tool", provider, sessionId, payload.tool_name ?? payload.tool);
+    rememberStart("tool", provider, sessionId, payload.tool_name ?? payload.tool, payload.tool_use_id);
   }
   const events = claudeHookToEvents(
     { ...payload, session_id: sessionId, provider },
@@ -658,6 +709,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
       provider,
       sessionId,
       event.metadata?.tool_name,
+      event.event_type === "tool_completed" ? payload.tool_use_id : undefined,
     );
     return duration ? { ...event, duration_ms: duration } : event;
   });
@@ -692,7 +744,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
   if (!clean.length) return { accepted: 0, provider };
   const fresh = clean.filter((event) => {
     // Same-provider repeat guard (e.g. native + Claude-format both under Cursor).
-    const key = `${event.provider}:${actionKey(event)}`;
+    const key = `${event.provider}:${event.session_id ?? ""}:${payload.tool_use_id ?? ""}:${actionKey(event)}`;
     const seen = recentAgentEvents.get(key) ?? 0;
     if (Date.now() - seen < 2_500) return false;
     recentAgentEvents.set(key, Date.now());

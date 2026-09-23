@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import type { ActivityEvent } from "@techlio/event-schema";
 import {
   mergeIntervals,
@@ -69,11 +69,21 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
   let sawTokens = false;
   let coverage: "complete" | "partial" | "gap" = "complete";
 
+  // Connector heartbeats and lifecycle events carry the last session id but are
+  // not agent activity: counting them would stretch a one-minute session to
+  // however long the laptop stayed on. Coverage events only mark the session
+  // when they fall inside its observed agent span (checked after the loop).
+  const coverageMarks: { at: number; state: "gap" | "partial" }[] = [];
+  let agentEvents = 0;
   for (const e of events) {
     const start = new Date(e.occurred_at).getTime();
     if (Number.isNaN(start)) continue;
-    times.push(start);
     const type = activityTypeOf(e.event_type);
+    if (type === "connector") continue;
+    if (type !== "coverage") {
+      times.push(start);
+      agentEvents++;
+    }
 
     if (type === "model") {
       if (e.event_type === "model_request_completed") {
@@ -112,16 +122,20 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
         e.event_type === "telemetry_gap_started" ||
         e.event_type === "connector_paused"
       ) {
-        coverage = "gap";
-      } else if (
-        e.event_type === "provider_capability_missing" &&
-        coverage === "complete"
-      ) {
-        coverage = "partial";
+        coverageMarks.push({ at: start, state: "gap" });
+      } else if (e.event_type === "provider_capability_missing") {
+        coverageMarks.push({ at: start, state: "partial" });
       }
     }
 
     if (e.status === "failed") failures++;
+  }
+
+  times.sort((a, b) => a - b);
+  for (const mark of coverageMarks) {
+    const inside = times.length > 0 && mark.at >= times[0] && mark.at <= times[times.length - 1];
+    if (mark.state === "gap" && inside) coverage = "gap";
+    else if (mark.state === "partial" && coverage === "complete") coverage = "partial";
   }
 
   const merged = mergeIntervals([...modelIntervals, ...toolIntervals]);
@@ -129,7 +143,6 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
   const toolDurationMs = totalDurationMs(toolIntervals);
   const activeDurationMs = totalDurationMs(merged);
 
-  times.sort((a, b) => a - b);
   const elapsedSpanMs =
     times.length > 1 ? times[times.length - 1] - times[0] : 0;
 
@@ -167,7 +180,7 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
     interactiveSpanMs,
     elapsedSpanMs,
     idleDurationMs,
-    eventCount: events.length,
+    eventCount: agentEvents,
     modelRequests,
     toolCalls,
     testsRun,
@@ -200,6 +213,8 @@ export async function recomputeSessionMetrics(
       and(
         eq(activityEvents.organizationId, organizationId),
         eq(activityEvents.sessionId, sessionId),
+        // Heartbeats are ignored by computeSessionMetrics; don't load them.
+        ne(activityEvents.eventType, "heartbeat_sent"),
       ),
     )
     .orderBy(asc(activityEvents.occurredAt));
@@ -234,6 +249,8 @@ export async function recomputeSessionMetrics(
       classification: m.classification,
       coverageState: m.coverageState,
       lastEventAt: m.lastEventAt,
+      // Late OTel events can predate the first event seen; keep the true start.
+      ...(m.startedAt ? { startedAt: m.startedAt } : {}),
       metricsAt: new Date(),
     })
     .where(

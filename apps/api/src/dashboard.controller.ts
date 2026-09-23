@@ -122,7 +122,10 @@ export class DashboardController {
       };
     });
 
-    const sessionRes = await db.execute<{
+    // Auditors see connector health and policy, never individual activity.
+    const sessionRes = !canViewActivityEvents(user)
+      ? { rows: [] }
+      : await db.execute<{
       id: string;
       developer_id: string;
       display_name: string;

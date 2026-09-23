@@ -68,6 +68,8 @@ async function runHook(): Promise<void> {
       (raw.generation_id as string) ||
       process.env.CURSOR_CONVERSATION_ID,
     tool_name: (raw.tool_name as string) || (raw.tool as string) || (toolCall.name as string),
+    // Opaque per-call id: pairs a tool's start and end and keeps parallel calls apart.
+    tool_use_id: (raw.tool_use_id as string) || (raw.toolUseId as string) || (toolCall.id as string),
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
     model: (raw.model as string) || (raw.model_name as string) || (raw.modelName as string),

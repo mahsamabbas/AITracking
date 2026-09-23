@@ -20,6 +20,7 @@ import {
   StatSkeleton,
 } from "@/components/ui/States";
 import { TrendChart } from "@/components/charts/TrendChart";
+import { ActivityCalendar, type ActivityCalendarData } from "@/components/charts/ActivityCalendar";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
@@ -68,6 +69,10 @@ export default function EmployeeDetailPage() {
       : null,
   );
   const live = useApi<LiveStatus>("/v1/dashboard/live?limit=20", { pollMs: 45_000 });
+  // Always the last year, independent of the range filter (like a git contribution graph).
+  const calendar = useApi<ActivityCalendarData>(
+    employeeId && employeeId !== "self" ? `/v1/employees/${employeeId}/activity-calendar` : null,
+  );
   const timeline = useApi<{
     timezone: string;
     hourlyCards: {
@@ -248,6 +253,27 @@ export default function EmployeeDetailPage() {
                 )}
               </div>
             </div>
+          </Card>
+
+          {/* ---------------- Year of AI activity (contribution graph) ---------------- */}
+          <Card className="mb-5">
+            <CardHeader
+              title="AI activity — last 12 months"
+              subtitle={
+                calendar.data
+                  ? `${formatNumber(calendar.data.totals.activeDays)} active days · ${formatNumber(calendar.data.totals.sessions)} sessions · ${formatDuration(calendar.data.totals.activeMs, { compact: true })} AI active · days in ${calendar.data.timezone}`
+                  : "Each square is one day, shaded by AI agent active time"
+              }
+            />
+            <CardBody>
+              {calendar.error ? (
+                <p className="hint">Could not load the activity graph.</p>
+              ) : !calendar.data ? (
+                <ChartSkeleton height={130} />
+              ) : (
+                <ActivityCalendar data={calendar.data} />
+              )}
+            </CardBody>
           </Card>
 
           {isSelf && d.devices.length === 0 ? (

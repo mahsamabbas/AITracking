@@ -190,4 +190,34 @@ describe("computeSessionMetrics", () => {
     expect(m.elapsedSpanMs).toBe(0);
     expect(m.startedAt).toBeNull();
   });
+
+  it("ignores connector heartbeats and lifecycle events that carry the session id", () => {
+    // One minute of agent work, then the laptop stays on for 8 hours sending
+    // heartbeats stamped with the same session id.
+    const events = [
+      ev("session_started", T0),
+      ev("model_request_completed", T0 + 30 * S, { duration_ms: 30 * S }),
+      ev("tool_completed", T0 + 60 * S, { duration_ms: 20 * S, metadata: { tool_category: "shell" } }),
+      ...Array.from({ length: 16 * 8 }, (_, i) => ev("heartbeat_sent", T0 + 2 * M + i * 225 * S)),
+      ev("connector_paused", T0 + 8 * 60 * M),
+      ev("connector_stopped", T0 + 8 * 60 * M + S),
+    ];
+
+    const m = computeSessionMetrics(events);
+
+    expect(m.elapsedSpanMs).toBe(60 * S);
+    expect(m.eventCount).toBe(3);
+    expect(m.lastEventAt?.getTime()).toBe(T0 + 60 * S);
+    // The pause happened hours after the session's agent activity ended.
+    expect(m.coverageState).toBe("complete");
+  });
+
+  it("marks a gap when collection paused during the session's agent activity", () => {
+    const events = [
+      ev("model_request_completed", T0 + 30 * S, { duration_ms: 30 * S }),
+      ev("connector_paused", T0 + 2 * M),
+      ev("tool_completed", T0 + 10 * M, { duration_ms: 20 * S, metadata: { tool_category: "shell" } }),
+    ];
+    expect(computeSessionMetrics(events).coverageState).toBe("gap");
+  });
 });

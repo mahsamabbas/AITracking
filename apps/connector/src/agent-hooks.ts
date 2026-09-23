@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,6 +73,7 @@ process.stdin.on("end", () => {
     session_id: raw.session_id || raw.conversation_id ||
       raw.conversationId || raw.generation_id || process.env.CURSOR_CONVERSATION_ID,
     tool_name: raw.tool_name || raw.tool || toolCall.name,
+    tool_use_id: raw.tool_use_id || raw.toolUseId || toolCall.id,
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
     model: raw.model || raw.model_name || raw.modelName,
@@ -114,22 +115,41 @@ function commandFor(
   return `"${node}" "${scriptPath}" ${provider}${suffix}`;
 }
 
-/** True for any hook entry this connector wrote, in script or packaged form. */
+/**
+ * True only for hook entries this connector wrote (script or packaged form).
+ * Matching a bare "--hook" would also delete unrelated user hooks such as
+ * "husky --hook pre-commit".
+ */
 function isTechlioHook(entry: unknown): boolean {
   const text = JSON.stringify(entry);
-  return text.includes(SCRIPT_NAME) || text.includes("--hook") || text.includes("techlio-connector");
+  return (
+    text.includes(SCRIPT_NAME) ||
+    text.includes("techlio-connector") ||
+    /--hook (claude_code|cursor|antigravity)\b/.test(text)
+  );
 }
 
+/**
+ * Reads a user's tool config. A file that exists but does not parse (e.g. a
+ * trailing comma the user typed) throws, so the caller skips it instead of
+ * replacing the user's settings with ours.
+ */
 function readJson(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
-  try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
+  const text = readFileSync(path, "utf8");
+  if (!text.trim()) return {};
+  const parsed = JSON.parse(text) as unknown; // throws on invalid JSON
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${path} is not a JSON object; left unchanged`);
   }
+  return parsed as Record<string, unknown>;
+}
+
+/** Write via a temp file + rename so a crash mid-write never truncates the user's config. */
+function writeJson(path: string, value: unknown): void {
+  const tmp = `${path}.techlio-${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(tmp, path);
 }
 
 function installScript(): string {
@@ -162,7 +182,7 @@ function installClaude(scriptPath: string): void {
   }
   settings.hooks = hooks;
   settings.env = withClaudeOtel(settings.env);
-  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  writeJson(path, settings);
 }
 
 /**
@@ -178,9 +198,12 @@ function withClaudeOtel(env: unknown): Record<string, string> {
 
 /** True when Claude Code is configured to export telemetry to this connector. */
 export function claudeOtelConfigured(): boolean {
-  const env = readJson(join(homedir(), ".claude", "settings.json")).env as
-    | Record<string, string>
-    | undefined;
+  let env: Record<string, string> | undefined;
+  try {
+    env = readJson(join(homedir(), ".claude", "settings.json")).env as Record<string, string> | undefined;
+  } catch {
+    return false;
+  }
   return (
     env?.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT === OTLP_LOGS_ENDPOINT &&
     env?.CLAUDE_CODE_ENABLE_TELEMETRY === "1"
@@ -207,7 +230,7 @@ function installAntigravity(scriptPath: string): boolean {
   }
   // One named entry, replaced on every start — never duplicated.
   config[ANTIGRAVITY_HOOK_NAME] = entry;
-  writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+  writeJson(path, config);
   return true;
 }
 
@@ -225,7 +248,7 @@ function installCursor(scriptPath: string): void {
   }
   settings.version = 1;
   settings.hooks = hooks;
-  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  writeJson(path, settings);
 }
 
 /** Point Claude Code, Cursor, and Antigravity at the local connector. Existing settings are kept. */
@@ -258,7 +281,12 @@ export function ensureAgentHooks(): { claude: boolean; cursor: boolean; antigrav
 export function removeAgentHooks(): void {
   for (const path of [join(homedir(), ".claude", "settings.json"), join(homedir(), ".cursor", "hooks.json")]) {
     if (!existsSync(path)) continue;
-    const settings = readJson(path);
+    let settings: Record<string, unknown>;
+    try {
+      settings = readJson(path);
+    } catch {
+      continue; // unreadable: leave the user's file exactly as it is
+    }
     const hooks = (settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {}) as Record<string, unknown>;
     for (const [name, entries] of Object.entries(hooks)) {
       if (!Array.isArray(entries)) continue;
@@ -273,12 +301,16 @@ export function removeAgentHooks(): void {
       for (const key of Object.keys(CLAUDE_OTEL_ENV)) delete env[key];
       settings.env = env;
     }
-    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+    writeJson(path, settings);
   }
   const ag = antigravityHooksPath();
   if (existsSync(ag)) {
-    const config = readJson(ag);
-    delete config[ANTIGRAVITY_HOOK_NAME];
-    writeFileSync(ag, `${JSON.stringify(config, null, 2)}\n`);
+    try {
+      const config = readJson(ag);
+      delete config[ANTIGRAVITY_HOOK_NAME];
+      writeJson(ag, config);
+    } catch {
+      /* unreadable: leave it */
+    }
   }
 }

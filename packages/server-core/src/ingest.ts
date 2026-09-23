@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { EventBatchSchema, type ActivityEvent } from "@techlio/event-schema";
+import { ActivityEventSchema, type ActivityEvent } from "@techlio/event-schema";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, auditLog, hourlySnapshots } from "./schema.js";
@@ -65,19 +65,39 @@ async function maybeScheduleLateRecalc(event: ActivityEvent): Promise<void> {
   });
 }
 
+export interface IngestAuth {
+  /** The developer the authenticating device belongs to; every event must be theirs. */
+  developerId?: string;
+  /** Only provider_pull devices (the worker) may submit Tier B daily aggregates. */
+  allowTierB?: boolean;
+}
+
 export async function ingestBatch(
   organizationId: string,
   body: unknown,
   deviceIdFromAuth?: string,
+  auth?: IngestAuth,
 ): Promise<{ accepted: number; rejected: number; reasons?: string[] }> {
-  const parsed = EventBatchSchema.safeParse(body);
-  if (!parsed.success) return { accepted: 0, rejected: 1, reasons: ["schema"] };
+  // Validate per event: one malformed event must not discard the valid rest of
+  // the batch (the connector deletes a batch once the API answers 2xx).
+  const raw = (body as { events?: unknown[] } | null)?.events;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 500) {
+    return { accepted: 0, rejected: 1, reasons: ["schema"] };
+  }
 
   let accepted = 0;
   let rejected = 0;
   const reasons: string[] = [];
 
-  for (const event of parsed.data.events) {
+  for (const candidate of raw) {
+    const parsedEvent = ActivityEventSchema.safeParse(candidate);
+    if (!parsedEvent.success) {
+      rejected++;
+      const issue = parsedEvent.error.issues[0];
+      reasons.push(`schema:${issue?.path.join(".") || "event"}`);
+      continue;
+    }
+    const event = parsedEvent.data;
     if (event.organization_id !== organizationId) {
       rejected++;
       reasons.push("org_mismatch");
@@ -86,6 +106,16 @@ export async function ingestBatch(
     if (deviceIdFromAuth && event.device_id !== deviceIdFromAuth) {
       rejected++;
       reasons.push("device_mismatch");
+      continue;
+    }
+    if (auth?.developerId && event.developer_id !== auth.developerId) {
+      rejected++;
+      reasons.push("developer_mismatch");
+      continue;
+    }
+    if (auth && !auth.allowTierB && event.event_type === "provider_daily_aggregate") {
+      rejected++;
+      reasons.push("tier_b_not_allowed");
       continue;
     }
     if (seenEvents.has(event.event_id)) {

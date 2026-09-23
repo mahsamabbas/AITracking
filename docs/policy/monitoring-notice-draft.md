@@ -24,6 +24,11 @@ Operational visibility into development activity performed through connected AI 
 
 Managers: authorized team metadata and summaries. Developers: the same data collected about themselves. Administrators: configuration and connector health.
 
+**AI usage leaderboard (added 2026-09-23, needs legal/HR approval):** administrators
+and managers can see a table ranking employees by observed AI agent usage (AI active time,
+sessions, model and tool calls, file changes, tokens where reported). Employees and auditors
+cannot see it. It measures AI tool usage only, not performance or effort.
+
 ## Retention (default proposal)
 
 Detailed events: 90 days. Hourly summaries and audit records: 1 year. Subject to contract and legal requirements.

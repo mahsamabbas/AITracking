@@ -233,7 +233,9 @@ function unregisterWindows(): void {
   reg(["delete", WIN_UNINSTALL_KEY, "/f"]);
   // A Run-key copy (and the supervised worker) is not owned by Task
   // Scheduler; stop every copy by image name.
-  spawnSync("taskkill", ["/F", "/IM", exeName()], QUIET);
+  // Never this process: the Settings → Apps uninstaller *is* this exe, and
+  // killing it would skip hook removal and file cleanup below.
+  spawnSync("taskkill", ["/F", "/IM", exeName(), "/FI", `PID ne ${process.pid}`], QUIET);
 }
 
 /** Last resort: run the service for this session, detached and windowless. */

@@ -14,13 +14,42 @@ Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 |------|--------|-------|
 | Remove auth bypasses (header auth, demo passwords, `dev-device-token`, default JWT secret) | **Done** | Fail-closed `TECHLIO_DEV_MODE`; migration 008; boot refuses weak secrets |
 | Production credential hygiene after the bypasses | **Blocked — owner action** | Create real admin, deploy 008–011, rotate `JWT_SECRET` + DB password, review audit log, decide on git-history purge (audit §5) |
-| Legal/HR approval of notice, consent, retention, access, pause, dispute, jurisdiction (SEC-007/010) | **Blocked — legal** | Notice is still a draft; do not start a pilot without it |
+| Legal/HR approval of notice, consent, retention, access, pause, dispute, jurisdiction (SEC-007/010) | **Blocked — legal** | Notice is still a draft (`docs/policy/monitoring-notice-draft.md`); it now also discloses the manager/admin AI usage leaderboard. Do not start a pilot without sign-off |
 | Phase 0 live Claude Code validation, recorded | **Open** | Hooks are proven live locally (2026-09-23); a sanitized, documented pilot session is still required |
 | §19 live integration tests (offline queue, heartbeat stop, pause, late event, invalid signature, replay, provider-missing UI) in CI | **Open** | `ai-progress.live.test.ts` and `tier-b.live.test.ts` cover connector → API → dashboard for Claude/Cursor/Antigravity and Tier B (`LIVE_STACK=1`); not yet in CI, and offline/replay/signature cases remain |
 | Production database behind deployed code (2026-09-23) | **Blocked — owner action** | Prod runs the audit-pass build without migrations 008+; `devices` queries fail. Run `admin:create`, then `pnpm db:migrate:prod`. `/v1/health` now reports `schema.upToDate` and drift returns 503 with the fix |
 | TLS + managed encryption at rest for Postgres, Redis, backups, exports (SEC-003) | **Blocked — infrastructure** | Neon/Vercel provide TLS + at-rest encryption; needs written confirmation and a backup-encryption decision |
 | SSO/OIDC (FR-001) | **Open** | ~3–5 d; password login remains, now scrypt-hashed |
 | Signed connector installers | **Blocked — certificates** | Apple Developer ID + notarization, Authenticode. Tooling done (`--release`) |
+
+## Review findings (2026-09-23)
+
+Fixed: device may only report its own developer; only provider_pull devices submit Tier B;
+per-event validation (a bad event no longer drops the batch; all-bad batch → 400, connector
+records `upload_failed`); heartbeats/connector events no longer stretch sessions or hourly
+spans (connector stops stamping them with a session id; server ignores them); hourly model/tool
+intervals now `[t − duration, t]` like sessions; session `started_at` corrected by late events;
+auditors no longer receive live sessions; tool timing paired by `tool_use_id`, parallel calls
+no longer deduplicated; unreadable user tool configs never overwritten (atomic writes); user
+hooks containing `--hook` no longer deleted; Windows uninstaller no longer kills itself;
+transient Keychain/DPAPI failures no longer regenerate keys; `/claim` only pairs with the
+configured API (localhost allowed only in local dev).
+
+| Open item | Severity | Notes |
+|-----------|----------|-------|
+| Cursor Tier B rows freeze at first pull of the day (id = hash(day,user), insert-or-ignore) | High | Upsert Tier B rows or only ingest closed days |
+| Sessionization reloads the whole session per event (≈8 queries) | High (scale) | Recompute once per session per batch |
+| Claude Code run inside Cursor's terminal labelled Cursor | Medium | Decide by payload shape (`transcript_path`) not env vars |
+| Several macOS users on one machine share port 9477 | Medium | Per-user port or Unix socket written into hook commands |
+| Org timezone vs UTC day keys; "today" computed in UTC (`range.ts`) | Medium | Use `organizations.timezone` everywhere |
+| Concurrent sessions summed can exceed wall-clock time | Medium | Merge intervals per person for totals |
+| Late-event recalc race / missing snapshot never recalculated | Medium | Unique `(org,dev,hour,version)`, debounce |
+| AiProgressPanel shows 0 for providers whose catalog lists the metric missing | Medium | Show "Not available from provider" |
+| `listRecentEvents` sorts on unindexed `received_at`; no `(org, occurred_at)` index | Medium (scale) | Add indexes via migration 013 |
+| Windows in-place upgrade silently keeps the old exe (file locked) | Medium | Stop task → copy → start; report failure |
+| Queue has no size cap and rewrites the file on each enqueue | Low | Cap + append-only |
+| CSV export silently truncated at 5000 events | Low | Say so in the file |
+| Project name lookup lacks org filter in session detail | Low | Add `organization_id` predicate |
 
 ## P1 — MVP product behaviour
 

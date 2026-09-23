@@ -396,3 +396,89 @@ export async function aiProgressTimeline(input: {
     })),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Activity calendar — a GitHub-style contribution graph of AI agent work
+// ---------------------------------------------------------------------------
+
+export interface ActivityCalendarDay {
+  /** YYYY-MM-DD in the organisation timezone. */
+  date: string;
+  sessions: number;
+  activeMs: number;
+  modelRequests: number;
+  toolCalls: number;
+  fileChanges: number;
+}
+
+export interface ActivityCalendar {
+  from: string;
+  to: string;
+  timezone: string;
+  /** First day any connector of this person existed or reported; earlier days are "not tracked", not zero. */
+  trackedSince: string | null;
+  /** Only days with at least one session; every other tracked day had none observed. */
+  days: ActivityCalendarDay[];
+  totals: { sessions: number; activeMs: number; activeDays: number };
+}
+
+export async function activityCalendar(input: {
+  organizationId: string;
+  developerId: string;
+  days?: number;
+}): Promise<ActivityCalendar> {
+  const { organizationId, developerId } = input;
+  const span = Math.min(Math.max(input.days ?? 365, 7), 371);
+  const tz = orgTimezone();
+  const to = new Date();
+  const from = new Date(to.getTime() - span * 86_400_000);
+
+  const [daily, since] = await Promise.all([
+    db.execute<Record<string, unknown> & { day: string }>(sql`
+      SELECT to_char((s.started_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+             COUNT(*)::int             AS sessions,
+             SUM(s.active_duration_ms) AS active_ms,
+             SUM(s.model_requests)     AS model_requests,
+             SUM(s.tool_calls)         AS tool_calls,
+             SUM(s.file_changes)       AS file_changes
+      FROM agent_sessions s
+      WHERE s.organization_id = ${organizationId}
+        AND s.developer_id = ${developerId}
+        AND s.started_at >= ${from} AND s.started_at < ${to}
+      GROUP BY 1
+      ORDER BY 1
+    `),
+    db.execute<{ since: Date | null }>(sql`
+      SELECT LEAST(
+        (SELECT MIN(created_at) FROM devices
+          WHERE organization_id = ${organizationId} AND developer_id = ${developerId}),
+        (SELECT MIN(started_at) FROM agent_sessions
+          WHERE organization_id = ${organizationId} AND developer_id = ${developerId})
+      ) AS since
+    `),
+  ]);
+
+  const sinceAt = since.rows[0]?.since;
+  const days = daily.rows.map((r) => ({
+    date: r.day,
+    sessions: n(r.sessions),
+    activeMs: n(r.active_ms),
+    modelRequests: n(r.model_requests),
+    toolCalls: n(r.tool_calls),
+    fileChanges: n(r.file_changes),
+  }));
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    timezone: tz,
+    trackedSince: sinceAt
+      ? new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(sinceAt))
+      : null,
+    days,
+    totals: {
+      sessions: days.reduce((sum, d) => sum + d.sessions, 0),
+      activeMs: days.reduce((sum, d) => sum + d.activeMs, 0),
+      activeDays: days.length,
+    },
+  };
+}

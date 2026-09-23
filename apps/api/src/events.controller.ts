@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Headers,
@@ -52,7 +53,17 @@ export class EventsController {
       }
     }
 
-    return ingestBatch(orgId, body, deviceId);
+    // A connector may only report its own developer's activity; only the
+    // worker's provider_pull devices may submit Tier B daily aggregates.
+    const result = await ingestBatch(orgId, body, deviceId, {
+      developerId: device?.kind === "provider_pull" ? undefined : verified.developerId,
+      allowTierB: device?.kind === "provider_pull",
+    });
+    if (result.accepted === 0 && result.rejected > 0 && result.reasons?.every((r) => r.startsWith("schema"))) {
+      // Nothing usable: say so instead of a 2xx the connector would treat as delivered.
+      throw new BadRequestException({ error: "invalid_batch", ...result });
+    }
+    return result;
   }
 
   @Post("timesheet")

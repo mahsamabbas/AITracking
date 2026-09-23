@@ -19,6 +19,8 @@ export interface ClaudeHookPayload {
   conversation_id?: string;
   tool_name?: string;
   tool?: string;
+  /** Opaque per-call id from the agent; used only locally to pair start/end. Never stored. */
+  tool_use_id?: string;
   cwd?: string;
   file_path?: string;
   model?: string;

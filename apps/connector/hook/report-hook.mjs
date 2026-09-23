@@ -57,6 +57,7 @@ process.stdin.on("end", () => {
       raw.generation_id ||
       process.env.CURSOR_CONVERSATION_ID,
     tool_name: raw.tool_name || raw.tool || toolCall.name,
+    tool_use_id: raw.tool_use_id || raw.toolUseId || toolCall.id,
     cwd,
     file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
     model: raw.model || raw.model_name || raw.modelName,

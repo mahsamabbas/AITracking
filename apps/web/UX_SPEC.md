@@ -11,7 +11,9 @@ never deceptive. Every number answers "where did this come from?".
    range, timezone, and *Data as of …*, with a manual refresh and a Live pill
    when the page polls `/v1/dashboard/live`.
 3. **No people scoring.** KPI deltas use ↑ / ↓ / → with neutral ink — a drop in
-   AI usage is not painted red. No leaderboards; sorting is a user action.
+   AI usage is not painted red. The one ranking is `/leaderboard` (administrators
+   and managers only, owner decision 2026-09-23): observed AI usage per person,
+   "Not reported" ranked last, never labelled as performance.
 4. **The agent performed…**, never "the developer worked…".
 5. **No browser math.** Pages format, sort, and filter UI state only. Totals
    come from the API (`summary`, `matched`, `totals`).

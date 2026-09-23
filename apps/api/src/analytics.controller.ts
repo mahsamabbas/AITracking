@@ -13,6 +13,7 @@ import {
   activityTotals,
   aiProgress,
   aiUsageLeaderboard,
+  activityCalendar,
   LEADERBOARD_SORTS,
   type LeaderboardSort,
   aiProgressTimeline,
@@ -410,6 +411,15 @@ export class AnalyticsController {
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
     return aiProgressTimeline({ organizationId: user.organizationId, developerId: id, date: day });
+  }
+
+  /** One year of daily AI agent activity for the contribution-style graph. */
+  @Get("employees/:id/activity-calendar")
+  async employeeActivityCalendar(@Param("id") id: string, @Req() req: FastifyRequest) {
+    const user = userFromRequest(req);
+    assertCanViewPeople(user);
+    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    return activityCalendar({ organizationId: user.organizationId, developerId: id });
   }
 
   @Get("employees/:id/sessions")

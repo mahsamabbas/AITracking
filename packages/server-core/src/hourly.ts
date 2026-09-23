@@ -1,3 +1,4 @@
+import { activityTypeOf } from "./activity.js";
 import {
   computeHourlyDurations,
   DEFAULT_IDLE_THRESHOLD_MS,
@@ -92,13 +93,17 @@ export async function finalizeHourForDeveloper(
         token_output?: number;
       };
     };
-    const start = new Date(p.occurred_at ?? row.occurredAt).getTime();
-    const end = start + (p.duration_ms ?? 0);
-    if (p.event_type?.includes("model")) {
-      modelIntervals.push({ startMs: start, endMs: end });
-    }
-    if (p.event_type?.includes("tool")) {
-      toolIntervals.push({ startMs: start, endMs: end });
+    // occurred_at is the completion time: a call spans [t - duration, t], the
+    // same convention as computeSessionMetrics, so hourly and session totals agree.
+    const at = new Date(p.occurred_at ?? row.occurredAt).getTime();
+    const interval = { startMs: at - (p.duration_ms ?? 0), endMs: at };
+    if (p.event_type === "model_request_completed") modelIntervals.push(interval);
+    if (
+      p.event_type === "tool_completed" ||
+      p.event_type === "test_completed" ||
+      p.event_type === "build_completed"
+    ) {
+      toolIntervals.push(interval);
     }
     if (p.metadata?.token_input != null) tokenInput = (tokenInput ?? 0) + p.metadata.token_input;
     if (p.metadata?.token_output != null) tokenOutput = (tokenOutput ?? 0) + p.metadata.token_output;
@@ -111,10 +116,15 @@ export async function finalizeHourForDeveloper(
     ) {
       fileChanges++;
     }
-    const sid = p.session_id ?? row.sessionId ?? "unknown";
-    const arr = sessionTimes.get(sid) ?? [];
-    arr.push(start);
-    sessionTimes.set(sid, arr);
+    // Heartbeats and connector/coverage events are not agent activity; they
+    // would make every powered-on hour look like an hour-long session.
+    const kind = activityTypeOf(p.event_type ?? row.eventType);
+    if (kind !== "connector" && kind !== "coverage") {
+      const sid = p.session_id ?? row.sessionId ?? "unknown";
+      const arr = sessionTimes.get(sid) ?? [];
+      arr.push(at);
+      sessionTimes.set(sid, arr);
+    }
   }
 
   const durations = computeHourlyDurations({

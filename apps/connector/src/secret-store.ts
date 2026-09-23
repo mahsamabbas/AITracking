@@ -85,18 +85,35 @@ export function setSecret(name: string, value: string): void {
   writePrivate(filePath(name), value);
 }
 
+/**
+ * The secret exists but could not be read right now (locked Keychain, DPAPI
+ * timing out at sign-in). Callers must not treat this as "missing" — creating
+ * a new key would silently break the device's signature and queued rows.
+ * The service exits and its supervisor retries shortly.
+ */
+export class SecretUnavailableError extends Error {}
+
+const KEYCHAIN_ITEM_NOT_FOUND = 44;
+
 export function getSecret(name: string): string | null {
   switch (backend()) {
     case "keychain": {
       const r = run("security", ["find-generic-password", "-s", SERVICE, "-a", name, "-w"]);
       if (r.status === 0) return r.stdout.replace(/\n$/, "");
+      if (r.status !== KEYCHAIN_ITEM_NOT_FOUND) {
+        throw new SecretUnavailableError(`Keychain read failed for ${name} (status ${r.status})`);
+      }
       break;
     }
     case "dpapi": {
       const p = filePath(name, "dpapi");
       if (existsSync(p)) {
-        const r = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", PS_UNPROTECT], readFileSync(p, "utf8"));
-        if (r.status === 0) return r.stdout;
+        const blob = readFileSync(p, "utf8");
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const r = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", PS_UNPROTECT], blob);
+          if (r.status === 0) return r.stdout;
+        }
+        throw new SecretUnavailableError(`DPAPI could not decrypt ${name}`);
       }
       break;
     }
