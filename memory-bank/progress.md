@@ -139,3 +139,24 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
   Bilal, Rizwan, hassan bajwa; remove 12 seeded `@techlio.local` people + `random@techlio.com`
   (~198k events) — **awaiting the owner's `--confirm` run**.
 - **Tests:** server-core 46, provider-adapters 12, connector 6, event-schema 6.
+
+## 2026-09-24 tracking truth, live feed, multi-tenant
+
+- **Multi-tenant:** role `super_admin` in a `platform` organisation (migration 013 adds
+  `organizations.kind/created_at/disabled_at`). `/platform` console: create organisation +
+  first admin (one-time password), add admins, disable/enable (blocks sign-in and connector
+  uploads; data kept). Super admin sees no organisation's activity. Bootstrap:
+  `pnpm admin:create --super --email platform@…`. Organisation admins keep managing their own
+  accounts under Access.
+- **File changes = agent-reported only:** a file/test/build event counts only when an agent
+  reported it (`metadata.tool_name` or `telemetry_source` hook/otel/provider_api) —
+  `isAgentReported`/`AGENT_REPORTED_SQL` in `activity.ts`, applied in sessions, hourly,
+  workday, timeline, file trends. The IDE companion no longer sends saves/typing/tasks/editor
+  sessions (only task context). Production had 40 human saves counted as AI edits; migration
+  013 recomputes stored session totals. IDE keep-alive pulses never count as work.
+- **Activity feed:** `/v1/activity` (range = page filter, keyset pagination, heartbeats
+  excluded, role-scoped, team/provider filters) + `ActivityFeed` component on the overview and
+  employee hub. Fixed: the employee "Live activity feed" showed the whole org's last events.
+- **Unprovided data removed, not placeholdered:** tokens/tests/builds/models/capability badges,
+  leaderboard Tokens/Provider-requests columns, AI subscription card, project column appear
+  only when some agent/provider reported them.

@@ -20,6 +20,9 @@ export function SessionTable({
 }) {
   const router = useRouter();
 
+  // Projects are assigned by people, never by agents: show the column only
+  // when some session in view actually has one.
+  const showProject = sessions.some((s) => !s.unassigned);
   if (sessions.length === 0) {
     return <EmptyState compact variant="no-activity" body={emptyBody} />;
   }
@@ -35,7 +38,7 @@ export function SessionTable({
           <tr>
             <th>Started</th>
             {showProvider ? <th>AI tool</th> : null}
-            <th>Project / work item</th>
+            {showProject ? <th>Project / work item</th> : null}
             <th className="text-right">Agent active</th>
             <th className="text-right">Session span</th>
             <th className="text-right">Model · Tools</th>
@@ -62,15 +65,17 @@ export function SessionTable({
                   <ProviderBadge provider={s.provider} size="sm" />
                 </td>
               ) : null}
-              <td className="max-w-[220px]">
-                {s.unassigned ? (
-                  <span className="hint italic">No task selected</span>
-                ) : (
-                  <span className="block truncate text-sm text-ink-700">
-                    {projectNames?.[s.projectId ?? ""] ?? "Assigned"}
-                  </span>
-                )}
-              </td>
+              {showProject ? (
+                <td className="max-w-[220px]">
+                  {s.unassigned ? (
+                    <span className="hint">Not assigned</span>
+                  ) : (
+                    <span className="block truncate text-sm text-ink-700">
+                      {projectNames?.[s.projectId ?? ""] ?? "Assigned"}
+                    </span>
+                  )}
+                </td>
+              ) : null}
               <td className="num whitespace-nowrap text-right font-medium">
                 {formatDuration(s.activeDurationMs)}
               </td>

@@ -116,6 +116,21 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
    `employee_provider_identities`; unmapped rows are skipped and counted in the
    worker log, never assigned to someone else.
 
+## Organisations (multi-tenant)
+
+The platform super admin creates organisations; each organisation's admins
+manage their own people under **Access**. Bootstrap once (use an email that is
+not an organisation account):
+
+```bash
+pnpm admin:create --super --email platform@yourcompany.com
+```
+
+Sign in with it → **Organizations** → *New organization* (name, timezone, first
+administrator). The administrator's password is shown once. *Disable* blocks
+sign-in and connector uploads for that organisation without deleting data. The
+super admin cannot see any organisation's activity.
+
 ## Removing the seeded demo people
 
 If `pnpm db:seed` ever ran against a database, the demo employees

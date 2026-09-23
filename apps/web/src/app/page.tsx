@@ -498,7 +498,7 @@ export default function OverviewPage() {
                               </span>
                             )}
                           </td>
-                          <td className="max-w-[180px] truncate text-sm text-ink-700">{p.lastModel ?? <span className="hint">Not reported</span>}</td>
+                          <td className="max-w-[180px] truncate text-sm text-ink-700">{p.lastModel ?? <span className="hint">—</span>}</td>
                           <td className="max-w-[160px] truncate text-sm text-ink-700">{p.lastTool ?? <span className="hint">—</span>}</td>
                           <td className="num text-right text-sm text-ink-700">{p.eventsThisHour}</td>
                           <td className="whitespace-nowrap text-sm text-ink-500">{formatRelative(p.lastEventAt)}</td>

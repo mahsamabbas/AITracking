@@ -174,7 +174,7 @@ export default function SessionDetailPage() {
               <div className="bg-card p-5">
                 <p className="label">Project / work item</p>
                 {s.unassigned ? (
-                  <p className="mt-1 text-sm font-medium text-amber-700">No task selected</p>
+                  <p className="mt-1 text-sm text-ink-500">Not assigned</p>
                 ) : (
                   <>
                     <p className="mt-1 truncate text-sm font-semibold text-ink-900">

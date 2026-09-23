@@ -53,25 +53,10 @@ export function EmployeeAiPlanUsage({
   rows: EmployeeAiSubscription[];
   isSelf?: boolean;
 }) {
-  if (rows.length === 0) {
-    return (
-      <Card>
-        <CardHeader
-          title="AI subscription usage"
-          subtitle={
-            isSelf
-              ? "Install the connector and use Cursor or Claude Code on this machine to see usage here."
-              : "No Cursor or Claude Code connector activity for this person yet."
-          }
-        />
-        <CardBody>
-          <p className="hint text-sm">
-            Cards appear only for tools with a registered connector or sessions this calendar month.
-          </p>
-        </CardBody>
-      </Card>
-    );
-  }
+  // Only providers that actually reported usage this month; nothing is shown
+  // for a tool that does not report it (e.g. Cursor without the Admin API).
+  rows = rows.filter((row) => !usageHeadline(row).missing);
+  if (rows.length === 0) return null;
 
   return (
     <Card>
