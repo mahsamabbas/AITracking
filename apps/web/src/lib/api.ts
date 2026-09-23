@@ -1,5 +1,14 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const LOCAL_API = "http://localhost:3001";
+
+function resolveApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!raw) return LOCAL_API;
+  if (raw === "[SENSITIVE]" || /\[SENSITIVE\]/i.test(raw)) return LOCAL_API;
+  if (!/^https?:\/\//i.test(raw)) return LOCAL_API;
+  return raw.replace(/\/$/, "");
+}
+
+export const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {
   constructor(
