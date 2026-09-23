@@ -14,6 +14,7 @@ import {
   aiProgress,
   aiUsageLeaderboard,
   activityCalendar,
+  workday,
   LEADERBOARD_SORTS,
   type LeaderboardSort,
   aiProgressTimeline,
@@ -420,6 +421,21 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
     return activityCalendar({ organizationId: user.organizationId, developerId: id });
+  }
+
+  /** One day, hour by hour: working periods, breaks, AI active / idle / exploration minutes. */
+  @Get("employees/:id/workday")
+  async employeeWorkday(
+    @Param("id") id: string,
+    @Req() req: FastifyRequest,
+    @Query("date") date?: string,
+  ) {
+    const user = userFromRequest(req);
+    assertCanViewPeople(user);
+    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: process.env.ORG_TIMEZONE ?? "UTC" }).format(new Date());
+    const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
+    return workday({ organizationId: user.organizationId, developerId: id, date: day });
   }
 
   @Get("employees/:id/sessions")

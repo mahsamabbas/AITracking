@@ -9,7 +9,17 @@
 import AppKit
 
 private let serviceLabel = "com.techlio.connector"
-private let healthURL = URL(string: "http://127.0.0.1:9477/health")!
+/// This user's connector. Each macOS user has their own port, recorded by the
+/// connector in ~/.techlio-connector/port, so two people signed in to one Mac
+/// never see or pause each other's connector.
+private func connectorBase() -> String {
+    let file = NSString(string: "~/.techlio-connector/port").expandingTildeInPath
+    if let text = try? String(contentsOfFile: file, encoding: .utf8),
+       let port = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)), port > 0 {
+        return "http://127.0.0.1:\(port)"
+    }
+    return "http://127.0.0.1:9477"
+}
 private let logPath = NSString(string: "~/.techlio-connector/connector.log").expandingTildeInPath
 
 private enum ConnectorState {
@@ -39,7 +49,7 @@ final class StatusController: NSObject, NSMenuDelegate {
     // MARK: - Health polling
 
     private func refresh() {
-        var request = URLRequest(url: healthURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
+        var request = URLRequest(url: URL(string: "\(connectorBase())/health")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
         request.httpMethod = "GET"
         URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
             var next: ConnectorState = .notRunning
@@ -149,7 +159,7 @@ final class StatusController: NSObject, NSMenuDelegate {
     // MARK: - Actions
 
     private func post(_ path: String) {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:9477\(path)")!)
+        var request = URLRequest(url: URL(string: "\(connectorBase())\(path)")!)
         request.httpMethod = "POST"
         URLSession.shared.dataTask(with: request) { [weak self] _, _, _ in
             DispatchQueue.main.async { self?.refresh() }

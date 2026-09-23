@@ -2,6 +2,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSyn
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { userPort } from "./port.js";
 
 const SCRIPT_NAME = "report-hook.mjs";
 const CLAUDE_EVENTS = [
@@ -22,16 +23,23 @@ const ANTIGRAVITY_HOOK_NAME = "techlio-connector";
  * Claude Code OpenTelemetry → this connector, for token totals and per-call
  * model timing. Prompts and responses stay redacted (explicitly forced off).
  */
-const OTLP_LOGS_ENDPOINT = `http://127.0.0.1:${Number(process.env.CONNECTOR_PORT ?? 9477)}/v1/logs`;
-const CLAUDE_OTEL_ENV: Record<string, string> = {
-  CLAUDE_CODE_ENABLE_TELEMETRY: "1",
-  OTEL_LOGS_EXPORTER: "otlp",
-  OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json",
-  OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: OTLP_LOGS_ENDPOINT,
-  OTEL_LOG_USER_PROMPTS: "0",
-  OTEL_LOG_ASSISTANT_RESPONSES: "0",
-  OTEL_LOG_TOOL_DETAILS: "0",
-};
+/** This user's connector endpoint (the port can differ per OS user; see port.ts). */
+function otlpLogsEndpoint(): string {
+  return `http://127.0.0.1:${userPort()}/v1/logs`;
+}
+/** Any endpoint a Techlio connector wrote, on any port in its range. */
+const TECHLIO_OTLP = /^http:\/\/127\.0\.0\.1:94(7[7-9]|8[0-6])\/v1\/logs$/;
+function claudeOtelEnv(): Record<string, string> {
+  return {
+    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+    OTEL_LOGS_EXPORTER: "otlp",
+    OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json",
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: otlpLogsEndpoint(),
+    OTEL_LOG_USER_PROMPTS: "0",
+    OTEL_LOG_ASSISTANT_RESPONSES: "0",
+    OTEL_LOG_TOOL_DETAILS: "0",
+  };
+}
 
 const CURSOR_EVENTS = [
   "sessionStart",
@@ -49,6 +57,14 @@ function installDir(): string {
 }
 
 const HOOK_SOURCE = `#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+// Each OS user has their own connector port (recorded by the connector).
+function connectorPort() {
+  try { const p = Number(readFileSync(join(homedir(), ".techlio-connector", "port"), "utf8").trim()); if (p > 0) return p; } catch {}
+  return 9477;
+}
 const fallback = process.argv[2] || "claude_code";
 function detectProvider() {
   if (fallback === "antigravity") return "antigravity"; // only Antigravity reads ~/.gemini hooks
@@ -65,6 +81,12 @@ process.stdin.on("end", () => {
   // Antigravity: only toolCall.name is read; toolCall.args (commands, file
   // content) never leaves this process.
   const toolCall = raw.toolCall && typeof raw.toolCall === "object" ? raw.toolCall : {};
+  // Claude Code nests the edited file under tool_input. Only the path of a
+  // file an agent wrote is read — never tool_input content, commands, or diffs.
+  const toolInput = raw.tool_input && typeof raw.tool_input === "object" ? raw.tool_input : {};
+  const editedPath = ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(raw.tool_name)
+    ? toolInput.file_path || toolInput.notebook_path
+    : undefined;
   const cwd = typeof raw.cwd === "string" ? raw.cwd : typeof roots[0] === "string" ? roots[0] : undefined;
   const body = {
     provider: detectProvider(),
@@ -75,11 +97,11 @@ process.stdin.on("end", () => {
     tool_name: raw.tool_name || raw.tool || toolCall.name,
     tool_use_id: raw.tool_use_id || raw.toolUseId || toolCall.id,
     cwd,
-    file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
+    file_path: typeof raw.file_path === "string" ? raw.file_path : typeof editedPath === "string" ? editedPath : undefined,
     model: raw.model || raw.model_name || raw.modelName,
     status: raw.status || (typeof raw.error === "string" && raw.error ? "failed" : undefined),
   };
-  fetch("http://127.0.0.1:9477/hooks/agent", {
+  fetch("http://127.0.0.1:" + connectorPort() + "/hooks/agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -192,8 +214,8 @@ function installClaude(scriptPath: string): void {
 function withClaudeOtel(env: unknown): Record<string, string> {
   const current = (env && typeof env === "object" ? env : {}) as Record<string, string>;
   const endpoint = current.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT ?? current.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (endpoint && endpoint !== OTLP_LOGS_ENDPOINT) return current;
-  return { ...current, ...CLAUDE_OTEL_ENV };
+  if (endpoint && !TECHLIO_OTLP.test(endpoint)) return current;
+  return { ...current, ...claudeOtelEnv() };
 }
 
 /** True when Claude Code is configured to export telemetry to this connector. */
@@ -205,7 +227,7 @@ export function claudeOtelConfigured(): boolean {
     return false;
   }
   return (
-    env?.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT === OTLP_LOGS_ENDPOINT &&
+    env?.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT === otlpLogsEndpoint() &&
     env?.CLAUDE_CODE_ENABLE_TELEMETRY === "1"
   );
 }
@@ -297,8 +319,8 @@ export function removeAgentHooks(): void {
     settings.hooks = hooks;
     // Remove our OTel settings only if they still point at this connector.
     const env = settings.env as Record<string, string> | undefined;
-    if (env?.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT === OTLP_LOGS_ENDPOINT) {
-      for (const key of Object.keys(CLAUDE_OTEL_ENV)) delete env[key];
+    if (TECHLIO_OTLP.test(env?.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT ?? "")) {
+      for (const key of Object.keys(claudeOtelEnv())) delete env![key];
       settings.env = env;
     }
     writeJson(path, settings);

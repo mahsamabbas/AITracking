@@ -79,7 +79,12 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
      retries a task that fails to launch. The executable is
      GUI-subsystem, so no console opens. Remove from **Settings → Apps**.
    - Logs: `~/.techlio-connector/connector.log`. Health: `techlio-connector --status`.
-   - If another connector already owns 127.0.0.1:9477 (e.g. `pnpm dev`), the
+   - **One connector per OS user.** Each user signed in to a computer gets their
+     own port in 9477–9486, recorded in `~/.techlio-connector/port`. Hooks, the
+     Claude Code telemetry endpoint, the menu-bar app, and the IDE companion read
+     that file, and the dashboard only talks to a connector paired to the signed-in
+     person (or not yet activated). Two profiles on one machine never share data.
+   - If this same user's other connector owns the port (e.g. `pnpm dev`), the
      service retries every ~40 s and takes over when that one stops.
    - **Dashboard says "not detected" while the connector runs:** Chrome/Edge
      142+ ask before a website may reach apps on this device. The employee must
@@ -101,6 +106,19 @@ set `NEXT_PUBLIC_SHOW_DEMO_LOGINS` outside local development.
    Copilot logins must be mapped to employees in
    `employee_provider_identities`; unmapped rows are skipped and counted in the
    worker log, never assigned to someone else.
+
+## Removing the seeded demo people
+
+If `pnpm db:seed` ever ran against a database, the demo employees
+(`@techlio.local` emails — Alex Rivera, Sam Okafor, Mei Tanaka, …) and their
+~200k synthetic events appear next to real people. Remove them (real people are
+never touched; the dry run lists exactly what goes and what stays):
+
+```bash
+read -rs DATABASE_URL && export DATABASE_URL
+node scripts/purge-demo-data.mjs --production            # dry run
+node scripts/purge-demo-data.mjs --production --confirm  # delete
+```
 
 ## Upgrading an existing deployment to this release
 

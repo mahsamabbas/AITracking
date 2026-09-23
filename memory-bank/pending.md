@@ -33,14 +33,17 @@ auditors no longer receive live sessions; tool timing paired by `tool_use_id`, p
 no longer deduplicated; unreadable user tool configs never overwritten (atomic writes); user
 hooks containing `--hook` no longer deleted; Windows uninstaller no longer kills itself;
 transient Keychain/DPAPI failures no longer regenerate keys; `/claim` only pairs with the
-configured API (localhost allowed only in local dev).
+configured API (localhost allowed only in local dev). Later the same day: Claude Code
+file edits are now counted (path read from `tool_input.file_path`, never content); one
+connector per OS user (per-user port recorded in `~/.techlio-connector/port`, dashboard
+discovery only uses the signed-in person's connector); per-day Workday graph; demo-data
+purge script (`scripts/purge-demo-data.mjs`).
 
 | Open item | Severity | Notes |
 |-----------|----------|-------|
 | Cursor Tier B rows freeze at first pull of the day (id = hash(day,user), insert-or-ignore) | High | Upsert Tier B rows or only ingest closed days |
 | Sessionization reloads the whole session per event (≈8 queries) | High (scale) | Recompute once per session per batch |
 | Claude Code run inside Cursor's terminal labelled Cursor | Medium | Decide by payload shape (`transcript_path`) not env vars |
-| Several macOS users on one machine share port 9477 | Medium | Per-user port or Unix socket written into hook commands |
 | Org timezone vs UTC day keys; "today" computed in UTC (`range.ts`) | Medium | Use `organizations.timezone` everywhere |
 | Concurrent sessions summed can exceed wall-clock time | Medium | Merge intervals per person for totals |
 | Late-event recalc race / missing snapshot never recalculated | Medium | Unique `(org,dev,hour,version)`, debounce |

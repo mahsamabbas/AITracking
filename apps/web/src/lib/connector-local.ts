@@ -2,7 +2,69 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+/**
+ * Each OS user on a computer runs their own connector on one of these ports
+ * (the connector records its port per user). The page must talk to the
+ * signed-in person's connector — never another profile's on the same machine.
+ */
+export const CONNECTOR_PORTS = Array.from({ length: 10 }, (_, i) => 9477 + i);
+/** Default address, used only for copy and when nothing has been found yet. */
 export const CONNECTOR_LOCAL = "http://127.0.0.1:9477";
+
+let viewerDeveloperId: string | null = null;
+let cachedBase: string | null = null;
+
+/** Called by the auth provider so discovery knows whose connector to pick. */
+export function setConnectorViewer(developerId: string | null | undefined): void {
+  if ((developerId ?? null) !== viewerDeveloperId) cachedBase = null;
+  viewerDeveloperId = developerId ?? null;
+}
+
+type LocalIdentity = { paired?: boolean; developerId?: string };
+
+async function probe(base: string): Promise<LocalIdentity | null> {
+  try {
+    const r = await fetch(`${base}/identity`, { cache: "no-store", signal: AbortSignal.timeout(1_500) });
+    return r.ok ? ((await r.json()) as LocalIdentity) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Mine: paired to the signed-in developer, or not yet activated (ready to pair). */
+function isMine(id: LocalIdentity): boolean {
+  if (!id.paired) return true;
+  return !viewerDeveloperId || id.developerId === viewerDeveloperId;
+}
+
+/**
+ * The base URL of this person's connector on this computer, or null. A
+ * connector paired to someone else is never used. When several are found,
+ * one already paired to this person wins over an unactivated one.
+ */
+export async function connectorBase(): Promise<string | null> {
+  if (cachedBase) {
+    const id = await probe(cachedBase);
+    if (id && isMine(id) && (id.paired || !viewerDeveloperId)) return cachedBase;
+  }
+  const found = await Promise.all(
+    CONNECTOR_PORTS.map(async (port) => {
+      const base = `http://127.0.0.1:${port}`;
+      return { base, id: await probe(base) };
+    }),
+  );
+  const mine = found.filter((f): f is { base: string; id: LocalIdentity } => f.id != null && isMine(f.id));
+  const pick = mine.find((f) => f.id.paired) ?? mine[0];
+  cachedBase = pick?.base ?? null;
+  return cachedBase;
+}
+
+/** Fetch against this person's connector; throws when none is reachable. */
+export async function connectorFetch(path: string, init?: RequestInit): Promise<Response> {
+  const base = await connectorBase();
+  if (!base) throw new Error("connector_not_found");
+  return fetch(`${base}${path}`, { cache: "no-store", ...init });
+}
 export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
 /** Installer package: sets the connector up as a background LaunchAgent (no app, no Dock icon). */
 export const CONNECTOR_MAC_PKG = "/downloads/techlio-connector-macos.pkg";
@@ -16,10 +78,7 @@ export function connectorDownloadPath(platform: "mac" | "windows" | "other"): st
 
 export async function fetchConnectorHealth(): Promise<boolean> {
   try {
-    const r = await fetch(`${CONNECTOR_LOCAL}/health`, {
-      method: "GET",
-      cache: "no-store",
-    });
+    const r = await connectorFetch("/health");
     return r.ok;
   } catch {
     return false;

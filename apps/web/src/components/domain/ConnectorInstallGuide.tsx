@@ -66,7 +66,7 @@ export function ConnectorInstallGuide() {
           {online === false ? (
             <>
               <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
-                Not detected yet on 127.0.0.1:9477 — complete the install, then click “Check if running”.
+                Not detected on this computer yet — complete the install, then click “Check if running”.
               </p>
               <LocalAccessHint />
             </>

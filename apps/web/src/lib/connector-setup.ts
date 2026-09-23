@@ -1,6 +1,6 @@
 "use client";
 
-import { CONNECTOR_LOCAL } from "./connector-local";
+import { connectorFetch } from "./connector-local";
 
 /** Routes developers may use until the local agent is installed and paired. */
 export const CONNECTOR_ONBOARDING_PATHS = [
@@ -28,9 +28,9 @@ export async function fetchConnectorSetupPhase(): Promise<
   Exclude<ConnectorSetupPhase, "loading">
 > {
   try {
-    const health = await fetch(`${CONNECTOR_LOCAL}/health`, { cache: "no-store" });
+    const health = await connectorFetch("/health");
     if (!health.ok) return "offline";
-    const r = await fetch(`${CONNECTOR_LOCAL}/identity`, { cache: "no-store" });
+    const r = await connectorFetch("/identity");
     if (!r.ok) return "offline";
     const json = (await r.json()) as { paired?: boolean };
     return json.paired ? "ready" : "unpaired";

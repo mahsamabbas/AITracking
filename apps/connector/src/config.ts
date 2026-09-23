@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { userPort } from "./port.js";
 
 /** Optional local env for API URL / port — identity is claimed, not stored here. */
 function loadLocalEnv(): void {
@@ -16,6 +17,9 @@ function loadLocalEnv(): void {
       const eq = line.indexOf("=");
       if (eq < 1) continue;
       const key = line.slice(0, eq).trim();
+      // Older installers pinned every user to 9477; the port is now chosen per
+      // OS user (port.ts), so only a real environment variable may override it.
+      if (key === "CONNECTOR_PORT") continue;
       let value = line.slice(eq + 1).trim();
       if (
         (value.startsWith('"') && value.endsWith('"')) ||
@@ -32,7 +36,8 @@ function loadLocalEnv(): void {
 loadLocalEnv();
 
 export const config = {
-  port: Number(process.env.CONNECTOR_PORT ?? 9477),
+  /** Per-user port (see port.ts); may be moved at startup if another user holds it. */
+  port: userPort(),
   apiBaseUrl: process.env.TECHLIO_API_URL ?? "https://tracking-app-api-three.vercel.app",
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",

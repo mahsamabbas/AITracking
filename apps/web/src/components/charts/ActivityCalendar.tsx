@@ -46,7 +46,17 @@ function todayIn(timezone: string, at: string): Date {
   return new Date(`${local}T00:00:00Z`);
 }
 
-export function ActivityCalendar({ data }: { data: ActivityCalendarData }) {
+export function ActivityCalendar({
+  data,
+  selected,
+  onSelect,
+}: {
+  data: ActivityCalendarData;
+  /** Highlighted day (YYYY-MM-DD). */
+  selected?: string;
+  /** Called with the day a square was clicked on. */
+  onSelect?: (date: string) => void;
+}) {
   const [hover, setHover] = useState<{ day: string; x: number; y: number } | null>(null);
 
   const { cells, months, byDate } = useMemo(() => {
@@ -124,8 +134,12 @@ export function ActivityCalendar({ data }: { data: ActivityCalendarData }) {
                 width={CELL}
                 height={CELL}
                 rx={2}
+                className={onSelect ? "cursor-pointer" : undefined}
+                onClick={onSelect ? () => onSelect(c.date) : undefined}
                 style={
-                  !c.tracked
+                  c.date === selected
+                    ? { fill: "rgb(var(--color-brand-500))", fillOpacity: Math.max(LEVEL_OPACITY[c.level], 0.15), stroke: "var(--chart-axis)", strokeWidth: 1.5 }
+                    : !c.tracked
                     ? { fill: "transparent", stroke: "var(--chart-muted)", strokeWidth: 1 }
                     : c.level === 0
                       ? { fill: "var(--chart-muted)" }

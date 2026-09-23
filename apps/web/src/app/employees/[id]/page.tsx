@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/States";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { ActivityCalendar, type ActivityCalendarData } from "@/components/charts/ActivityCalendar";
+import { WorkdayPanel } from "@/components/domain/WorkdayPanel";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
@@ -73,6 +74,10 @@ export default function EmployeeDetailPage() {
   const calendar = useApi<ActivityCalendarData>(
     employeeId && employeeId !== "self" ? `/v1/employees/${employeeId}/activity-calendar` : null,
   );
+  // Workday graph: the day picked on the calendar, else the most recent day with activity.
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const lastActiveDay = calendar.data?.days.length ? calendar.data.days[calendar.data.days.length - 1].date : null;
+  const workDay = pickedDay ?? lastActiveDay ?? new Date().toISOString().slice(0, 10);
   const timeline = useApi<{
     timezone: string;
     hourlyCards: {
@@ -261,7 +266,7 @@ export default function EmployeeDetailPage() {
               title="AI activity — last 12 months"
               subtitle={
                 calendar.data
-                  ? `${formatNumber(calendar.data.totals.activeDays)} active days · ${formatNumber(calendar.data.totals.sessions)} sessions · ${formatDuration(calendar.data.totals.activeMs, { compact: true })} AI active · days in ${calendar.data.timezone}`
+                  ? `${formatNumber(calendar.data.totals.activeDays)} active days · ${formatNumber(calendar.data.totals.sessions)} sessions · ${formatDuration(calendar.data.totals.activeMs, { compact: true })} AI active · click a day to see it hour by hour`
                   : "Each square is one day, shaded by AI agent active time"
               }
             />
@@ -271,10 +276,15 @@ export default function EmployeeDetailPage() {
               ) : !calendar.data ? (
                 <ChartSkeleton height={130} />
               ) : (
-                <ActivityCalendar data={calendar.data} />
+                <ActivityCalendar data={calendar.data} selected={workDay} onSelect={setPickedDay} />
               )}
             </CardBody>
           </Card>
+
+          {/* ---------------- One day, hour by hour ---------------- */}
+          {calendar.data ? (
+            <WorkdayPanel employeeId={employeeId} date={workDay} onDateChange={setPickedDay} />
+          ) : null}
 
           {isSelf && d.devices.length === 0 ? (
             <div className="mb-5">

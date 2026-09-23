@@ -48,6 +48,13 @@ async function runHook(): Promise<void> {
   // Antigravity: only toolCall.name is read; toolCall.args never leaves here.
   const toolCall =
     raw.toolCall && typeof raw.toolCall === "object" ? (raw.toolCall as Record<string, unknown>) : {};
+  // Claude Code nests the edited file under tool_input. Only the path of a
+  // file an agent wrote is read — never tool_input content, commands, or diffs.
+  const toolInput =
+    raw.tool_input && typeof raw.tool_input === "object" ? (raw.tool_input as Record<string, unknown>) : {};
+  const editedPath = ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(raw.tool_name as string)
+    ? toolInput.file_path ?? toolInput.notebook_path
+    : undefined;
   // Antigravity does not name the event on stdin; the installer passes it after the provider.
   const argEvent = process.argv[process.argv.indexOf("--hook") + 2];
   const cwd =
@@ -71,12 +78,15 @@ async function runHook(): Promise<void> {
     // Opaque per-call id: pairs a tool's start and end and keeps parallel calls apart.
     tool_use_id: (raw.tool_use_id as string) || (raw.toolUseId as string) || (toolCall.id as string),
     cwd,
-    file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
+    file_path:
+      typeof raw.file_path === "string" ? raw.file_path : typeof editedPath === "string" ? editedPath : undefined,
     model: (raw.model as string) || (raw.model_name as string) || (raw.modelName as string),
     status: raw.status ?? (typeof raw.error === "string" && raw.error ? "failed" : undefined),
   };
   try {
-    await fetch("http://127.0.0.1:9477/hooks/agent", {
+    // This OS user's own connector (port recorded per user; see port.ts).
+    const { userPort } = await import("./port.js");
+    await fetch(`http://127.0.0.1:${userPort()}/hooks/agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

@@ -49,4 +49,43 @@ describe("claudeHookToEvents", () => {
   it("ignores unknown hook names", () => {
     expect(claudeHookToEvents({ hook_event_name: "afterAgentThought" }, ctx)).toEqual([]);
   });
+
+  it("counts a successful Claude Code Edit as a file change as well as a tool call", () => {
+    const events = claudeHookToEvents(
+      {
+        hook_event_name: "PostToolUse",
+        session_id: "550e8400-e29b-41d4-a716-446655440099",
+        tool_name: "Edit",
+        cwd: "/Users/dev/app",
+        file_path: "/Users/dev/app/src/index.ts",
+      },
+      ctx,
+    );
+    expect(events.map((e) => e.event_type)).toEqual(["tool_completed", "file_modified"]);
+    expect(events[1]?.metadata?.file_path).toBe("src/index.ts");
+    expect(events[1]?.session_id).toBe(events[0]?.session_id);
+    expect(events[1]?.event_id).not.toBe(events[0]?.event_id);
+  });
+
+  it("does not count a failed edit or a read as a file change", () => {
+    const failed = claudeHookToEvents(
+      { hook_event_name: "PostToolUseFailure", tool_name: "Edit", cwd: "/a", file_path: "/a/x.ts" },
+      ctx,
+    );
+    const read = claudeHookToEvents(
+      { hook_event_name: "PostToolUse", tool_name: "Read", cwd: "/a", file_path: "/a/x.ts" },
+      ctx,
+    );
+    expect(failed.map((e) => e.event_type)).toEqual(["tool_completed"]);
+    expect(read.map((e) => e.event_type)).toEqual(["tool_completed"]);
+  });
+
+  it("maps a Cursor afterFileEdit to exactly one file change", () => {
+    const events = claudeHookToEvents(
+      { hook_event_name: "afterFileEdit", cwd: "/w", file_path: "/w/lib/a.ts" },
+      { ...ctx, provider: "cursor" },
+    );
+    expect(events.map((e) => e.event_type)).toEqual(["file_modified"]);
+    expect(events[0]?.metadata?.file_path).toBe("lib/a.ts");
+  });
 });

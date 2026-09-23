@@ -1,6 +1,26 @@
 import * as vscode from "vscode";
 
-const CONNECTOR = "http://127.0.0.1:9477";
+// Node built-ins exist in the extension host; this package ships without @types/node.
+declare function require(id: "node:fs"): { readFileSync(path: string, encoding: "utf8"): string };
+declare function require(id: "node:os"): { homedir(): string };
+const { readFileSync } = require("node:fs");
+const { homedir } = require("node:os");
+
+/**
+ * This OS user's connector. Each user on a computer has their own port,
+ * recorded by the connector, so two people never report through one connector.
+ */
+function connectorBase(): string {
+  try {
+    const port = Number(
+      readFileSync(`${homedir()}/.techlio-connector/port`, "utf8").trim(),
+    );
+    if (port > 0) return `http://127.0.0.1:${port}`;
+  } catch {
+    /* connector not started yet: default port */
+  }
+  return "http://127.0.0.1:9477";
+}
 const SESSION_ID = globalThis.crypto.randomUUID();
 const EDIT_THROTTLE_MS = 30_000;
 const SESSION_PULSE_MS = 120_000;
@@ -38,7 +58,7 @@ function shouldIgnore(uri: vscode.Uri): boolean {
 
 async function postJson(path: string, body: Record<string, unknown>): Promise<void> {
   try {
-    await fetch(`${CONNECTOR}${path}`, {
+    await fetch(`${connectorBase()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -81,14 +101,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("techlio.pauseCollection", async () => {
-      await fetch(`${CONNECTOR}/pause`, { method: "POST" });
+      await fetch(`${connectorBase()}/pause`, { method: "POST" });
       status.text = "Techlio: paused";
     }),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("techlio.resumeCollection", async () => {
-      await fetch(`${CONNECTOR}/resume`, { method: "POST" });
+      await fetch(`${connectorBase()}/resume`, { method: "POST" });
       status.text = `Techlio: ${hostProvider()}`;
     }),
   );

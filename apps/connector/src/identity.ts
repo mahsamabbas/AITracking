@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { deleteSecret, getSecret, setSecret } from "./secret-store.js";
+import { SecretUnavailableError, deleteSecret, getSecret, setSecret } from "./secret-store.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -42,7 +42,9 @@ export function loadIdentity(): ConnectorIdentity | null {
     if (raw.deviceId && deviceToken && raw.developerId && raw.organizationId) {
       return { ...(raw as ConnectorIdentity), deviceToken };
     }
-  } catch {
+  } catch (err) {
+    // A locked credential store is not "unpaired": fail so the service retries.
+    if (err instanceof SecretUnavailableError) throw err;
     /* ignore corrupt file */
   }
   return null;

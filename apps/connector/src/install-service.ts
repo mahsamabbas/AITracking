@@ -12,6 +12,7 @@ import { homedir, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { removeAgentHooks } from "./agent-hooks.js";
 import { deleteSecret } from "./secret-store.js";
+import { userPort } from "./port.js";
 
 /**
  * Registers the connector as a per-user background service so it starts at
@@ -37,7 +38,6 @@ import { deleteSecret } from "./secret-store.js";
 const LABEL = "com.techlio.connector";
 const WIN_TASK = "TechlioConnector";
 const LINUX_UNIT = "techlio-connector.service";
-const PORT = Number(process.env.CONNECTOR_PORT ?? 9477);
 
 // Defaults baked into the packaged build; overridable at install time.
 const API_URL = process.env.TECHLIO_API_URL ?? "https://tracking-app-api-three.vercel.app";
@@ -81,7 +81,6 @@ function writeEnv(dir: string): void {
     [
       `TECHLIO_API_URL=${API_URL}`,
       `TECHLIO_DASHBOARD_ORIGINS=${DASHBOARD}`,
-      `CONNECTOR_PORT=${PORT}`,
       `CONNECTOR_DB=${join(dataDir(), "queue.db")}`,
       "",
     ].join(platform() === "win32" ? "\r\n" : "\n"),
@@ -318,7 +317,8 @@ async function waitForHealth(timeoutMs = 15_000): Promise<Record<string, unknown
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const r = await fetch(`http://127.0.0.1:${PORT}/health`);
+      // Read each time: the service records this user's port when it starts.
+      const r = await fetch(`http://127.0.0.1:${userPort()}/health`);
       if (r.ok) return (await r.json()) as Record<string, unknown>;
     } catch {
       /* not up yet */

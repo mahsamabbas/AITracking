@@ -6,6 +6,20 @@
  * The running app is identified by its own environment — not by which settings
  * file launched the hook — so Cursor actions are never mislabelled as Claude.
  */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+// Each OS user has their own connector port (recorded by the connector), so
+// two people on one computer never report through each other's connector.
+function connectorPort() {
+  try {
+    const p = Number(readFileSync(join(homedir(), ".techlio-connector", "port"), "utf8").trim());
+    if (p > 0) return p;
+  } catch {}
+  return 9477;
+}
+
 const fallback = process.argv[2] || "claude_code";
 
 function detectProvider() {
@@ -40,6 +54,12 @@ process.stdin.on("end", () => {
   // Antigravity: only toolCall.name is read; toolCall.args (commands, file
   // content) never leaves this process.
   const toolCall = raw.toolCall && typeof raw.toolCall === "object" ? raw.toolCall : {};
+  // Claude Code nests the edited file under tool_input. Only the path of a
+  // file an agent wrote is read — never tool_input content, commands, or diffs.
+  const toolInput = raw.tool_input && typeof raw.tool_input === "object" ? raw.tool_input : {};
+  const editedPath = ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(raw.tool_name)
+    ? toolInput.file_path || toolInput.notebook_path
+    : undefined;
   const cwd =
     typeof raw.cwd === "string"
       ? raw.cwd
@@ -59,11 +79,11 @@ process.stdin.on("end", () => {
     tool_name: raw.tool_name || raw.tool || toolCall.name,
     tool_use_id: raw.tool_use_id || raw.toolUseId || toolCall.id,
     cwd,
-    file_path: typeof raw.file_path === "string" ? raw.file_path : undefined,
+    file_path: typeof raw.file_path === "string" ? raw.file_path : typeof editedPath === "string" ? editedPath : undefined,
     model: raw.model || raw.model_name || raw.modelName,
     status: raw.status || (typeof raw.error === "string" && raw.error ? "failed" : undefined),
   };
-  fetch("http://127.0.0.1:9477/hooks/agent", {
+  fetch(`http://127.0.0.1:${connectorPort()}/hooks/agent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

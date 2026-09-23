@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE } from "./api";
+import { setConnectorViewer } from "./connector-local";
 import {
   isMobileDevice,
   loadEnrollment,
@@ -162,6 +163,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .finally(() => setReady(true));
   }, []);
+
+  // Local connector discovery must pick *this* person's connector on a
+  // computer shared by several OS users (see lib/connector-local.ts).
+  useEffect(() => {
+    setConnectorViewer(user?.developerId);
+  }, [user?.developerId]);
 
   useEffect(() => {
     if (!ready) return;

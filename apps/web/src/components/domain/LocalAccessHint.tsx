@@ -28,7 +28,7 @@ export function LocalAccessHint() {
     return (
       <p className="mt-2 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
         When your browser asks to let this site access apps or devices on this computer, choose{" "}
-        <strong>Allow</strong>. The dashboard only talks to the Techlio connector at 127.0.0.1:9477.
+        <strong>Allow</strong>. The dashboard only talks to your Techlio connector on this computer (127.0.0.1).
       </p>
     );
   }

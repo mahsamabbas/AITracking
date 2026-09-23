@@ -30,6 +30,8 @@ import { EncryptedQueue } from "./queue.js";
 import { loadOrCreateSigningKey, publicSigningKey } from "./signing.js";
 import { sanitizeEvent } from "./redaction.js";
 import { uploadBatch } from "./uploader.js";
+import { BASE_PORT, PORT_COUNT, choosePort, osUser, recordUserPort } from "./port.js";
+import { createServer } from "node:net";
 
 // Pause is the employee's choice and must survive restarts and reboots.
 const STATE_FILE = join(identityDir(), "state.json");
@@ -346,6 +348,10 @@ app.get("/health", async () => {
     credentialStore: secretBackend(),
     version: config.connectorVersion,
     provider: hostProvider,
+    // Which OS user this connector serves, so a second user on the same
+    // computer never adopts it (see port.ts).
+    osUser: osUser(),
+    port: config.port,
     ...publicIdentity(identity),
     capabilities: {
       hourly: caps?.hourly ?? false,
@@ -821,56 +827,85 @@ setInterval(() => {
   enqueueHeartbeat();
 }, 30_000);
 
-const port = config.port;
-app
-  .listen({ port, host: "127.0.0.1" })
-  .then(() => {
-    if (identity) {
-      app.log.info(
-        { developerId: identity.developerId, displayName: identity.displayName },
-        "Connector paired",
-      );
-      setTimeout(() => enqueueHeartbeat(), 3_000);
-    } else {
-      app.log.info(
-        "Connector unpaired — developer can add tools from My connectors in the portal",
-      );
-    }
-    console.log("Techlio connector is running at http://127.0.0.1:9477");
-    const hooks = ensureAgentHooks();
-    console.log("Dashboard pings are hidden. Agent events print below as they happen.");
-    if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");
-    if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
-    if (hooks.antigravity) console.log("Antigravity hooks are installed (~/.gemini/config/hooks.json).");
-    if (claudeOtelConfigured()) console.log("Claude Code telemetry is routed here for token totals (prompts stay redacted).");
-    console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
-  })
-  .catch(async (err: NodeJS.ErrnoException) => {
-    if (err?.code === "EADDRINUSE") {
-      // Another process owns the port. If it is a Techlio connector, this copy
-      // is a duplicate (e.g. launched manually while the service runs) and
-      // exits cleanly; exit code 0 tells launchd/systemd not to respawn it.
-      try {
-        const r = await fetch(`http://127.0.0.1:${port}/health`);
-        const body = (await r.json()) as { version?: string };
-        if (body.version) {
-          if (process.argv.includes("--service")) {
-            // Another copy (e.g. `pnpm dev`) holds the port. The service must
-            // take over when it stops, so exit non-zero after a pause and let
-            // launchd / Task Scheduler / systemd start it again.
-            console.log(`Another Techlio connector owns 127.0.0.1:${port}; retrying in 30s.`);
-            setTimeout(() => process.exit(75), 30_000); // EX_TEMPFAIL
-            return;
-          }
-          console.log(`Techlio connector is already running on 127.0.0.1:${port}. Nothing to do.`);
-          process.exit(0);
-        }
-      } catch {
-        /* not ours */
-      }
-      console.error(`Port ${port} is used by another program. Set CONNECTOR_PORT to change it.`);
-      process.exit(78); // EX_CONFIG: do not respawn
-    }
-    console.error(err);
-    process.exit(1);
+/** True when nothing is listening on 127.0.0.1:port. */
+function portFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, "127.0.0.1");
   });
+}
+
+void (async () => {
+  const port = await choosePort({
+    preferred: config.port,
+    me: osUser(),
+    isFree: portFree,
+    ownerOf: async (candidate) => {
+      try {
+        const r = await fetch(`http://127.0.0.1:${candidate}/health`, { signal: AbortSignal.timeout(1_500) });
+        const body = (await r.json()) as { version?: string; osUser?: string };
+        if (!body.version) return undefined;
+        return body.osUser ?? null;
+      } catch {
+        return undefined;
+      }
+    },
+  });
+  config.port = port;
+  if (!process.env.CONNECTOR_PORT) recordUserPort(port);
+  app
+    .listen({ port, host: "127.0.0.1" })
+    .then(() => {
+      if (identity) {
+        app.log.info(
+          { developerId: identity.developerId, displayName: identity.displayName },
+          "Connector paired",
+        );
+        setTimeout(() => enqueueHeartbeat(), 3_000);
+      } else {
+        app.log.info(
+          "Connector unpaired — developer can add tools from My connectors in the portal",
+        );
+      }
+      console.log(`Techlio connector is running at http://127.0.0.1:${port} for ${osUser()}`);
+      const hooks = ensureAgentHooks();
+      console.log("Dashboard pings are hidden. Agent events print below as they happen.");
+      if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");
+      if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
+      if (hooks.antigravity) console.log("Antigravity hooks are installed (~/.gemini/config/hooks.json).");
+      if (claudeOtelConfigured()) console.log("Claude Code telemetry is routed here for token totals (prompts stay redacted).");
+      console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
+    })
+    .catch(async (err: NodeJS.ErrnoException) => {
+      if (err?.code === "EADDRINUSE") {
+        // Another process owns the port. If it is a Techlio connector, this copy
+        // is a duplicate (e.g. launched manually while the service runs) and
+        // exits cleanly; exit code 0 tells launchd/systemd not to respawn it.
+        try {
+          const r = await fetch(`http://127.0.0.1:${port}/health`);
+          const body = (await r.json()) as { version?: string; osUser?: string };
+          // Same user's connector (e.g. `pnpm dev` while the service runs): a duplicate.
+          if (body.version && (!body.osUser || body.osUser === osUser())) {
+            if (process.argv.includes("--service")) {
+              // Another copy (e.g. `pnpm dev`) holds the port. The service must
+              // take over when it stops, so exit non-zero after a pause and let
+              // launchd / Task Scheduler / systemd start it again.
+              console.log(`Another Techlio connector owns 127.0.0.1:${port}; retrying in 30s.`);
+              setTimeout(() => process.exit(75), 30_000); // EX_TEMPFAIL
+              return;
+            }
+            console.log(`Techlio connector is already running on 127.0.0.1:${port}. Nothing to do.`);
+            process.exit(0);
+          }
+        } catch {
+          /* not ours */
+        }
+        console.error(`Port ${port} is used by another program and no free port was found in ${BASE_PORT}–${BASE_PORT + PORT_COUNT - 1}.`);
+        process.exit(78); // EX_CONFIG: do not respawn
+      }
+      console.error(err);
+      process.exit(1);
+    });
+})();

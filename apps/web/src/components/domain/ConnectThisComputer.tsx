@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import { CONNECTOR_LOCAL } from "@/lib/connector-local";
+import { CONNECTOR_LOCAL, connectorFetch } from "@/lib/connector-local";
 import { Callout } from "@/components/ui/Callout";
 import { LocalAccessHint } from "@/components/domain/LocalAccessHint";
 
@@ -16,7 +16,7 @@ export async function claimLocalConnector(input: {
   consentAccepted: boolean;
 }): Promise<{ ok: true } | { ok: false; offline: boolean; message: string }> {
   try {
-    const r = await fetch(`${CONNECTOR_LOCAL}/claim`, {
+    const r = await connectorFetch("/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -42,14 +42,14 @@ export async function claimLocalConnector(input: {
       ok: false,
       offline: true,
       message:
-        "This page could not reach the connector at 127.0.0.1:9477. If it is installed, your browser may be blocking local access: allow “Local network access” for this site in the address-bar site settings, then try again.",
+        "This page could not reach your connector on this computer. If it is installed, your browser may be blocking local access: allow “Local network access” for this site in the address-bar site settings, then try again.",
     };
   }
 }
 
 export async function unpairLocalConnector(): Promise<boolean> {
   try {
-    const r = await fetch(`${CONNECTOR_LOCAL}/unpair`, { method: "POST" });
+    const r = await connectorFetch("/unpair", { method: "POST" });
     return r.ok;
   } catch {
     return false;
@@ -66,7 +66,7 @@ export function ThisComputerStatus() {
 
   async function refresh() {
     try {
-      const r = await fetch(`${CONNECTOR_LOCAL}/identity`);
+      const r = await connectorFetch("/identity");
       const json = (await r.json()) as {
         paired?: boolean;
         displayName?: string;

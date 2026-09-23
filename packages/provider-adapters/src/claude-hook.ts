@@ -126,5 +126,26 @@ export function claudeHookToEvents(
         : undefined,
     metadata: Object.keys(metadata).length ? metadata : undefined,
   };
+  // A successful Write/Edit reported by the agent is a file change. Cursor
+  // reports the same edit via afterFileEdit; the connector's cross-provider
+  // echo guard keys on event type + tool + path, so it is counted once.
+  if (
+    type === EventTypes.tool_completed &&
+    !failed &&
+    filePath &&
+    metadata.tool_category === "file_write"
+  ) {
+    return [
+      event,
+      {
+        ...event,
+        event_id: randomUUID(),
+        event_type: EventTypes.file_modified,
+        status: "succeeded",
+        duration_ms: undefined,
+        metadata: { ...metadata },
+      },
+    ];
+  }
   return [event];
 }
