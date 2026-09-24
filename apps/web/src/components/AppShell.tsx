@@ -10,6 +10,7 @@ import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import { initialsOf } from "@/lib/format";
 import type { Role } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PlatformOrgTabBar } from "@/components/PlatformOrgTabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BiometricSetup } from "@/components/BiometricSetup";
 
@@ -29,11 +30,11 @@ const icon = (d: string) => (
 
 const NAV: NavItem[] = [
   {
-    // Multi-tenant console: the only screen a platform super admin sees.
     href: "/platform",
-    label: "Organizations",
+    label: "Platform",
     roles: ["super_admin"],
     icon: icon("M3 17V7l5-3 5 3v10M13 17V10l4 2v5M6 9h1M6 12h1M9 9h1M9 12h1M2 17h16"),
+    match: (p) => p === "/platform" || p.startsWith("/platform/"),
   },
   {
     href: "/",
@@ -327,6 +328,7 @@ export function AppShell({
           {/* Keyed by route so only the content animates in, never the shell. */}
           <div key={path} className="enter">
             <BiometricSetup />
+            <PlatformOrgTabBar />
             {children}
           </div>
         </main>

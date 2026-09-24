@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Callout } from "@/components/ui/Callout";
@@ -24,25 +25,20 @@ interface Organization {
   lastActivityAt: string | null;
 }
 
-/** Credentials are shown exactly once, right after they are created. */
 interface Issued {
   organization: string;
   email: string;
   password: string;
 }
 
-const input = "h-9 w-full rounded-md border border-line bg-card px-3 text-sm text-ink-900";
+const input =
+  "h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200";
 
-/**
- * Multi-tenant console for the platform super admin: create organisations and
- * their first administrator, add administrators, disable/enable an
- * organisation. Each organisation then manages its own accounts under Access.
- * No organisation's activity is visible here.
- */
 export default function PlatformPage() {
   const { user, token } = useAuth();
   const allowed = user?.role === "super_admin";
   const query = useApi<{ organizations: Organization[] }>(allowed ? "/v1/platform/organizations" : null);
+  const [search, setSearch] = useState("");
   const [form, setForm] = useState({ name: "", timezone: "UTC", adminName: "", adminEmail: "" });
   const [adminFor, setAdminFor] = useState<Organization | null>(null);
   const [adminForm, setAdminForm] = useState({ name: "", email: "" });
@@ -50,9 +46,26 @@ export default function PlatformPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const orgs = query.data?.organizations ?? [];
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orgs;
+    return orgs.filter((o) => o.name.toLowerCase().includes(q) || o.timezone.toLowerCase().includes(q));
+  }, [orgs, search]);
+
+  const totals = useMemo(
+    () => ({
+      orgs: orgs.length,
+      active: orgs.filter((o) => !o.disabled).length,
+      people: orgs.reduce((s, o) => s + o.employees, 0),
+      connectors: orgs.reduce((s, o) => s + o.connectors, 0),
+    }),
+    [orgs],
+  );
+
   if (user && !allowed) {
     return (
-      <AppShell title="Organizations">
+      <AppShell title="Platform">
         <Card>
           <EmptyState variant="no-permission" />
         </Card>
@@ -99,14 +112,22 @@ export default function PlatformPage() {
 
   const toggle = (org: Organization) =>
     run(async () => {
-      if (!org.disabled && !window.confirm(`Disable ${org.name}? Nobody in it can sign in and its connectors stop uploading until you enable it again. No data is deleted.`)) return;
+      if (
+        !org.disabled &&
+        !window.confirm(
+          `Disable ${org.name}? Sign-in and connector uploads stop until you enable it again. Data is kept.`,
+        )
+      ) {
+        return;
+      }
       await apiPatch(`/v1/platform/organizations/${org.id}`, token, { disabled: !org.disabled });
     });
 
-  const orgs = query.data?.organizations ?? [];
-
   return (
-    <AppShell title="Organizations" subtitle="Create organisations and their administrators. Each organisation manages its own accounts.">
+    <AppShell
+      title="Platform console"
+      subtitle="Manage customer organisations, then open any tenant to inspect its dashboards and access settings."
+    >
       {issued ? (
         <div className="mb-5">
           <Callout
@@ -118,8 +139,7 @@ export default function PlatformPage() {
               </button>
             }
           >
-            Send these to the administrator through a private channel. The password is shown only now; they
-            can change it after signing in.
+            Send these through a private channel. The password is shown only once.
             <div className="mt-2 grid gap-1 font-mono text-xs">
               <span>Email: {issued.email}</span>
               <span className="flex items-center gap-2">
@@ -144,24 +164,50 @@ export default function PlatformPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-3">
+      <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Organisations", value: formatNumber(totals.orgs) },
+          { label: "Active tenants", value: formatNumber(totals.active) },
+          { label: "Monitored people", value: formatNumber(totals.people) },
+          { label: "Live connectors", value: formatNumber(totals.connectors) },
+        ].map((tile) => (
+          <div
+            key={tile.label}
+            className="rounded-xl border border-line bg-card px-4 py-3 shadow-sm"
+          >
+            <p className="label">{tile.label}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-ink-900">{tile.value}</p>
+          </div>
+        ))}
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2 card-table">
-          <CardHeader title="Organizations" subtitle={`${formatNumber(orgs.length)} organisation${orgs.length === 1 ? "" : "s"}`} />
+          <CardHeader
+            title="Customer organisations"
+            subtitle={`${formatNumber(filtered.length)} shown`}
+            action={
+              <input
+                className="field h-9 w-44 text-xs"
+                placeholder="Search…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            }
+          />
           {query.error ? (
             <ErrorState title="Could not load organisations" detail={query.error} onRetry={query.reload} />
           ) : query.loading ? (
             <LoadingBlock rows={4} />
-          ) : orgs.length === 0 ? (
-            <EmptyState compact title="No organisations yet" body="Create the first organisation and its administrator." />
+          ) : filtered.length === 0 ? (
+            <EmptyState compact title="No organisations yet" body="Create the first tenant on the right." />
           ) : (
             <TableScroll>
-              <table className="tbl min-w-[760px]">
+              <table className="tbl min-w-[820px]">
                 <thead>
                   <tr>
-                    <th>Organization</th>
-                    <th className="text-right">Admins</th>
-                    <th className="text-right">Accounts</th>
-                    <th className="text-right">Employees</th>
+                    <th>Organisation</th>
+                    <th className="text-right">People</th>
                     <th className="text-right">Connectors</th>
                     <th>Last activity</th>
                     <th>Status</th>
@@ -169,21 +215,33 @@ export default function PlatformPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orgs.map((o) => (
+                  {filtered.map((o) => (
                     <tr key={o.id}>
                       <td>
                         <p className="text-sm font-medium text-ink-900">{o.name}</p>
                         <p className="hint">
-                          {o.timezone} · created {formatDate(o.createdAt)}
+                          {o.timezone} · {formatNumber(o.users)} accounts · {formatNumber(o.administrators)} admins
                         </p>
                       </td>
-                      <td className="num text-right">{o.administrators}</td>
-                      <td className="num text-right">{o.users}</td>
                       <td className="num text-right">{o.employees}</td>
                       <td className="num text-right">{o.connectors}</td>
-                      <td className="text-sm text-ink-500">{o.lastActivityAt ? formatRelative(o.lastActivityAt) : "—"}</td>
-                      <td>{o.disabled ? <span className="badge-bad">Disabled</span> : <span className="badge-ok">Active</span>}</td>
+                      <td className="text-sm text-ink-500">
+                        {o.lastActivityAt ? formatRelative(o.lastActivityAt) : "—"}
+                      </td>
+                      <td>
+                        {o.disabled ? (
+                          <span className="badge-bad">Disabled</span>
+                        ) : (
+                          <span className="badge-ok">Active</span>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap text-right">
+                        <Link
+                          href={`/platform/${o.id}/overview`}
+                          className="btn-primary h-8 px-3 text-xs"
+                        >
+                          Open workspace
+                        </Link>
                         <button
                           type="button"
                           className="btn-ghost h-8 text-xs"
@@ -195,7 +253,12 @@ export default function PlatformPage() {
                         >
                           Add admin
                         </button>
-                        <button type="button" className="btn-ghost h-8 text-xs" disabled={busy} onClick={() => void toggle(o)}>
+                        <button
+                          type="button"
+                          className="btn-ghost h-8 text-xs"
+                          disabled={busy}
+                          onClick={() => void toggle(o)}
+                        >
                           {o.disabled ? "Enable" : "Disable"}
                         </button>
                       </td>
@@ -209,8 +272,12 @@ export default function PlatformPage() {
 
         <Card>
           <CardHeader
-            title={adminFor ? `Add an administrator to ${adminFor.name}` : "New organization"}
-            subtitle={adminFor ? "They can then add their own managers, developers, and auditors." : "Creates the organisation and its first administrator."}
+            title={adminFor ? `Administrator · ${adminFor.name}` : "New organisation"}
+            subtitle={
+              adminFor
+                ? "They manage people and connectors inside that tenant."
+                : "Creates the tenant and its first administrator login."
+            }
           />
           <CardBody>
             {adminFor ? (
@@ -223,11 +290,22 @@ export default function PlatformPage() {
               >
                 <label className="block text-xs font-medium text-ink-700">
                   Full name
-                  <input className={input} required value={adminForm.name} onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })} />
+                  <input
+                    className={input}
+                    required
+                    value={adminForm.name}
+                    onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
+                  />
                 </label>
                 <label className="block text-xs font-medium text-ink-700">
                   Work email
-                  <input className={input} type="email" required value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} />
+                  <input
+                    className={input}
+                    type="email"
+                    required
+                    value={adminForm.email}
+                    onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  />
                 </label>
                 <div className="flex gap-2">
                   <button type="submit" className="btn-primary h-9 px-3 text-xs" disabled={busy}>
@@ -247,29 +325,50 @@ export default function PlatformPage() {
                 }}
               >
                 <label className="block text-xs font-medium text-ink-700">
-                  Organization name
-                  <input className={input} required minLength={2} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  Organisation name
+                  <input
+                    className={input}
+                    required
+                    minLength={2}
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  />
                 </label>
                 <label className="block text-xs font-medium text-ink-700">
-                  Timezone (IANA, e.g. Asia/Karachi)
-                  <input className={input} value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
+                  Timezone (IANA)
+                  <input
+                    className={input}
+                    value={form.timezone}
+                    onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+                  />
                 </label>
                 <label className="block text-xs font-medium text-ink-700">
                   Administrator name
-                  <input className={input} required value={form.adminName} onChange={(e) => setForm({ ...form, adminName: e.target.value })} />
+                  <input
+                    className={input}
+                    required
+                    value={form.adminName}
+                    onChange={(e) => setForm({ ...form, adminName: e.target.value })}
+                  />
                 </label>
                 <label className="block text-xs font-medium text-ink-700">
                   Administrator email
-                  <input className={input} type="email" required value={form.adminEmail} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
+                  <input
+                    className={input}
+                    type="email"
+                    required
+                    value={form.adminEmail}
+                    onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
+                  />
                 </label>
-                <button type="submit" className="btn-primary h-9 px-3 text-xs" disabled={busy}>
-                  Create organization
+                <button type="submit" className="btn-primary h-9 w-full text-xs" disabled={busy}>
+                  Create organisation
                 </button>
               </form>
             )}
           </CardBody>
         </Card>
-      </section>
+      </div>
     </AppShell>
   );
 }

@@ -1,7 +1,8 @@
 import { Controller, Get, Query, Req, UseGuards } from "@nestjs/common";
 import { db, projects, workItems } from "@techlio/server-core";
 import { eq, and } from "drizzle-orm";
-import { DashboardAuthGuard, userFromRequest } from "./auth/guards.js";
+import { DashboardAuthGuard } from "./auth/guards.js";
+import { orgAccessFromRequest } from "./auth/org-scope.js";
 import type { FastifyRequest } from "fastify";
 
 @Controller("v1")
@@ -9,11 +10,11 @@ import type { FastifyRequest } from "fastify";
 export class ProjectsController {
   @Get("projects")
   async listProjects(@Req() req: FastifyRequest) {
-    const user = userFromRequest(req);
+    const { organizationId } = await orgAccessFromRequest(req);
     const rows = await db
       .select()
       .from(projects)
-      .where(eq(projects.organizationId, user.organizationId));
+      .where(eq(projects.organizationId, organizationId));
     return { projects: rows };
   }
 
@@ -23,8 +24,8 @@ export class ProjectsController {
     @Query("q") q?: string,
     @Query("projectId") projectId?: string,
   ) {
-    const user = userFromRequest(req);
-    const conditions = [eq(workItems.organizationId, user.organizationId)];
+    const { organizationId } = await orgAccessFromRequest(req);
+    const conditions = [eq(workItems.organizationId, organizationId)];
     if (projectId) conditions.push(eq(workItems.projectId, projectId));
     let rows = await db
       .select()

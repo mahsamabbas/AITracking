@@ -25,4 +25,5 @@ export * from "./leaderboard.js";
 export * from "./workday.js";
 export * from "./activity-feed.js";
 export * from "./platform.js";
+export * from "./org-context.js";
 export * from "./schema-version.js";

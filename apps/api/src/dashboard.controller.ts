@@ -25,6 +25,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { providerLabel } from "@techlio/event-schema";
 import { listRecentEvents } from "./services/ingest.js";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
+import { orgAccessFromRequest } from "./auth/org-scope.js";
 
 const STALE_MS = 5 * 60 * 1000;
 
@@ -59,7 +60,7 @@ export class DashboardController {
   @Get("dashboard/live")
   @UseGuards(DashboardAuthGuard)
   async live(@Req() req: FastifyRequest, @Query("limit") limit?: string) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
 
     if (!(await isDatabaseReady())) {
@@ -93,7 +94,7 @@ export class DashboardController {
       FROM devices d
       JOIN employees e ON e.id = d.developer_id
       LEFT JOIN connector_health ch ON ch.device_id = d.id
-      WHERE d.organization_id = ${user.organizationId} AND d.revoked_at IS NULL AND d.kind = 'connector'
+      WHERE d.organization_id = ${organizationId} AND d.revoked_at IS NULL AND d.kind = 'connector'
         ${selfOnly !== null ? sql`AND d.developer_id = ${selfOnly}` : sql``}
       ORDER BY e.display_name ASC
     `);
@@ -143,7 +144,7 @@ export class DashboardController {
       FROM agent_sessions s
       JOIN employees e ON e.id = s.developer_id
       LEFT JOIN projects p ON p.id = s.project_id
-      WHERE s.organization_id = ${user.organizationId}
+      WHERE s.organization_id = ${organizationId}
         AND COALESCE(s.last_event_at, s.started_at) > NOW() - INTERVAL '24 hours'
         ${selfOnly !== null ? sql`AND s.developer_id = ${selfOnly}` : sql``}
       ORDER BY COALESCE(s.last_event_at, s.started_at) DESC
@@ -178,7 +179,7 @@ export class DashboardController {
           WITH recent AS (
             SELECT e.developer_id, e.occurred_at, e.payload
             FROM activity_events e
-            WHERE e.organization_id = ${user.organizationId}
+            WHERE e.organization_id = ${organizationId}
               AND e.occurred_at > NOW() - INTERVAL '2 hours'
               AND e.event_type NOT IN ('heartbeat_sent')
               ${selfOnly !== null ? sql`AND e.developer_id = ${selfOnly}` : sql``}
@@ -217,7 +218,7 @@ export class DashboardController {
 
     const recentEvents = canViewActivityEvents(user)
       ? (
-          await listRecentEvents(user.organizationId, Math.min(Number(limit ?? 25) || 25, 100), {
+          await listRecentEvents(organizationId, Math.min(Number(limit ?? 25) || 25, 100), {
             developerId: selfOnly ?? undefined,
           })
         ).map((e) => ({ ...e, activity_type: activityTypeOf(e.event_type) }))
@@ -286,7 +287,7 @@ export class DashboardController {
       SELECT ae.event_type, ae.developer_id, e.display_name, COUNT(*)::int AS n
       FROM activity_events ae
       JOIN employees e ON e.id = ae.developer_id
-      WHERE ae.organization_id = ${user.organizationId}
+      WHERE ae.organization_id = ${organizationId}
         AND ae.occurred_at >= NOW() - INTERVAL '24 hours'
         AND ae.event_type IN ('upload_failed', 'upload_recovered', 'update_required')
         ${selfOnly !== null ? sql`AND ae.developer_id = ${selfOnly}` : sql``}
@@ -332,7 +333,7 @@ export class DashboardController {
     @Req() req: FastifyRequest,
     @Query("hours") hours?: string,
   ) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     if (!canViewDeveloper(user, developerId)) {
       throw new ForbiddenException("out_of_scope");
     }
@@ -344,7 +345,7 @@ export class DashboardController {
       .where(
         and(
           eq(hourlySnapshots.developerId, developerId),
-          eq(hourlySnapshots.organizationId, user.organizationId),
+          eq(hourlySnapshots.organizationId, organizationId),
           gte(hourlySnapshots.hourStart, since),
         ),
       )
@@ -378,8 +379,8 @@ export class DashboardController {
   @Get("hourly-snapshots/:id")
   @UseGuards(DashboardAuthGuard)
   async hourlySnapshot(@Param("id") id: string, @Req() req: FastifyRequest) {
-    const user = userFromRequest(req);
-    const detail = await getHourlySnapshotDetail(user.organizationId, id);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
+    const detail = await getHourlySnapshotDetail(organizationId, id);
     if (!detail.snapshot) throw new NotFoundException("snapshot_not_found");
     if (!canViewDeveloper(user, detail.snapshot.developerId)) {
       throw new ForbiddenException("out_of_scope");

@@ -1,18 +1,17 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
   addOrganizationAdmin,
   createOrganization,
+  getCustomerOrganization,
   listOrganizations,
   setOrganizationDisabled,
 } from "@techlio/server-core";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
 /**
- * Platform console (multi-tenant). Only the super admin may list, create, or
- * disable organisations and add their administrators. The super admin has no
- * access to any organisation's activity: every analytics route requires an
- * organisation role.
+ * Platform console (multi-tenant). Super admins create organisations and may
+ * open any customer tenant in read-only mode from the web app (org context header).
  */
 @Controller("v1/platform")
 @UseGuards(DashboardAuthGuard)
@@ -21,6 +20,26 @@ export class PlatformController {
   async list(@Req() req: FastifyRequest) {
     requireRoles(userFromRequest(req), ["super_admin"]);
     return { organizations: await listOrganizations() };
+  }
+
+  @Get("organizations/:id")
+  async one(@Req() req: FastifyRequest, @Param("id") id: string) {
+    requireRoles(userFromRequest(req), ["super_admin"]);
+    const org = await getCustomerOrganization(id);
+    if (!org) throw new NotFoundException("organization_not_found");
+    const rows = await listOrganizations();
+    const summary = rows.find((o) => o.id === id);
+    return {
+      organization: {
+        ...org,
+        createdAt: summary?.createdAt ?? null,
+        administrators: summary?.administrators ?? 0,
+        users: summary?.users ?? 0,
+        employees: summary?.employees ?? 0,
+        connectors: summary?.connectors ?? 0,
+        lastActivityAt: summary?.lastActivityAt ?? null,
+      },
+    };
   }
 
   @Post("organizations")

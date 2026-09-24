@@ -301,6 +301,19 @@ if (config.source === "local default" && PRODUCTION) {
   process.exit(1);
 }
 
+/** Emit a single postgres DSN on stdout (for admin:create:prod and similar). */
+if (process.argv.includes("--print-dsn")) {
+  if (config.connectionString) {
+    process.stdout.write(config.connectionString);
+  } else {
+    const { user, password, host, port, database } = config;
+    process.stdout.write(
+      `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}?sslmode=require`,
+    );
+  }
+  process.exit(0);
+}
+
 const { source: _source, envFile: _envFile, ...poolOptions } = config;
 const pool = new pg.Pool(poolOptions);
 

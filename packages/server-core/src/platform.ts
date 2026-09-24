@@ -7,9 +7,8 @@ import { createPortalUser } from "./users.js";
 /**
  * Multi-tenant platform. A super admin (role `super_admin`, living in the
  * "platform" organisation) creates customer organisations and their first
- * administrators; each organisation then manages its own accounts under
- * Access. The super admin never sees an organisation's activity data — every
- * analytics route requires an organisation role.
+ * administrators. With org context (web header), they can inspect any tenant's
+ * dashboards in read-only mode; each organisation still manages day-to-day access.
  */
 
 export interface OrganizationSummary {

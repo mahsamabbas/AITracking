@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { usePlatformOrgOptional } from "@/lib/platform-org";
+import { OrgLink } from "@/components/OrgLink";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { TableScroll } from "@/components/ui/TableScroll";
@@ -49,6 +51,7 @@ interface IssuedKey {
 
 export default function UsersPage() {
   const { token } = useAuth();
+  const platformView = usePlatformOrgOptional();
   const query = useApi<{ users: OrgUser[] }>("/v1/users");
   const [form, setForm] = useState({
     displayName: "",
@@ -273,6 +276,7 @@ export default function UsersPage() {
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-3">
+        {!platformView ? (
         <Card>
           <CardHeader
             title="Add a user"
@@ -329,6 +333,14 @@ export default function UsersPage() {
             </form>
           </CardBody>
         </Card>
+        ) : (
+          <Card>
+            <CardHeader
+              title="Platform view"
+              subtitle="Account changes are made by each organisation's administrators. You can review members here."
+            />
+          </Card>
+        )}
 
         <Card className="card-table xl:col-span-2">
           <CardHeader
@@ -398,12 +410,12 @@ export default function UsersPage() {
                             </button>
                           ) : null}
                           {u.developerId ? (
-                            <Link
+                            <OrgLink
                               href={`/employees/${u.developerId}`}
                               className="inline-flex h-8 items-center text-xs font-medium text-brand-600 hover:text-brand-700"
                             >
                               Analytics →
-                            </Link>
+                            </OrgLink>
                           ) : null}
                         </div>
                       </td>

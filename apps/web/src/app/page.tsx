@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -163,9 +163,9 @@ export default function OverviewPage() {
                 </button>
               </>
             ) : null}
-            <Link href="/employees" className="btn-primary">
+            <OrgLink href="/employees" className="btn-primary">
               Employee directory
-            </Link>
+            </OrgLink>
           </div>
         ) : null
       }
@@ -478,12 +478,12 @@ export default function OverviewPage() {
                       {live.data!.people!.map((p) => (
                         <tr key={p.developerId}>
                           <td>
-                            <Link
+                            <OrgLink
                               href={`/employees/${p.developerId}`}
                               className="text-sm font-medium text-ink-900 hover:text-brand-600"
                             >
                               {p.displayName}
-                            </Link>
+                            </OrgLink>
                           </td>
                           <td>{p.provider ? <ProviderBadge provider={p.provider} size="sm" /> : <span className="hint">—</span>}</td>
                           <td>
@@ -569,12 +569,12 @@ export default function OverviewPage() {
                       {live.data!.connectors.map((c) => (
                         <tr key={c.deviceId}>
                           <td>
-                            <Link
+                            <OrgLink
                               href={`/employees/${c.developerId}`}
                               className="text-sm font-medium text-ink-900 hover:text-brand-600"
                             >
                               {c.displayName}
-                            </Link>
+                            </OrgLink>
                             <span className="hint block">{c.team}</span>
                           </td>
                           <td>

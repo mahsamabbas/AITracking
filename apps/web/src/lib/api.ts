@@ -10,6 +10,22 @@ function resolveApiBase(): string {
 
 export const API_BASE = resolveApiBase();
 
+const TECHLIO_ORG_HEADER = "x-techlio-org-id";
+
+let activeOrgContextId: string | null = null;
+
+/** Set while a platform super admin views a customer organisation workspace. */
+export function setApiOrgContext(orgId: string | null): void {
+  activeOrgContextId = orgId;
+}
+
+function authHeaders(token: string | null): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (activeOrgContextId) headers[TECHLIO_ORG_HEADER] = activeOrgContextId;
+  return headers;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -21,7 +37,7 @@ export class ApiError extends Error {
 
 export async function apiGet<T>(path: string, token: string | null): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: authHeaders(token),
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -55,7 +71,7 @@ async function apiSend<T>(
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders(token),
     },
     // Fastify rejects Content-Type: application/json with an empty body.
     body: JSON.stringify(body ?? {}),

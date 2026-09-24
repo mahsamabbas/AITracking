@@ -26,6 +26,7 @@
     "deploy:all": "bash scripts/deploy-all.sh",
     "deploy:all:connector": "bash scripts/deploy-all.sh --with-connector",
     "admin:create": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/create-admin.ts",
+    "admin:create:prod": "bash scripts/admin-create-prod.sh",
     "db:migrate:check:prod": "node scripts/migrate.mjs --check --production",
     "db:purge-demo": "node scripts/purge-demo-data.mjs"
   },

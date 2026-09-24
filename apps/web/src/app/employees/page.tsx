@@ -24,6 +24,7 @@ import {
   type RangeValue,
 } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
+import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
@@ -47,6 +48,7 @@ const CONNECTOR_STATES = [
 
 export default function EmployeesPage() {
   const router = useRouter();
+  const { resolvePath } = useAppPaths();
   const [range, setRange] = useState<RangeValue>({ preset: "7d" });
   const [search, setSearch] = useState("");
   const [team, setTeam] = useState("");
@@ -331,7 +333,7 @@ export default function EmployeesPage() {
                         </td>
                         <td className="text-right">
                           <Link
-                            href={`/employees/${r.id}`}
+                            href={resolvePath(`/employees/${r.id}`)}
                             className="text-xs font-medium text-brand-600 hover:text-brand-700"
                             onClick={(e) => e.stopPropagation()}
                           >

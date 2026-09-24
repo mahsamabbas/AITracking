@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { EmptyState } from "@/components/ui/States";
 
 export interface AlertItem {
@@ -37,12 +37,12 @@ export function AlertList({ alerts, limit }: { alerts: AlertItem[]; limit?: numb
             <p className="hint mt-0.5">{a.code.replace(/_/g, " ")}</p>
           </div>
           {a.developerId ? (
-            <Link
+            <OrgLink
               href={`/employees/${a.developerId}`}
               className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
             >
               View
-            </Link>
+            </OrgLink>
           ) : null}
         </li>
       ))}

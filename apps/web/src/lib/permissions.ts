@@ -59,5 +59,5 @@ export const ROLE_SCOPE: Record<Role, string> = {
   auditor:
     "Read-only access history, connector configuration, and retention. Not individual timelines.",
   super_admin:
-    "Create and manage organisations and their administrators. No access to any organisation's activity.",
+    "Manage organisations and open any tenant workspace to inspect dashboards, people, and connectors (read-only).",
 };

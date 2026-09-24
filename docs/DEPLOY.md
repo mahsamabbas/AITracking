@@ -123,7 +123,11 @@ manage their own people under **Access**. Bootstrap once (use an email that is
 not an organisation account):
 
 ```bash
+# Local Docker Postgres only — not Vercel/Neon:
 pnpm admin:create --super --email platform@yourcompany.com
+
+# Production (same database as pnpm db:migrate:prod):
+pnpm admin:create:prod --super --email platform@yourcompany.com --name "Platform Admin"
 ```
 
 Sign in with it → **Organizations** → *New organization* (name, timezone, first

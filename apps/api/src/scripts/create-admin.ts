@@ -4,9 +4,12 @@
  *
  *   DATABASE_URL=... pnpm admin:create --email you@company.com --name "Your Name"
  *
+ * Production Neon/Vercel (never uses local Docker by accident):
+ *   pnpm admin:create:prod --email you@company.com --name "Your Name"
+ *
  * Platform super admin (creates and manages organisations; sees no
  * organisation's activity). Use an email that is not an organisation account:
- *   DATABASE_URL=... pnpm admin:create --super --email platform@company.com
+ *   pnpm admin:create:prod --super --email platform@company.com
  *
  * The password is read from ADMIN_PASSWORD, or generated and printed once.
  */

@@ -19,16 +19,17 @@ import {
   type OrgAssignableRole,
 } from "@techlio/server-core";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
+import { orgAccessFromRequest } from "./auth/org-scope.js";
 
 @Controller("v1")
 @UseGuards(DashboardAuthGuard)
 export class OrgController {
   @Get("users")
   async users(@Req() req: FastifyRequest) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator"]);
-    const users = await listPortalUsers(user.organizationId);
-    const devices = await listOrgDevices(user.organizationId).catch(() => []);
+    const users = await listPortalUsers(organizationId);
+    const devices = await listOrgDevices(organizationId).catch(() => []);
     const connected = new Set(
       devices.filter((d) => !d.revokedAt).map((d) => d.developerId),
     );
@@ -81,10 +82,10 @@ export class OrgController {
 
   @Get("org/developers")
   async developers(@Req() req: FastifyRequest) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
-    const members = await listPortalUsers(user.organizationId);
-    const deviceRows = await listOrgDevices(user.organizationId);
+    const members = await listPortalUsers(organizationId);
+    const deviceRows = await listOrgDevices(organizationId);
     const seen = new Map<
       string,
       { developerId: string; displayName: string; email?: string }
@@ -115,10 +116,10 @@ export class OrgController {
 
   @Get("audit-log")
   async audit(@Req() req: FastifyRequest, @Query("limit") limit?: string) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     if (!canViewAudit(user)) requireRoles(user, ["auditor"]);
     const rows = await listAuditLog(
-      user.organizationId,
+      organizationId,
       Math.min(Number(limit ?? 100) || 100, 200),
     );
     return { entries: rows };
@@ -126,10 +127,10 @@ export class OrgController {
 
   @Get("org/policy")
   async policy(@Req() req: FastifyRequest) {
-    const user = userFromRequest(req);
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
     return {
-      organizationId: user.organizationId,
+      organizationId,
       ...getOrgPolicy(),
     };
   }
