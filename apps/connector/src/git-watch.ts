@@ -119,13 +119,18 @@ export function createGitWatcher(options: {
     if (!options.isActive() || scanning.has(repo.root)) return;
     scanning.add(repo.root);
     try {
+      // Always look back BACKFILL_MS, even for repos first seen by an older
+      // build that stored "from now": commits made while the connector was
+      // missing/outdated are still read from git. Event ids are deterministic,
+      // so re-reading a commit never counts it twice.
+      const sinceMs = Math.min(repo.watchedSince, Date.now() - BACKFILL_MS);
       const email = (await git(repo.root, ["config", "user.email"]))?.trim().toLowerCase();
       const log = email
         ? await git(repo.root, [
             "log",
             "-n",
             "300",
-            `--since=@${Math.floor(repo.watchedSince / 1000)}`,
+            `--since=@${Math.floor(sinceMs / 1000)}`,
             "--format=@@%H%x09%ct%x09%ae",
             "--numstat",
           ])
@@ -137,7 +142,7 @@ export function createGitWatcher(options: {
         if (!hash || !ct || author?.trim().toLowerCase() !== email) continue; // pulled commits by others
         if (repo.commits[hash]) continue;
         const at = Number(ct) * 1000;
-        if (at < Math.floor(repo.watchedSince / 1000) * 1000) continue; // git times are whole seconds
+        if (at < Math.floor(sinceMs / 1000) * 1000) continue; // git times are whole seconds
         let files = 0;
         let added = 0;
         let deleted = 0;
