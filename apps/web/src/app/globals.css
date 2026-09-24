@@ -133,6 +133,8 @@
   html,
   body {
     height: 100%;
+    overflow-x: clip;
+    max-width: 100%;
   }
   body {
     @apply bg-canvas font-sans text-[15px] leading-relaxed text-ink-900 antialiased;

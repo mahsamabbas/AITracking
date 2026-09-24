@@ -1,3 +1,4 @@
+import { activityTimeline, type ActivityTimeline } from "./work-mix.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { AGENT_REPORTED_SQL, PRODUCTIVE_CLASSIFICATIONS } from "./activity.js";
@@ -279,6 +280,23 @@ export async function listEmployeeDirectory(
   }
   if (f.provider) {
     rows = rows.filter((r) => r.tools.some((t) => t.provider === f.provider));
+  }
+
+  // Time columns use event time (where each minute happened), the same source
+  // as the employee page, Workday, leaderboard, and overview charts.
+  const timeline = await activityTimeline({
+    organizationId: f.organizationId,
+    range: f.range,
+    timeZone: tz,
+    developerIds: f.developerIds,
+    provider: f.provider,
+  });
+  for (const r of rows) {
+    const t = timeline.byDeveloper.get(r.id);
+    r.activeMs = t?.activeMs ?? 0;
+    r.idleMs = t?.idleMs ?? 0;
+    r.productiveMs = r.activeMs;
+    r.avgSessionMs = r.sessions > 0 ? Math.round(r.activeMs / r.sessions) : 0;
   }
 
   const sort = f.sort ?? "activity";
@@ -801,6 +819,8 @@ export interface OrganizationAnalytics {
   previousTotals: ActivityTotals;
   headcount: { total: number; active: number; connected: number };
   dailyTrend: TrendPoint[];
+  /** Agent time by what it was doing (event time, same rules as the Workday). */
+  workMix: WorkMixSummary;
   /** Agent file changes + commits per day (same day keys as dailyTrend). */
   changeTrend: ChangeTrendPoint[];
   /** Commit → Verified → Shipped for the range. */
@@ -881,19 +901,29 @@ export async function organizationAnalytics(input: {
     commitSummary(scope, input.range),
   ]);
 
-  return {
-    range: { from: input.range.from.toISOString(), to: input.range.to.toISOString() },
+  const timed = await withEventTime(scope, input.range, {
     totals,
     previousTotals,
+    trend,
+    hours,
+    weekdays,
+    tools,
+  });
+
+  return {
+    range: { from: input.range.from.toISOString(), to: input.range.to.toISOString() },
+    totals: timed.totals,
+    previousTotals: timed.previousTotals ?? previousTotals,
+    workMix: timed.workMix,
     headcount: {
       total: headcountRes.rows[0]?.total ?? 0,
       connected: headcountRes.rows[0]?.connected ?? 0,
       active: totals.activeEmployees,
     },
-    dailyTrend: trend,
-    tools,
-    hourPattern: hours,
-    weekdayPattern: weekdays,
+    dailyTrend: timed.trend ?? trend,
+    tools: timed.tools ?? tools,
+    hourPattern: timed.hours ?? hours,
+    weekdayPattern: timed.weekdays ?? weekdays,
     classifications: classes,
     toolCategories: categories,
     coverage,
@@ -1243,7 +1273,8 @@ type CommitDayRow = Record<string, unknown> & {
 function commitScope(f: ScopeFilters, range: DateRange) {
   const parts = [
     sql`c.organization_id = ${f.organizationId}`,
-    sql`c.event_type = 'commit_created'`,
+    // Legacy post-commit signal (build_completed/git_commit, before the git watcher) is still a commit.
+    sql.raw(`(c.event_type = 'commit_created' OR (c.event_type = 'build_completed' AND c.payload->'metadata'->>'tool_name' = 'git_commit'))`),
     sql`c.occurred_at >= ${range.from}`,
     sql`c.occurred_at < ${range.to}`,
   ];
@@ -1301,7 +1332,7 @@ export async function commitSummary(f: ScopeFilters, range: DateRange): Promise<
     developer_id: string;
     display_name: string | null;
   }>(sql`
-    SELECT c.payload->'metadata'->>'commit_ref' AS ref, c.occurred_at,
+    SELECT COALESCE(c.payload->'metadata'->>'commit_ref', c.event_id::text) AS ref, c.occurred_at,
            c.payload->'metadata'->>'path_category' AS repo,
            (c.payload->'metadata'->>'files_changed')::int AS files,
            (c.payload->'metadata'->>'lines_added')::int AS added,
@@ -1350,5 +1381,95 @@ export async function commitSummary(f: ScopeFilters, range: DateRange): Promise<
       developerId: r.developer_id,
       developerName: r.display_name,
     })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One time source for every chart. Session rows put a whole session's time on
+// the hour/day it STARTED; the event-time engine (work-mix.ts) puts each
+// minute of agent work where it actually happened. All time figures below are
+// replaced with event time; counts (sessions, calls, files) stay as they are.
+// ---------------------------------------------------------------------------
+
+export interface WorkMixSummary {
+  verifyMs: number;
+  writingMs: number;
+  researchMs: number;
+  idleMs: number;
+  activeMs: number;
+  workingMs: number;
+}
+
+export async function withEventTime(
+  f: ScopeFilters,
+  range: DateRange,
+  parts: {
+    totals: ActivityTotals;
+    previousTotals?: ActivityTotals;
+    trend?: TrendPoint[];
+    hours?: HourPattern[];
+    weekdays?: WeekdayPattern[];
+    tools?: ToolUsage[];
+  },
+): Promise<{
+  totals: ActivityTotals;
+  previousTotals?: ActivityTotals;
+  trend?: TrendPoint[];
+  hours?: HourPattern[];
+  weekdays?: WeekdayPattern[];
+  tools?: ToolUsage[];
+  workMix: WorkMixSummary;
+}> {
+  const tz = await scopeTimezone(f);
+  const engineScope = {
+    organizationId: f.organizationId,
+    timeZone: tz,
+    developerId: f.developerId,
+    developerIds: f.developerIds,
+    team: f.team,
+    provider: f.provider,
+  };
+  const [cur, prev] = await Promise.all([
+    activityTimeline({ ...engineScope, range }),
+    parts.previousTotals ? activityTimeline({ ...engineScope, range: previousRange(range) }) : Promise.resolve(null),
+  ]);
+  const fixTotals = (t: ActivityTotals, tl: ActivityTimeline): ActivityTotals => ({
+    ...t,
+    activeMs: tl.totals.activeMs,
+    idleMs: tl.totals.idleMs,
+    // Every observed agent minute is work (verify, writing, or research);
+    // idle is reported separately, never folded in.
+    productiveMs: tl.totals.activeMs,
+  });
+  const sessionsByDay = new Map((parts.trend ?? []).map((p) => [p.date, p]));
+  return {
+    totals: fixTotals(parts.totals, cur),
+    previousTotals: parts.previousTotals && prev ? fixTotals(parts.previousTotals, prev) : parts.previousTotals,
+    trend: parts.trend
+      ? dayKeysInRange(range, tz).map((date) => {
+          const slice = cur.daily.get(date);
+          return {
+            date,
+            activeMs: slice?.activeMs ?? 0,
+            productiveMs: slice?.activeMs ?? 0,
+            idleMs: slice?.idleMs ?? 0,
+            sessions: sessionsByDay.get(date)?.sessions ?? 0,
+            employees: sessionsByDay.get(date)?.employees ?? 0,
+          };
+        })
+      : undefined,
+    hours: parts.hours?.map((h) => ({ ...h, activeMs: cur.hourOfDay[h.hour] ?? 0 })),
+    weekdays: parts.weekdays?.map((w) => ({ ...w, activeMs: cur.weekday[w.weekday] ?? 0 })),
+    tools: parts.tools
+      ?.map((t) => ({ ...t, activeMs: cur.byProvider.get(t.provider) ?? 0 }))
+      .sort((a, b) => b.activeMs - a.activeMs),
+    workMix: {
+      verifyMs: cur.totals.verifyMs,
+      writingMs: cur.totals.writingMs,
+      researchMs: cur.totals.researchMs,
+      idleMs: cur.totals.idleMs,
+      activeMs: cur.totals.activeMs,
+      workingMs: cur.totals.workingMs,
+    },
   };
 }

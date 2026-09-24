@@ -29,7 +29,8 @@
     "admin:create:prod": "bash scripts/admin-create-prod.sh",
     "db:migrate:check:prod": "node scripts/migrate.mjs --check --production",
     "db:purge-demo": "node scripts/purge-demo-data.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "commits:sync": "node scripts/techlio-sync-commits.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

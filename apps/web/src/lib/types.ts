@@ -128,6 +128,7 @@ export interface CommitSummary {
 }
 
 export interface OrganizationAnalytics {
+  workMix?: import("./vocab").WorkMix;
   changeTrend?: ChangeTrendPoint[];
   commits?: CommitSummary;
   preset: string;
@@ -275,6 +276,7 @@ export interface EmployeeAnalytics {
   fileChangeTrend: ChangeTrendPoint[];
   /** Commit → Verified → Shipped (null when unavailable). */
   commits?: CommitSummary | null;
+  workMix?: import("./vocab").WorkMix;
   aiSubscriptions?: EmployeeAiSubscription[];
   idlePeriods: IdlePeriod[];
   recentSessions: SessionRow[];
@@ -282,6 +284,7 @@ export interface EmployeeAnalytics {
 }
 
 export interface ToolAnalytics {
+  workMix?: import("./vocab").WorkMix;
   preset: string;
   range: { from: string; to: string };
   employee: EmployeeProfile;

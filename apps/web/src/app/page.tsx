@@ -42,7 +42,9 @@ import {
   LONG_QUIET_GAPS,
   OBSERVED_TIME_SPLIT,
   REVIEWING_NO_AI,
-  SESSION_MIX,
+  WORK_MIX,
+  WORK_MIX_HELP,
+  workMixSlices,
 } from "@/lib/vocab";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
@@ -314,35 +316,16 @@ export default function OverviewPage() {
                 subtitle={OBSERVED_TIME_SPLIT.subtitle}
               />
               <CardBody>
+                {/* Same event-time source and rules as the Work mix and Workday graph. */}
                 <DurationSplit
-                  totalMs={t!.elapsedMs}
-                  totalLabel="Total session span observed"
-                  bands={[
-                    {
-                      label: OBSERVED_TIME_SPLIT.verifyCodeResearch.label,
-                      ms: t!.productiveMs,
-                      color: "var(--chart-2)",
-                      help: OBSERVED_TIME_SPLIT.verifyCodeResearch.help,
-                    },
-                    {
-                      label: OBSERVED_TIME_SPLIT.otherAgentActivity.label,
-                      ms: Math.max(0, t!.activeMs - t!.productiveMs),
-                      color: "var(--chart-1)",
-                      help: OBSERVED_TIME_SPLIT.otherAgentActivity.help,
-                    },
-                    {
-                      label: LONG_QUIET_GAPS.label,
-                      ms: t!.idleMs,
-                      color: "var(--chart-idle)",
-                      help: LONG_QUIET_GAPS.durationBandHelp,
-                    },
-                    {
-                      label: REVIEWING_NO_AI.label,
-                      ms: Math.max(0, t!.elapsedMs - t!.activeMs - t!.idleMs),
-                      color: "var(--chart-muted)",
-                      help: REVIEWING_NO_AI.help,
-                    },
-                  ]}
+                  totalMs={d!.workMix?.workingMs ?? 0}
+                  totalLabel="Working with AI"
+                  bands={workMixSlices(d!.workMix).map((slice) => ({
+                    label: slice.name,
+                    ms: slice.value,
+                    color: slice.color,
+                    help: WORK_MIX_HELP[slice.name] ?? "",
+                  }))}
                 />
               </CardBody>
             </Card>
@@ -381,14 +364,18 @@ export default function OverviewPage() {
 
             <Card>
               <CardHeader
-                title={SESSION_MIX.title}
-                subtitle={SESSION_MIX.subtitle}
+                title={WORK_MIX.title}
+                subtitle={
+                  d!.commits && "commits" in d!.commits && (d!.commits as { commits: number }).commits > 0
+                    ? `${WORK_MIX.subtitle} · ${(d!.commits as { commits: number }).commits} commits`
+                    : WORK_MIX.subtitle
+                }
               />
               <CardBody>
                 <DonutChart
-                  data={classificationSlices}
-                  centerValue={formatNumber(t!.sessions)}
-                  centerLabel="sessions"
+                  data={workMixSlices(d!.workMix)}
+                  centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
+                  centerLabel="working time"
                 />
               </CardBody>
             </Card>

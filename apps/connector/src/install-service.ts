@@ -45,6 +45,8 @@ const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app
 export const DASHBOARD_URL = DASHBOARD.split(",")[0];
 const VSIX_URL = `${DASHBOARD_URL}/downloads/techlio-companion.vsix`;
 const WIN_TRAY_TASK = "TechlioConnectorTray";
+/** publisher.name of apps/extension (the IDE companion). */
+const COMPANION_EXTENSION_ID = "techlio.techlio-activity-companion";
 
 /** Paths written by the macOS .pkg installer (pack-connector.mjs). */
 export const MAC_SYSTEM_DIR = "/Library/Application Support/Techlio/Connector";
@@ -382,6 +384,13 @@ export async function installBackgroundService(): Promise<void> {
   // The .pkg already placed the binary in /Library; do not copy a second one.
   const dest =
     os === "darwin" && existsSync(MAC_SYSTEM_PLIST) ? join(MAC_SYSTEM_DIR, exeName()) : join(dir, exeName());
+  if (os === "win32" && process.execPath !== dest) {
+    // Upgrade: the running service locks the old .exe; stop every copy (not
+    // this installer) so the new version can replace it.
+    for (const task of [WIN_TASK, WIN_TRAY_TASK]) spawnSync("schtasks", ["/End", "/TN", task], QUIET);
+    spawnSync("taskkill", ["/F", "/IM", exeName(), "/FI", `PID ne ${process.pid}`], QUIET);
+    sleepMs(1_500);
+  }
   try {
     if (process.execPath !== dest && !dest.startsWith(MAC_SYSTEM_DIR)) copyFileSync(process.execPath, dest);
     if (os !== "win32" && !dest.startsWith(MAC_SYSTEM_DIR)) chmodSync(dest, 0o755);
@@ -425,15 +434,37 @@ export function uninstallBackgroundService(options: { purgeData?: boolean } = {}
   else if (os === "win32") unregisterWindows();
   else unregisterLinux();
   removeAgentHooks();
+  // The IDE companion extension installed alongside the connector.
+  for (const cmd of ["cursor", "code"]) {
+    if (which(cmd)) spawnSync(cmd, ["--uninstall-extension", COMPANION_EXTENSION_ID], { ...QUIET, shell: os === "win32" });
+  }
   if (options.purgeData) {
-    for (const name of ["device-token", "signing-key", "queue-key"]) deleteSecret(name);
+    for (const name of ["device-token", "signing-key", "queue-key"]) {
+      try {
+        deleteSecret(name);
+      } catch {
+        /* already gone */
+      }
+    }
     rmSync(dataDir(), { recursive: true, force: true });
   }
-  rmSync(installDir(), { recursive: true, force: true });
-  console.log(
+  try {
+    rmSync(installDir(), { recursive: true, force: true });
+  } catch {
+    // Windows cannot delete the running uninstaller's own .exe: remove the
+    // folder a few seconds after this process exits.
+    if (os === "win32") {
+      spawn("cmd.exe", ["/c", `ping -n 4 127.0.0.1 >nul & rmdir /s /q "${installDir()}"`], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      }).unref();
+    }
+  }
+  announce(
     options.purgeData
-      ? "Techlio connector removed, including its credentials and queued events."
-      : "Techlio connector service removed. Credentials and unsent events were kept; use --uninstall --purge to remove them.",
+      ? "Techlio connector removed from this computer, including its activation and unsent events. You can now install the new version."
+      : "Techlio connector removed from this computer. Its activation was kept, so the new version continues where this one stopped once you install it.",
   );
 }
 

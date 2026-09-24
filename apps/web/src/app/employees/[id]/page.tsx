@@ -49,7 +49,8 @@ import {
   classificationDonutSlices,
   LONG_QUIET_GAPS,
   REVIEWING_NO_AI,
-  SESSION_MIX,
+  WORK_MIX,
+  workMixSlices,
   TOOL_CATEGORY_LABEL,
 } from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
@@ -209,7 +210,7 @@ export default function EmployeeDetailPage() {
               title="AI activity — last 12 months"
               subtitle="Each square is one day in the last year — click a day for the workday view below"
             />
-            <CardBody className="pb-6 pt-2">
+            <CardBody className="min-w-0 pb-6 pt-2">
               {calendar.error ? (
                 <p className="hint">Could not load the activity graph.</p>
               ) : !calendar.data ? (
@@ -278,11 +279,11 @@ export default function EmployeeDetailPage() {
               previous={d.previousTotals.sessions}
             />
             <StatTile
-              label={AGENT_WORK_SHARE.label}
-              value={t.activeMs ? `${Math.round((t.productiveMs / t.activeMs) * 100)}%` : "—"}
-              hint={`${formatDuration(t.productiveMs)} of agent activity`}
+              label="Working with AI"
+              value={formatDuration(d.workMix?.workingMs ?? 0, { compact: true })}
+              hint={`${formatDuration(t.activeMs)} agent active · ${formatDuration(t.idleMs)} idle`}
               accent="teal"
-              help={AGENT_WORK_SHARE.help}
+              help="Time between agent events with no gap over 10 minutes — the same measure as the Workday graph."
             />
             <StatTile
               label={LONG_QUIET_GAPS.label}
@@ -309,14 +310,18 @@ export default function EmployeeDetailPage() {
             </Card>
             <Card>
               <CardHeader
-                title={SESSION_MIX.title}
-                subtitle={SESSION_MIX.subtitle}
+                title={WORK_MIX.title}
+                subtitle={
+                  d!.commits && "commits" in d!.commits && (d!.commits as { commits: number }).commits > 0
+                    ? `${WORK_MIX.subtitle} · ${(d!.commits as { commits: number }).commits} commits`
+                    : WORK_MIX.subtitle
+                }
               />
               <CardBody>
                 <DonutChart
-                  data={classificationSlices}
-                  centerValue={formatNumber(t.sessions)}
-                  centerLabel="sessions"
+                  data={workMixSlices(d!.workMix)}
+                  centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
+                  centerLabel="working time"
                   emptyVariant={silenceVariant}
                 />
               </CardBody>

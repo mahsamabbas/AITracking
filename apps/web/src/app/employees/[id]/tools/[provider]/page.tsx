@@ -27,7 +27,7 @@ import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
-import { classificationDonutSlices, SESSION_MIX, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { TOOL_CATEGORY_LABEL, WORK_MIX, workMixSlices } from "@/lib/vocab";
 import type { ToolAnalytics } from "@/lib/types";
 
 export default function EmployeeToolPage() {
@@ -213,14 +213,14 @@ export default function EmployeeToolPage() {
             </Card>
             <Card>
               <CardHeader
-                title={SESSION_MIX.title}
-                subtitle={SESSION_MIX.subtitle}
+                title={WORK_MIX.title}
+                subtitle={WORK_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart
-                  data={classificationDonutSlices(d.classifications)}
-                  centerValue={formatNumber(t.sessions)}
-                  centerLabel="sessions"
+                  data={workMixSlices(d.workMix)}
+                  centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
+                  centerLabel="working time"
                 />
               </CardBody>
             </Card>

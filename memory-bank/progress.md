@@ -180,3 +180,21 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
   unused `/v1/stream/sse` (token in URL, no role check) removed; super-admin tenant view
   (`X-Techlio-Org` header) verified: non-super-admins can never switch organisations.
 - **Schema:** EXPECTED_SCHEMA_MIGRATION = 014 (014 was added without bumping it).
+
+## 2026-09-24 one time source, commit backfill, connector uninstall
+
+- **One time source for every chart:** `activityTimeline` (work-mix.ts) attributes each minute of
+  agent work to the local hour/day it happened (was: whole session on its start hour/day). Used by
+  KPIs, usage trend, hour/weekday patterns, per-tool time, Work mix, 12-month calendar, directory,
+  leaderboard, and (same rules via `workCategory`/`timedInterval`) the Workday graph. Verified on
+  the local DB: all surfaces equal per person and per day. Counts stay session/event based.
+- **Work mix replaces the session-count "Session mix" donut:** time split into Verify & ship /
+  Writing code / Research & planning / Idle (a session is no longer one label). "Agent work share"
+  (always 100% now) replaced by "Working with AI" (employee) and "Idle" (directory).
+- **Commits from git:** a newly seen repo backfills the git user's last 14 days of commits (never
+  marked verified — unknowable). `pnpm commits:sync` syncs the current repo on demand. Legacy
+  `build_completed/git_commit` signals count as commits everywhere.
+- **Connector:** Uninstall from the tray / menu bar (keep or remove activation); Windows
+  uninstaller cleans its own folder after exit and removes the companion extension; Windows
+  upgrade stops the running service first. Windows Pause/Stop fixed (PowerShell sent an empty
+  form-encoded POST → Fastify 415; connector now accepts it and the tray sends JSON).

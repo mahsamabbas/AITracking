@@ -245,3 +245,41 @@ export const CHART_COLORS = [
   "var(--chart-6)",
   "var(--chart-4)",
 ];
+
+
+/** Agent time by what it was doing — event time, same rules as the Workday graph. */
+export interface WorkMix {
+  verifyMs: number;
+  writingMs: number;
+  researchMs: number;
+  idleMs: number;
+  activeMs: number;
+  workingMs: number;
+}
+
+export const WORK_MIX = {
+  title: "Work mix",
+  subtitle:
+    "Where the time went — verify & ship, writing code, research & planning, and idle — measured from the same events as the Workday graph",
+} as const;
+
+export function workMixSlices(mix?: WorkMix | null): { name: string; value: number; formatted: string; color: string }[] {
+  const m = mix ?? { verifyMs: 0, writingMs: 0, researchMs: 0, idleMs: 0, activeMs: 0, workingMs: 0 };
+  const fmt = (ms: number) => {
+    const min = Math.round(ms / 60_000);
+    return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
+  };
+  return [
+    { name: "Verify & ship", value: m.verifyMs, formatted: fmt(m.verifyMs), color: "var(--chart-3)" },
+    { name: "Writing code", value: m.writingMs, formatted: fmt(m.writingMs), color: "var(--chart-1)" },
+    { name: "Research & planning", value: m.researchMs, formatted: fmt(m.researchMs), color: "var(--chart-6)" },
+    { name: "Idle", value: m.idleMs, formatted: fmt(m.idleMs), color: "var(--chart-idle)" },
+  ];
+}
+
+export const WORK_MIX_HELP: Record<string, string> = {
+  "Verify & ship": "Agent time running tests, builds, lint, type-checks, or the repo's CI gate.",
+  "Writing code": "Agent time editing or creating files.",
+  "Research & planning": "Agent time reading, searching, and in model calls without writing files.",
+  Idle: "Inside a working period with no agent running — reviewing, typing, or waiting. Gaps over 10 minutes end the period.",
+};

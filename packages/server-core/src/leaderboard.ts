@@ -1,3 +1,5 @@
+import { activityTimeline } from "./work-mix.js";
+import { resolveReportingTimezone } from "./timezone.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import type { DateRange } from "./analytics.js";
@@ -156,6 +158,11 @@ export async function aiUsageLeaderboard(input: {
     providers: [...new Set(((r.providers as (string | null)[] | null) ?? []).filter(Boolean) as string[])],
     lastActiveAt: r.last_at ? new Date(r.last_at as string).toISOString() : null,
   }));
+
+  // AI active time = event time (same source as every other chart).
+  const tz = await resolveReportingTimezone(organizationId);
+  const timeline = await activityTimeline({ organizationId, range, timeZone: tz, team: input.team, provider: input.provider });
+  for (const row of rows) row.activeMs = timeline.byDeveloper.get(row.id)?.activeMs ?? 0;
 
   // Measured values first (descending), then people with nothing measured, by name.
   rows.sort((a, b) => {

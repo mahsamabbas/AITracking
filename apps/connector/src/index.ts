@@ -327,6 +327,9 @@ function dashboardOriginAllowed(origin: string): boolean {
 }
 
 const app = Fastify({ logger: false });
+// Windows PowerShell (the tray) POSTs with an empty form-encoded body; Fastify
+// would answer 415 and Pause/Stop silently did nothing. Accept it as {}.
+app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_req, _body, done) => done(null, {}));
 
 // Commit → Verified → Shipped for repos the agents work in (see git-watch.ts).
 const gitWatch = createGitWatcher({

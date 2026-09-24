@@ -152,6 +152,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         menu.addItem(action("Open Techlio dashboard", #selector(openDashboard)))
         menu.addItem(action("Show log", #selector(openLog)))
         menu.addItem(.separator())
+        menu.addItem(action("Uninstall connector…", #selector(uninstallConnector)))
         menu.addItem(action("Hide menu bar icon", #selector(hideIcon)))
     }
 
@@ -226,6 +227,44 @@ final class StatusController: NSObject, NSMenuDelegate {
             launchctl(["kickstart", "\(domain)/\(serviceLabel)"])
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.refresh() }
+    }
+
+    /// Removes the connector from this Mac (service, menu bar icon, AI tool
+    /// hooks, program) so a new version can be installed. The .pkg install
+    /// lives in /Library, so macOS asks for an administrator password.
+    @objc private func uninstallConnector() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Uninstall the Techlio connector?"
+        alert.informativeText = "This removes the background service, this menu bar icon, the AI tool hooks, and the program from this Mac. Afterwards you can install the new version.\n\n“Remove everything” also deletes this Mac's activation and any events not yet uploaded — you will activate the new connector again."
+        alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: "Remove everything")
+        alert.addButton(withTitle: "Cancel")
+        let choice = alert.runModal()
+        if choice == .alertThirdButtonReturn { return }
+        let purge = choice == .alertSecondButtonReturn ? " --purge" : ""
+        let systemScript = "/Library/Application Support/Techlio/Connector/uninstall.sh"
+        let task = Process()
+        if FileManager.default.fileExists(atPath: systemScript) {
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            task.arguments = ["-e", "do shell script quoted form of \"\(systemScript)\" & \"\(purge)\" with administrator privileges"]
+        } else {
+            task.executableURL = URL(fileURLWithPath: NSString(string: "~/.techlio/connector/techlio-connector").expandingTildeInPath)
+            task.arguments = purge.isEmpty ? ["--uninstall"] : ["--uninstall", "--purge"]
+        }
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            let failed = NSAlert()
+            failed.messageText = "Could not start the uninstaller"
+            failed.informativeText = error.localizedDescription
+            failed.runModal()
+            return
+        }
+        if task.terminationStatus == 0 {
+            NSApp.terminate(nil)
+        }
     }
 
     /// Only the icon goes away (until next sign-in); collection keeps running.

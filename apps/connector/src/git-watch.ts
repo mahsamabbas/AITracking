@@ -48,6 +48,8 @@ interface State {
 }
 
 const VERIFY_WINDOW_MS = 30 * 60_000;
+/** A newly seen repo reports this much of the git user's history (then live). */
+const BACKFILL_MS = 14 * 86_400_000;
 const TRACK_PUSH_FOR_MS = 14 * 86_400_000;
 const SCAN_EVERY_MS = 60_000;
 
@@ -101,8 +103,9 @@ export function createGitWatcher(options: {
     const root = await resolveRoot(cwd);
     if (!root) return null;
     if (!state.repos[root]) {
-      // Only commits made from now on count — never the repo's history.
-      state.repos[root] = { root, watchedSince: Date.now(), commits: {} };
+      // Pick up the git user's recent commits from git itself (the connector
+      // may have been missing or outdated when they were made), then go live.
+      state.repos[root] = { root, watchedSince: Date.now() - BACKFILL_MS, commits: {} };
       save();
     }
     return state.repos[root];
@@ -121,7 +124,7 @@ export function createGitWatcher(options: {
         ? await git(repo.root, [
             "log",
             "-n",
-            "50",
+            "300",
             `--since=@${Math.floor(repo.watchedSince / 1000)}`,
             "--format=@@%H%x09%ct%x09%ae",
             "--numstat",
@@ -146,6 +149,7 @@ export function createGitWatcher(options: {
           deleted += Number(d) || 0;
         }
         const ref = refOf(repo.root, hash);
+        // Unknowable for commits made before we watched: reported as not verified, never guessed.
         const verified = repo.lastCheckAt != null && repo.lastCheckAt >= at - VERIFY_WINDOW_MS && repo.lastCheckAt <= at + 120_000;
         repo.commits[hash] = { ref, at, pushed: false };
         changed = true;

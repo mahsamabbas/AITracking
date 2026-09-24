@@ -68,4 +68,18 @@ describe("git watcher: Commit → Verified → Shipped", () => {
     await watcher.scanNow(other);
     expect(signals.filter((s) => s.type === "commit_created").at(-1)).toMatchObject({ verified: false, filesChanged: 1 });
   });
+
+  it("picks up commits made before the connector saw the repo (from git), never as verified", async () => {
+    const early = join(base, "early");
+    execFileSync("git", ["init", "-q", early]);
+    git(early, "config", "user.email", "dev@example.test");
+    writeFileSync(join(early, "d.ts"), "d\ne\n");
+    git(early, "add", ".");
+    git(early, "commit", "-q", "-m", "made while the connector was not running");
+    const before = signals.length;
+    await watcher.scanNow(early); // first time this repo is seen
+    const found = signals.slice(before).filter((s) => s.type === "commit_created");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ filesChanged: 1, linesAdded: 2, verified: false });
+  });
 });

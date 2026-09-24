@@ -1,3 +1,5 @@
+import { resolveRange } from "./range.js";
+import { activityTimeline } from "./work-mix.js";
 import { AGENT_REPORTED_SQL } from "./activity.js";
 import { sql } from "drizzle-orm";
 import { PROVIDER_CAPABILITIES, providerLabel } from "@techlio/event-schema";
@@ -438,23 +440,27 @@ export async function activityCalendar(input: {
   const { organizationId, developerId } = input;
   const span = Math.min(Math.max(input.days ?? 365, 7), 371);
   const tz = await resolveReportingTimezone(organizationId, input.timeZone);
-  const to = new Date();
-  const from = new Date(to.getTime() - span * 86_400_000);
+  // Local-day range ending today, so days match the Workday and every chart.
+  const today = resolveRange({ preset: "today", timeZone: tz }).range;
+  const from = new Date(today.from.getTime() - (span - 1) * 86_400_000);
+  const to = today.to;
 
-  const [daily, since] = await Promise.all([
+  const [timeline, counts, since] = await Promise.all([
+    // Time: where each minute of agent work happened (same engine as all charts).
+    activityTimeline({ organizationId, developerId, range: { from, to }, timeZone: tz }),
+    // Counts: events on the day they happened (not the day their session started).
     db.execute<Record<string, unknown> & { day: string }>(sql`
-      SELECT to_char((s.started_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
-             COUNT(*)::int             AS sessions,
-             SUM(s.active_duration_ms) AS active_ms,
-             SUM(s.model_requests)     AS model_requests,
-             SUM(s.tool_calls)         AS tool_calls,
-             SUM(s.file_changes)       AS file_changes
-      FROM agent_sessions s
-      WHERE s.organization_id = ${organizationId}
-        AND s.developer_id = ${developerId}
-        AND s.started_at >= ${from} AND s.started_at < ${to}
+      SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+             COUNT(DISTINCT e.session_id)::int                                       AS sessions,
+             COUNT(*) FILTER (WHERE e.event_type = 'model_request_completed')::int   AS model_requests,
+             COUNT(*) FILTER (WHERE e.event_type = 'tool_completed')::int            AS tool_calls,
+             COUNT(*) FILTER (WHERE e.event_type LIKE 'file\_%' AND ${sql.raw(AGENT_REPORTED_SQL("e"))})::int AS file_changes
+      FROM activity_events e
+      WHERE e.organization_id = ${organizationId}
+        AND e.developer_id = ${developerId}
+        AND e.occurred_at >= ${from} AND e.occurred_at < ${to}
+        AND e.event_type IN ('model_request_completed', 'tool_completed', 'file_created', 'file_modified', 'file_deleted')
       GROUP BY 1
-      ORDER BY 1
     `),
     db.execute<{ since: Date | null }>(sql`
       SELECT LEAST(
@@ -465,6 +471,21 @@ export async function activityCalendar(input: {
       ) AS since
     `),
   ]);
+  const countsByDay = new Map(counts.rows.map((r) => [r.day, r]));
+  const dayKeys = new Set([...countsByDay.keys(), ...[...timeline.daily.entries()].filter(([, v]) => v.activeMs > 0).map(([k]) => k)]);
+  const daily = {
+    rows: [...dayKeys].sort().map((day) => {
+      const c = countsByDay.get(day);
+      return {
+        day,
+        sessions: c?.sessions ?? 0,
+        active_ms: timeline.daily.get(day)?.activeMs ?? 0,
+        model_requests: c?.model_requests ?? 0,
+        tool_calls: c?.tool_calls ?? 0,
+        file_changes: c?.file_changes ?? 0,
+      };
+    }),
+  };
 
   const sinceAt = since.rows[0]?.since;
   const days = daily.rows.map((r) => ({

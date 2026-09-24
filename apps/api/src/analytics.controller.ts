@@ -50,6 +50,7 @@ import {
   workspaceFileChanges,
   fileChangeTrend,
   commitSummary,
+  withEventTime,
   employeeAiSubscriptions,
   deleteEmployeeWithData,
   type AuthUser,
@@ -337,18 +338,29 @@ export class AnalyticsController {
       aiProgress({ organizationId: organizationId, developerId: id, range, timeZone }),
       safeAnalytics("commitSummary", () => commitSummary(scope, range), null),
     ]);
+    // One time source: event time (where each minute of agent work happened),
+    // the same engine as the Workday graph and Work mix.
+    const timed = await withEventTime(scope, range, {
+      totals,
+      previousTotals,
+      trend,
+      hours,
+      weekdays,
+      tools,
+    });
 
     return {
       preset,
       range: { from: range.from.toISOString(), to: range.to.toISOString() },
       employee: profile,
       devices,
-      totals,
-      previousTotals,
-      dailyTrend: trend,
-      tools,
-      hourPattern: hours,
-      weekdayPattern: weekdays,
+      totals: timed.totals,
+      previousTotals: timed.previousTotals ?? previousTotals,
+      workMix: timed.workMix,
+      dailyTrend: timed.trend ?? trend,
+      tools: timed.tools ?? tools,
+      hourPattern: timed.hours ?? hours,
+      weekdayPattern: timed.weekdays ?? weekdays,
       classifications: classes,
       toolCategories: categories,
       models,
@@ -392,7 +404,6 @@ export class AnalyticsController {
     const [
       totals,
       previousTotals,
-      allTools,
       trend,
       hours,
       classes,
@@ -403,7 +414,6 @@ export class AnalyticsController {
     ] = await Promise.all([
       activityTotals(scope, range),
       activityTotals(scope, prev),
-      toolDistribution(allScope, range),
       dailyTrend(scope, range),
       hourOfDayPattern(scope, range),
       classificationSplit(scope, range),
@@ -421,6 +431,12 @@ export class AnalyticsController {
     ]);
 
     const capability = await capabilityFor(organizationId, id, provider);
+    // Same event-time source as every other chart (this tool's minutes only;
+    // the share denominator is the person's merged active time across tools).
+    const [timed, personTimed] = await Promise.all([
+      withEventTime(scope, range, { totals, previousTotals, trend, hours }),
+      withEventTime(allScope, range, { totals }),
+    ]);
 
     return {
       preset,
@@ -428,11 +444,12 @@ export class AnalyticsController {
       employee: profile,
       provider,
       capability,
-      totals,
-      previousTotals,
-      shareOfEmployeeActiveMs: allTools.reduce((s, t) => s + t.activeMs, 0),
-      dailyTrend: trend,
-      hourPattern: hours,
+      totals: timed.totals,
+      previousTotals: timed.previousTotals ?? previousTotals,
+      workMix: timed.workMix,
+      shareOfEmployeeActiveMs: personTimed.totals.activeMs,
+      dailyTrend: timed.trend ?? trend,
+      hourPattern: timed.hours ?? hours,
       classifications: classes,
       toolCategories: categories,
       models,

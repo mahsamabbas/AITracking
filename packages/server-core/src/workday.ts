@@ -1,3 +1,4 @@
+import { workCategory } from "./work-mix.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
@@ -76,23 +77,6 @@ function clip(intervals: Interval[], from: number, to: number): number {
   let total = 0;
   for (const i of intervals) total += Math.max(0, Math.min(i.end, to) - Math.max(i.start, from));
   return total;
-}
-
-const EDITING_TOOL_CATEGORIES = new Set(["file_write", "test", "build"]);
-
-function isEditingActivity(event: {
-  event_type: string;
-  metadata: { tool_name?: unknown; telemetry_source?: unknown; tool_category?: unknown } | null;
-}): boolean {
-  const kind = activityTypeOf(event.event_type);
-  if (kind === "file_change" || kind === "engineering_check") {
-    return isAgentReported({ event_type: event.event_type, metadata: event.metadata });
-  }
-  if (event.event_type === "tool_completed") {
-    const cat = String(event.metadata?.tool_category ?? "");
-    if (EDITING_TOOL_CATEGORIES.has(cat)) return true;
-  }
-  return false;
 }
 
 /** Minimum active slice when the provider reports completion without duration_ms. */
@@ -188,7 +172,8 @@ export async function workday(input: {
         agentTimes.push(at - dur);
         const interval = { start: at - dur, end: at };
         all.push(interval);
-        if (isEditingActivity(e)) editing.push(interval);
+        // Same rule as the Work mix (work-mix.ts): writing + verify vs research.
+        if (workCategory(e) !== "research") editing.push(interval);
       }
     }
     if (e.event_type === "model_request_completed") models.push(at);

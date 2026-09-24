@@ -274,7 +274,7 @@ export function AppShell({
   );
 
   return (
-    <div className="flex min-h-[100dvh] bg-canvas">
+    <div className="flex min-h-[100dvh] max-w-full overflow-x-clip bg-canvas">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-ink-900 focus:shadow-modal"
@@ -332,10 +332,10 @@ export function AppShell({
         <main
           id="main"
           tabIndex={-1}
-          className={`mx-auto w-full ${maxWidth} flex-1 px-4 py-6 focus:outline-none sm:px-6 lg:px-8`}
+          className={`mx-auto w-full min-w-0 overflow-x-clip ${maxWidth} flex-1 px-4 py-6 focus:outline-none sm:px-6 lg:px-8`}
         >
           {/* Keyed by route so only the content animates in, never the shell. */}
-          <div key={path} className="enter">
+          <div key={path} className="enter min-w-0 max-w-full">
             <PlatformOrgTabBar />
             {children}
           </div>

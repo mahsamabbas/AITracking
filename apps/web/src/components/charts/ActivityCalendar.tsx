@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDuration, formatNumber } from "@/lib/format";
 
 /**
@@ -35,6 +36,19 @@ const WEEKS = 53;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 // Opacity steps of the brand colour read correctly in light and dark themes.
 const LEVEL_OPACITY = [0, 0.3, 0.5, 0.75, 1];
+const TOOLTIP_HALF_PX = 112;
+
+type HoverAnchor = {
+  day: string;
+  rect: Pick<DOMRect, "left" | "top" | "bottom" | "width" | "height">;
+};
+
+function clampTooltipCenterX(rect: Pick<DOMRect, "left" | "width">): number {
+  const cx = rect.left + rect.width / 2;
+  if (typeof window === "undefined") return cx;
+  const pad = 12;
+  return Math.max(pad + TOOLTIP_HALF_PX, Math.min(window.innerWidth - pad - TOOLTIP_HALF_PX, cx));
+}
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -57,7 +71,7 @@ export function ActivityCalendar({
   /** Called with the day a square was clicked on. */
   onSelect?: (date: string) => void;
 }) {
-  const [hover, setHover] = useState<{ day: string; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<HoverAnchor | null>(null);
 
   const { cells, months, byDate } = useMemo(() => {
     const byDate = new Map(data.days.map((d) => [d.date, d]));
@@ -100,95 +114,97 @@ export function ActivityCalendar({
   const hovered = hover ? byDate.get(hover.day) : undefined;
   const hoveredTracked = hover ? data.trackedSince != null && hover.day >= data.trackedSince : false;
 
-  return (
-    <div className="relative w-full">
-      <div className="relative w-full">
-        <svg
-          className="block h-auto w-full max-w-none"
-          width={width}
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="xMinYMin meet"
-          role="img"
-          aria-label={`AI agent activity per day for the last year: ${data.totals.activeDays} active days, ${data.totals.sessions} sessions.`}
-          onMouseLeave={() => setHover(null)}
-        >
-          {months.map((m) => (
-            <text key={`${m.label}-${m.col}`} x={LEFT + m.col * STEP} y={12} className="fill-ink-400 text-[11px]">
-              {m.label}
-            </text>
-          ))}
-          {[
-            ["Mon", 1],
-            ["Wed", 3],
-            ["Fri", 5],
-          ].map(([label, row]) => (
-            <text key={label} x={0} y={TOP + (row as number) * STEP + CELL - 2} className="fill-ink-400 text-[11px]">
-              {label}
-            </text>
-          ))}
-          {cells.map((c) =>
-            c.future ? null : (
-              <rect
-                key={c.date}
-                x={LEFT + c.col * STEP}
-                y={TOP + c.row * STEP}
-                width={CELL}
-                height={CELL}
-                rx={2}
-                className={onSelect ? "cursor-pointer" : undefined}
-                onClick={onSelect ? () => onSelect(c.date) : undefined}
-                style={
-                  c.date === selected
-                    ? { fill: "rgb(var(--color-brand-500))", fillOpacity: Math.max(LEVEL_OPACITY[c.level], 0.15), stroke: "var(--chart-axis)", strokeWidth: 1.5 }
-                    : !c.tracked
-                    ? { fill: "transparent", stroke: "var(--chart-muted)", strokeWidth: 1 }
-                    : c.level === 0
-                      ? { fill: "var(--chart-muted)" }
-                      : { fill: "rgb(var(--color-brand-500))", fillOpacity: LEVEL_OPACITY[c.level] }
-                }
-                onMouseEnter={() =>
-                  setHover({ day: c.date, x: LEFT + c.col * STEP, y: TOP + c.row * STEP })
-                }
-              >
-                <title>{c.date}</title>
-              </rect>
-            ),
-          )}
-        </svg>
-
-        {hover ? (
-          <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-line bg-card px-2.5 py-1.5 text-2xs shadow-pop"
+  const tooltip =
+    hover && typeof document !== "undefined"
+      ? createPortal(
+          <ActivityCalendarTooltip
+            day={hover.day}
+            tracked={hoveredTracked}
+            stats={hovered}
             style={{
-              left: `${((hover.x + CELL / 2) / width) * 100}%`,
-              top: `${(hover.y / height) * 100}%`,
-              marginTop: -4,
+              left: clampTooltipCenterX(hover.rect),
+              top: hover.rect.bottom + 8,
             }}
+          />,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className="max-w-full">
+      <div className="max-w-full overflow-x-auto overscroll-x-contain">
+        <div className="relative shrink-0" style={{ width, height }}>
+          <svg
+            className="block h-auto w-full"
+            width={width}
+            height={height}
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="xMinYMin meet"
+            role="img"
+            aria-label={`AI agent activity per day for the last year: ${data.totals.activeDays} active days, ${data.totals.sessions} sessions.`}
+            onMouseLeave={() => setHover(null)}
           >
-          <p className="font-semibold text-ink-900">
-            {new Date(`${hover.day}T00:00:00Z`).toLocaleDateString(undefined, {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              timeZone: "UTC",
-            })}
-          </p>
-          {!hoveredTracked ? (
-            <p className="text-ink-500">Not tracked yet — no connector before this day</p>
-          ) : hovered ? (
-            <p className="text-ink-700">
-              {formatDuration(hovered.activeMs)} AI active · {formatNumber(hovered.sessions)} sessions ·{" "}
-              {formatNumber(hovered.modelRequests)} model calls · {formatNumber(hovered.toolCalls)} tool calls ·{" "}
-              {formatNumber(hovered.fileChanges)} file changes
-            </p>
-          ) : (
-            <p className="text-ink-500">No AI agent activity observed</p>
-          )}
+            {months.map((m) => (
+              <text key={`${m.label}-${m.col}`} x={LEFT + m.col * STEP} y={12} className="fill-ink-400 text-[11px]">
+                {m.label}
+              </text>
+            ))}
+            {[
+              ["Mon", 1],
+              ["Wed", 3],
+              ["Fri", 5],
+            ].map(([label, row]) => (
+              <text key={label} x={0} y={TOP + (row as number) * STEP + CELL - 2} className="fill-ink-400 text-[11px]">
+                {label}
+              </text>
+            ))}
+            {cells.map((c) =>
+              c.future ? null : (
+                <rect
+                  key={c.date}
+                  x={LEFT + c.col * STEP}
+                  y={TOP + c.row * STEP}
+                  width={CELL}
+                  height={CELL}
+                  rx={2}
+                  className={onSelect ? "cursor-pointer" : undefined}
+                  onClick={onSelect ? () => onSelect(c.date) : undefined}
+                  style={
+                    c.date === selected
+                      ? {
+                          fill: "rgb(var(--color-brand-500))",
+                          fillOpacity: Math.max(LEVEL_OPACITY[c.level], 0.15),
+                          stroke: "var(--chart-axis)",
+                          strokeWidth: 1.5,
+                        }
+                      : !c.tracked
+                        ? { fill: "transparent", stroke: "var(--chart-muted)", strokeWidth: 1 }
+                        : c.level === 0
+                          ? { fill: "var(--chart-muted)" }
+                          : { fill: "rgb(var(--color-brand-500))", fillOpacity: LEVEL_OPACITY[c.level] }
+                  }
+                  onMouseEnter={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setHover({
+                      day: c.date,
+                      rect: {
+                        left: r.left,
+                        top: r.top,
+                        bottom: r.bottom,
+                        width: r.width,
+                        height: r.height,
+                      },
+                    });
+                  }}
+                >
+                  <title>{c.date}</title>
+                </rect>
+              ),
+            )}
+          </svg>
         </div>
-      ) : null}
       </div>
+      {tooltip}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-2xs text-ink-500">
         <span className="flex items-center gap-1.5">
@@ -197,7 +213,7 @@ export function ActivityCalendar({
           </svg>
           Not tracked
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex flex-wrap items-center gap-1">
           Less
           {LEVEL_OPACITY.map((o, i) => (
             <svg key={i} width={CELL} height={CELL} aria-hidden>
@@ -212,6 +228,64 @@ export function ActivityCalendar({
           More
         </span>
       </div>
+    </div>
+  );
+}
+
+function ActivityCalendarTooltip({
+  day,
+  tracked,
+  stats,
+  style,
+}: {
+  day: string;
+  tracked: boolean;
+  stats: ActivityCalendarDay | undefined;
+  style: { left: number; top: number };
+}) {
+  return (
+    <div
+      className="pointer-events-none fixed z-[200] w-56 -translate-x-1/2 rounded-md border border-line bg-card px-2.5 py-2 text-left text-2xs shadow-pop"
+      style={style}
+      role="tooltip"
+    >
+      <p className="font-semibold text-ink-900">
+        {new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "UTC",
+        })}
+      </p>
+      {!tracked ? (
+        <p className="mt-0.5 leading-snug text-ink-500">Not tracked yet — no connector before this day</p>
+      ) : stats ? (
+        <dl className="mt-1 space-y-0.5 leading-snug text-ink-700">
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-500">AI active</dt>
+            <dd className="num shrink-0 font-medium text-ink-900">{formatDuration(stats.activeMs)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-500">Sessions</dt>
+            <dd className="num shrink-0">{formatNumber(stats.sessions)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-500">Model calls</dt>
+            <dd className="num shrink-0">{formatNumber(stats.modelRequests)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-500">Tool calls</dt>
+            <dd className="num shrink-0">{formatNumber(stats.toolCalls)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-500">File changes</dt>
+            <dd className="num shrink-0">{formatNumber(stats.fileChanges)}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="mt-0.5 leading-snug text-ink-500">No AI agent activity observed</p>
+      )}
     </div>
   );
 }

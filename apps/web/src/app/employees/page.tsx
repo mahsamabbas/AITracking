@@ -241,8 +241,8 @@ export default function EmployeesPage() {
                       align="right"
                       defaultDirection={defaultDir("activity")}
                     />
-                    <th className="text-right" title={AGENT_WORK_SHARE.help}>
-                      {AGENT_WORK_SHARE.label}
+                    <th className="text-right" title="Idle time inside working periods (same measure as the Workday graph)">
+                      Idle
                     </th>
                     <SortableTh
                       label="Sessions"
@@ -269,8 +269,6 @@ export default function EmployeesPage() {
                 </thead>
                 <tbody>
                   {displayedRows.map((r) => {
-                    const productivePct =
-                      r.activeMs > 0 ? Math.round((r.productiveMs / r.activeMs) * 100) : 0;
                     return (
                       <tr
                         key={r.id}
@@ -315,15 +313,7 @@ export default function EmployeesPage() {
                           {r.activeMs === 0 ? (
                             <span className="hint">—</span>
                           ) : (
-                            <div className="inline-flex flex-col items-end gap-1">
-                              <span className="num text-sm text-ink-700">{productivePct}%</span>
-                              <span className="block h-1 w-14 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-                                <span
-                                  className="block h-full rounded-full bg-teal-500"
-                                  style={{ width: `${productivePct}%` }}
-                                />
-                              </span>
-                            </div>
+                            <span className="num text-sm text-ink-700">{formatDuration(r.idleMs)}</span>
                           )}
                         </td>
                         <td className="num text-right text-ink-700">{r.sessions || "—"}</td>

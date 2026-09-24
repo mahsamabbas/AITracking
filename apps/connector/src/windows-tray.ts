@@ -66,7 +66,13 @@ $script:state = 'notRunning'
 $script:health = $null
 
 function Invoke-Local([string]$path) {
-  try { Invoke-RestMethod -Method Post -Uri ((Get-Base) + $path) -TimeoutSec 8 | Out-Null } catch {}
+  try {
+    Invoke-RestMethod -Method Post -Uri ((Get-Base) + $path) -ContentType 'application/json' -Body '{}' -TimeoutSec 8 | Out-Null
+    return $true
+  } catch {
+    [System.Windows.Forms.MessageBox]::Show("The connector did not respond: $($_.Exception.Message)", 'Techlio Connector', 'OK', 'Warning') | Out-Null
+    return $false
+  }
 }
 
 function Update-State {
@@ -108,9 +114,27 @@ function Stop-Connector {
     "AI agent activity on this computer will not be recorded until you start it again or sign in again. The stop is shown on the dashboard as a period when collection was off.",
     'Techlio Connector', 'YesNo', 'Question')
   if ($answer -ne 'Yes') { return }
-  Invoke-Local '/stop'
+  [void](Invoke-Local '/stop')
   Start-Sleep -Seconds 2
   Update-State
+}
+
+function Uninstall-Connector {
+  $answer = [System.Windows.Forms.MessageBox]::Show(
+    "Uninstall the Techlio connector from this computer?" + [Environment]::NewLine + [Environment]::NewLine +
+    "This removes the background service, the tray icon, the AI tool hooks, and the program. Afterwards you can install the new version.",
+    'Techlio Connector', 'YesNo', 'Question')
+  if ($answer -ne 'Yes') { return }
+  $purge = [System.Windows.Forms.MessageBox]::Show(
+    "Also delete this computer's activation and any events not yet uploaded?" + [Environment]::NewLine + [Environment]::NewLine +
+    "Yes = remove everything (you will activate the new connector again)." + [Environment]::NewLine +
+    "No = keep the activation, so the new version picks up where this one stopped.",
+    'Techlio Connector', 'YesNo', 'Question')
+  $uninstallArgs = @('--uninstall')
+  if ($purge -eq 'Yes') { $uninstallArgs += '--purge' }
+  $tray.Visible = $false
+  if ($exe) { Start-Process -FilePath $exe -ArgumentList $uninstallArgs -WindowStyle Hidden -Wait }
+  [System.Windows.Forms.Application]::Exit()
 }
 
 function Build-Menu {
@@ -128,8 +152,8 @@ function Build-Menu {
   [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
   switch ($script:state) {
-    'collecting'   { Add-Item 'Pause collection' $true { Invoke-Local '/pause'; Update-State } }
-    'paused'       { Add-Item 'Resume collection' $true { Invoke-Local '/resume'; Update-State } }
+    'collecting'   { Add-Item 'Pause collection' $true { [void](Invoke-Local '/pause'); Update-State } }
+    'paused'       { Add-Item 'Resume collection' $true { [void](Invoke-Local '/resume'); Update-State } }
     'notActivated' { Add-Item 'Activate this computer...' $true { Start-Process "$dashboard/my-connectors" } }
   }
   if ($script:state -eq 'stopped' -or $script:state -eq 'notRunning') {
@@ -141,6 +165,7 @@ function Build-Menu {
   Add-Item 'Open Techlio dashboard' $true { Start-Process $dashboard }
   Add-Item 'Show log' $true { if (Test-Path $logPath) { Start-Process notepad.exe $logPath } }
   [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+  Add-Item 'Uninstall connector...' $true { Uninstall-Connector }
   Add-Item 'Hide tray icon' $true { $tray.Visible = $false; [System.Windows.Forms.Application]::Exit() }
 }
 
