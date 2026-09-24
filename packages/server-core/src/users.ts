@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { db } from "./db.js";
 import { portalUsers, auditLog, employees } from "./schema.js";
-import type { Role } from "./roles.js";
+import { ORG_ASSIGNABLE_ROLES, type OrgAssignableRole, type Role } from "./roles.js";
 import { devAffordancesEnabled } from "./runtime.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
@@ -195,11 +195,10 @@ export async function createPortalUser(input: {
   email: string;
   password: string;
   displayName: string;
-  role: Role;
+  role: OrgAssignableRole;
   developerId?: string | null;
 }): Promise<PortalUserPublic> {
-  const allowed: Role[] = ["administrator", "manager", "developer", "auditor"];
-  if (!allowed.includes(input.role)) {
+  if (!ORG_ASSIGNABLE_ROLES.includes(input.role)) {
     throw new Error("invalid_role");
   }
   const id = randomUUID();

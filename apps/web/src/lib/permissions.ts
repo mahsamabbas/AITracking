@@ -33,6 +33,14 @@ export function canViewAudit(role?: Role | null): boolean {
   return role === "auditor" || role === "administrator";
 }
 
+/** Roles shown on Access → Add a user (platform super admins use the CLI or platform org). */
+export const ORG_ASSIGNABLE_ROLES: Role[] = [
+  "administrator",
+  "manager",
+  "developer",
+  "auditor",
+];
+
 export const ROLE_LABEL: Record<Role, string> = {
   manager: "Manager",
   administrator: "Administrator",

@@ -1,6 +1,16 @@
 /** `super_admin` manages organisations on the platform; it has no access to any organisation's activity. */
 export type Role = "administrator" | "manager" | "developer" | "auditor" | "super_admin";
 
+/** Roles an organisation administrator may assign under Access (not platform super admins). */
+export const ORG_ASSIGNABLE_ROLES = [
+  "administrator",
+  "manager",
+  "developer",
+  "auditor",
+] as const satisfies readonly Role[];
+
+export type OrgAssignableRole = (typeof ORG_ASSIGNABLE_ROLES)[number];
+
 export interface AuthUser {
   id: string;
   email?: string;

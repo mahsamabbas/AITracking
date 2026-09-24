@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
-import { ROLE_LABEL } from "@/lib/permissions";
+import { ORG_ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/permissions";
 import { providerLabel } from "@/lib/providers";
 import type { Role } from "@/lib/types";
 
@@ -69,6 +69,11 @@ export default function UsersPage() {
     setNotice(null);
     try {
       const res = await apiPost<{ error?: string; user?: OrgUser }>("/v1/users", token, form);
+      if (res.error === "invalid_role") {
+        throw new Error(
+          "Platform super admin accounts are not created under Access. From the repo root run: pnpm admin:create --super --email your@email.com --name \"Name\"",
+        );
+      }
       if (res.error) throw new Error(res.error.replace(/_/g, " "));
       const createdName = form.displayName;
       const role = form.role;
@@ -269,7 +274,10 @@ export default function UsersPage() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
-          <CardHeader title="Add a user" subtitle="Developers are monitored; other roles are not." />
+          <CardHeader
+            title="Add a user"
+            subtitle="Developers are monitored; other roles are not. Platform super admins are created with pnpm admin:create --super (not here)."
+          />
           <CardBody>
             <form className="space-y-3" onSubmit={onCreate}>
               <label className="block">
@@ -308,7 +316,7 @@ export default function UsersPage() {
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
                 >
-                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                  {ORG_ASSIGNABLE_ROLES.map((r) => (
                     <option key={r} value={r}>
                       {ROLE_LABEL[r]}
                     </option>

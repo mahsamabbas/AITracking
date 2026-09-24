@@ -15,7 +15,8 @@ import {
   listAuditLog,
   listOrgDevices,
   listPortalUsers,
-  type Role,
+  ORG_ASSIGNABLE_ROLES,
+  type OrgAssignableRole,
 } from "@techlio/server-core";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
@@ -47,7 +48,7 @@ export class OrgController {
       email?: string;
       password?: string;
       displayName?: string;
-      role?: Role;
+      role?: OrgAssignableRole;
       developerId?: string;
     },
   ) {
@@ -55,6 +56,9 @@ export class OrgController {
     requireRoles(user, ["administrator"]);
     if (!body.email || !body.password || !body.displayName || !body.role) {
       return { error: "email_password_name_role_required" };
+    }
+    if (!ORG_ASSIGNABLE_ROLES.includes(body.role)) {
+      return { error: "invalid_role" };
     }
     try {
       const created = await createPortalUser({
@@ -67,7 +71,10 @@ export class OrgController {
         developerId: body.developerId,
       });
       return { user: created };
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === "email_already_used") {
+        return { error: "email_already_used" };
+      }
       return { error: "could_not_create_user" };
     }
   }
