@@ -10,6 +10,7 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
+import { PasswordField } from "@/components/ui/PasswordField";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
@@ -305,9 +306,7 @@ export default function UsersPage() {
               </label>
               <label className="block">
                 <span className="label mb-1 block">Temporary password</span>
-                <input
-                  className="field"
-                  type="password"
+                <PasswordField
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required

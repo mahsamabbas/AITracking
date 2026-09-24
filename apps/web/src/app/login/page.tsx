@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PasswordField } from "@/components/ui/PasswordField";
 import {
   biometricLabel,
   canUsePlatformBiometrics,
@@ -107,9 +108,7 @@ export default function LoginPage() {
             </label>
             <label className="block">
               <span className="label mb-1.5 block">Password</span>
-              <input
-                type="password"
-                className="field"
+              <PasswordField
                 value={password}
                 autoComplete="current-password"
                 onChange={(e) => setPassword(e.target.value)}

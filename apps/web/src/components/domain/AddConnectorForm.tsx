@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Callout } from "@/components/ui/Callout";
+import { PasswordField } from "@/components/ui/PasswordField";
 import { claimLocalConnector } from "@/components/domain/ConnectThisComputer";
 import { providerLabel } from "@/lib/providers";
 
@@ -83,9 +84,8 @@ export function ActivateConnectorForm({
       </label>
       <label className="block">
         <span className="label mb-1 block">Connector token</span>
-        <input
-          className="field font-mono text-xs"
-          type="password"
+        <PasswordField
+          className="font-mono text-xs"
           value={deviceToken}
           onChange={(e) => setDeviceToken(e.target.value)}
           placeholder="Shown once when the admin issued the key"

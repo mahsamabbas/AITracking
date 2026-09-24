@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { PasswordField } from "@/components/ui/PasswordField";
 import { Tabs } from "@/components/ui/Tabs";
 import { LoadingBlock } from "@/components/ui/States";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
@@ -266,9 +267,7 @@ function SecurityTab({
         <CardBody className="grid gap-4 sm:max-w-md">
           <label className="block">
             <span className="label mb-1 block">Current password</span>
-            <input
-              className="field"
-              type="password"
+            <PasswordField
               autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -276,9 +275,7 @@ function SecurityTab({
           </label>
           <label className="block">
             <span className="label mb-1 block">New password</span>
-            <input
-              className="field"
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -286,9 +283,7 @@ function SecurityTab({
           </label>
           <label className="block">
             <span className="label mb-1 block">Confirm new password</span>
-            <input
-              className="field"
-              type="password"
+            <PasswordField
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
