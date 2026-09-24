@@ -175,13 +175,16 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
 
   const idleDurationMs = Math.max(0, elapsedSpanMs - interactiveSpanMs);
 
+  // Ship/edit signals win over "long quiet gaps": a session can span hours while
+  // the agent still wrote files or ran checks in bursts — the mix chart counts
+  // sessions, not hours idle.
   let classification: SessionClassification;
-  if (idleDurationMs > elapsedSpanMs * 0.5 && elapsedSpanMs > 15 * 60_000) {
-    classification = "idle_dominant";
-  } else if (verifySignals > 0) {
+  if (verifySignals > 0) {
     classification = "engineering_output";
   } else if (fileChanges > 0) {
     classification = "assisted_editing";
+  } else if (idleDurationMs > elapsedSpanMs * 0.5 && elapsedSpanMs > 15 * 60_000) {
+    classification = "idle_dominant";
   } else {
     classification = "exploration";
   }

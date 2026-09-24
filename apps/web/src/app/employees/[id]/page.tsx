@@ -25,6 +25,7 @@ import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge } from "@/components/domain/Badges";
+import { EmployeeProfileCard } from "@/components/domain/EmployeeProfileCard";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
@@ -40,7 +41,6 @@ import {
   formatDuration,
   formatNumber,
   formatRelative,
-  initialsOf,
 } from "@/lib/format";
 import {
   AGENT_WORK_SHARE,
@@ -50,7 +50,7 @@ import {
   SESSION_MIX,
   TOOL_CATEGORY_LABEL,
 } from "@/lib/vocab";
-import { canViewTeam, canManageUsers } from "@/lib/permissions";
+import { canViewTeam } from "@/lib/permissions";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
@@ -191,46 +191,15 @@ export default function EmployeeDetailPage() {
         </>
       ) : (
         <>
-          {/* ---------------- Identity + connectors ---------------- */}
-          <Card className="mb-5">
-            <div className="flex flex-wrap items-center gap-4 p-5">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700">
-                {initialsOf(d.employee.displayName)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold text-ink-900">
-                  {d.employee.displayName}
-                  {isSelf ? <span className="badge-info ml-2">You</span> : null}
-                </p>
-                <p className="hint">
-                  {d.employee.email} · joined {formatDate(d.employee.joinedAt)}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {isSelf ? (
-                  <Link href="/my-connectors" className="btn-ghost h-8 text-xs">
-                    My connectors
-                  </Link>
-                ) : canManageUsers(user?.role) ? (
-                  <Link href="/connectors" className="btn-ghost h-8 text-xs">
-                    Connector health
-                  </Link>
-                ) : null}
-                {d.devices.length === 0 ? (
-                  <span className="badge-warn">No connector registered</span>
-                ) : (
-                  d.devices.map((dev) => (
-                    <span key={dev.deviceId} className="flex items-center gap-1.5">
-                      <ConnectorBadge state={dev.state} />
-                      <span className="hint">
-                        {dev.label ?? dev.provider} · {formatRelative(dev.lastHeartbeat)}
-                      </span>
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-          </Card>
+          <EmployeeProfileCard
+            employee={{
+              ...d.employee,
+              avatarUrl: d.employee.avatarUrl ?? (isSelf ? user?.avatarUrl ?? null : null),
+            }}
+            devices={d.devices}
+            isSelf={isSelf}
+            showManageConnectors
+          />
 
           {/* ---------------- Year of AI activity (contribution graph) ---------------- */}
           <Card className="mb-5">

@@ -51,6 +51,7 @@ export interface EmployeeDirectoryRow {
   team: string | null;
   title: string | null;
   status: string;
+  avatarUrl: string | null;
   connectorState: "online" | "stale" | "paused" | "offline";
   lastHeartbeat: string | null;
   lastActiveAt: string | null;
@@ -107,6 +108,7 @@ export async function listEmployeeDirectory(
     model_requests: string | null;
     file_changes: string | null;
     last_active_at: Date | null;
+    avatar_url: string | null;
   }>(sql`
     WITH agg AS (
       SELECT s.developer_id,
@@ -148,7 +150,10 @@ export async function listEmployeeDirectory(
     SELECT e.id, e.display_name, e.email, e.team, e.title, e.status,
            h.paused, h.last_heartbeat, h.any_offline, h.any_stale, h.any_online,
            a.active_ms, a.productive_ms, a.idle_ms, a.elapsed_ms,
-           a.sessions, a.model_requests, a.file_changes, a.last_active_at
+           a.sessions, a.model_requests, a.file_changes, a.last_active_at,
+           (SELECT pu.avatar_url FROM portal_users pu
+            WHERE pu.developer_id = e.id AND pu.organization_id = e.organization_id
+            LIMIT 1) AS avatar_url
     FROM employees e
     LEFT JOIN agg a    ON a.developer_id = e.id
     LEFT JOIN health h ON h.developer_id = e.id
@@ -230,6 +235,7 @@ export async function listEmployeeDirectory(
       team: r.team,
       title: r.title,
       status: r.status,
+      avatarUrl: r.avatar_url ?? null,
       connectorState,
       lastHeartbeat: r.last_heartbeat ? new Date(r.last_heartbeat).toISOString() : null,
       lastActiveAt: r.last_active_at ? new Date(r.last_active_at).toISOString() : null,
@@ -898,6 +904,7 @@ export interface EmployeeProfile {
   title: string | null;
   status: string;
   joinedAt: string | null;
+  avatarUrl: string | null;
 }
 
 export async function getEmployee(
@@ -912,9 +919,13 @@ export async function getEmployee(
     title: string | null;
     status: string;
     joined_at: Date | null;
+    avatar_url: string | null;
   }>(sql`
-    SELECT id, display_name, email, team, title, status, joined_at
-    FROM employees WHERE id = ${developerId} AND organization_id = ${organizationId}
+    SELECT e.id, e.display_name, e.email, e.team, e.title, e.status, e.joined_at,
+           (SELECT pu.avatar_url FROM portal_users pu
+            WHERE pu.developer_id = e.id AND pu.organization_id = e.organization_id
+            LIMIT 1) AS avatar_url
+    FROM employees e WHERE e.id = ${developerId} AND e.organization_id = ${organizationId}
   `);
   const r = res.rows[0];
   if (!r) return null;
@@ -926,6 +937,7 @@ export async function getEmployee(
     title: r.title,
     status: r.status,
     joinedAt: r.joined_at ? new Date(r.joined_at).toISOString() : null,
+    avatarUrl: r.avatar_url ?? null,
   };
 }
 

@@ -9,6 +9,7 @@ import { TableScroll } from "@/components/ui/TableScroll";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   ActiveFilters,
   FilterBar,
@@ -25,7 +26,7 @@ import {
 import { useApi } from "@/lib/use-api";
 import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
-import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
+import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { AGENT_WORK_SHARE } from "@/lib/vocab";
 import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
@@ -278,9 +279,7 @@ export default function EmployeesPage() {
                       >
                         <td>
                           <div className="flex items-center gap-2.5">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-2xs font-semibold text-brand-700">
-                              {initialsOf(r.displayName)}
-                            </span>
+                            <UserAvatar name={r.displayName} src={r.avatarUrl} size="sm" />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium text-ink-900">
                                 {r.displayName}

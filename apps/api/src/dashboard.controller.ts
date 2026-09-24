@@ -170,6 +170,7 @@ export class DashboardController {
       ? await db.execute<{
           developer_id: string;
           display_name: string;
+          avatar_url: string | null;
           provider: string | null;
           last_at: Date | null;
           last_model: string | null;
@@ -185,6 +186,9 @@ export class DashboardController {
               ${selfOnly !== null ? sql`AND e.developer_id = ${selfOnly}` : sql``}
           )
           SELECT r.developer_id, emp.display_name,
+                 (SELECT pu.avatar_url FROM portal_users pu
+                  WHERE pu.developer_id = r.developer_id AND pu.organization_id = ${organizationId}
+                  LIMIT 1) AS avatar_url,
                  (SELECT x.payload->>'provider' FROM recent x WHERE x.developer_id = r.developer_id
                    AND x.payload->>'event_type' LIKE ANY (ARRAY['model_%','tool_%','file_%','session_%'])
                    ORDER BY x.occurred_at DESC LIMIT 1) AS provider,
@@ -206,6 +210,7 @@ export class DashboardController {
       return {
         developerId: p.developer_id,
         displayName: p.display_name,
+        avatarUrl: p.avatar_url ?? null,
         provider: p.provider,
         // "active" = agent event in the last 10 minutes (the idle threshold).
         sessionState: ageMs < 10 * 60_000 ? ("active" as const) : ("recent" as const),

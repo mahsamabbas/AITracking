@@ -133,7 +133,7 @@ function ProfileTab({
 
   return (
     <Card>
-      <CardHeader title="Profile" subtitle="Name, email, and photo shown in the portal" />
+      <CardHeader title="Profile" subtitle="Name, email, and photo — shown in the header, employee directory, and profile card" />
       <CardBody className="space-y-5">
         <div className="flex flex-wrap items-center gap-4">
           <UserAvatar name={displayName || user.displayName} src={avatarPreview} size="lg" />

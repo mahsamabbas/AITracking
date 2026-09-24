@@ -19,6 +19,7 @@ import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
+import { UserAvatar } from "@/components/UserAvatar";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { FilterBar, SelectFilter } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
@@ -459,9 +460,10 @@ export default function OverviewPage() {
                           <td>
                             <OrgLink
                               href={`/employees/${p.developerId}`}
-                              className="text-sm font-medium text-ink-900 hover:text-brand-600"
+                              className="flex items-center gap-2.5 text-sm font-medium text-ink-900 hover:text-brand-600"
                             >
-                              {p.displayName}
+                              <UserAvatar name={p.displayName} src={p.avatarUrl} size="sm" />
+                              <span className="truncate">{p.displayName}</span>
                             </OrgLink>
                           </td>
                           <td>{p.provider ? <ProviderBadge provider={p.provider} size="sm" /> : <span className="hint">—</span>}</td>

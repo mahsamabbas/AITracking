@@ -119,6 +119,7 @@ export interface EmployeeRow {
   team: string | null;
   title: string | null;
   status: string;
+  avatarUrl: string | null;
   connectorState: "online" | "stale" | "paused" | "offline";
   lastHeartbeat: string | null;
   lastActiveAt: string | null;
@@ -144,6 +145,7 @@ export interface EmployeeProfile {
   title: string | null;
   status: string;
   joinedAt: string | null;
+  avatarUrl: string | null;
 }
 
 export interface EmployeeDevice {
@@ -429,6 +431,7 @@ export interface ProgressTimeline {
 export interface LivePerson {
   developerId: string;
   displayName: string;
+  avatarUrl: string | null;
   provider: string | null;
   sessionState: "active" | "recent";
   lastEventAt: string | null;

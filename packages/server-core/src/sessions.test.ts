@@ -161,6 +161,28 @@ describe("computeSessionMetrics", () => {
     expect(m.idleDurationMs).toBeGreaterThan(m.elapsedSpanMs * 0.5);
   });
 
+  it("prefers writing code over long quiet gaps when agent file changes exist", () => {
+    const events = [
+      ev("session_started", T0),
+      ev("file_modified", T0 + 30 * S, {
+        metadata: { tool_name: "Edit", telemetry_source: "hook" },
+      }),
+      ev("session_ended", T0 + 90 * M),
+    ];
+    expect(computeSessionMetrics(events).classification).toBe("assisted_editing");
+  });
+
+  it("prefers verify and ship over long quiet gaps when checks or commits exist", () => {
+    const events = [
+      ev("session_started", T0),
+      ev("build_completed", T0 + 30 * S, {
+        metadata: { tool_name: "git_commit", tool_category: "build", telemetry_source: "connector" },
+      }),
+      ev("session_ended", T0 + 90 * M),
+    ];
+    expect(computeSessionMetrics(events).classification).toBe("engineering_output");
+  });
+
   it("reports missing token data as null, never as zero", () => {
     const withoutTokens = computeSessionMetrics([
       ev("session_started", T0),
