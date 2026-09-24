@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#4F46E5" />
+<title>Offline · Techlio Pulse</title>
+<link rel="icon" href="/icons/logo.svg" type="image/svg+xml" />
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; font: 15px/1.5 -apple-system, "Inter", "Segoe UI", sans-serif;
+         background: #f6f7f9; color: #111827; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+  @media (prefers-color-scheme: dark) { body { background: #0c0e13; color: #eceef2; } p { color: #9aa3b2 !important; } }
+  main { max-width: 340px; text-align: center; }
+  img { width: 64px; height: 64px; border-radius: 14px; }
+  h1 { font-size: 20px; margin: 16px 0 6px; }
+  p { color: #5b6474; margin: 0 0 20px; }
+  button { font: inherit; font-weight: 600; color: #fff; background: #4F46E5; border: 0; border-radius: 10px; padding: 12px 20px; min-height: 44px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/icons/logo.svg" alt="" />
+  <h1>You're offline</h1>
+  <p>Techlio Pulse needs a connection to show current activity. Nothing is lost — your connector keeps recording and uploads when you're back online.</p>
+  <button type="button" onclick="location.reload()">Try again</button>
+</main>
+</body>
+</html>

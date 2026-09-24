@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { InstallAppButton } from "@/components/InstallAppButton";
+import { BRAND } from "@/lib/brand";
 import { PasswordField } from "@/components/ui/PasswordField";
 import {
   biometricLabel,
@@ -77,17 +79,17 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-[100dvh] lg:grid-cols-2">
       <div className="relative flex items-center justify-center px-6 py-12">
-        <div className="absolute right-4 top-4">
+        <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex items-center gap-2">
+          <InstallAppButton />
           <ThemeToggle />
         </div>
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-solid text-sm font-bold text-white">
-              T
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND.logo} alt="" width={36} height={36} className="h-9 w-9 rounded-lg" />
             <div>
-              <p className="text-sm font-semibold text-ink-900">Techlio</p>
-              <p className="text-2xs text-ink-500">AI activity monitoring</p>
+              <p className="text-sm font-semibold text-ink-900">{BRAND.name}</p>
+              <p className="text-2xs text-ink-500">{BRAND.tagline}</p>
             </div>
           </div>
 
@@ -190,7 +192,7 @@ export default function LoginPage() {
       </div>
       ) : (
         <div className="hidden flex-col justify-center border-line bg-slate-950 px-10 py-12 dark:border-l dark:bg-black/40 lg:flex">
-          <p className="label text-brand-200">Techlio</p>
+          <p className="label text-brand-200">{BRAND.name}</p>
           <h2 className="mt-2 text-xl font-semibold text-white">Agent activity, not timekeeping</h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
             Every screen, API, and query is scoped by role. Developers see exactly what is collected

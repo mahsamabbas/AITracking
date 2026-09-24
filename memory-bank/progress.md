@@ -198,3 +198,18 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
   uninstaller cleans its own folder after exit and removes the companion extension; Windows
   upgrade stops the running service first. Windows Pause/Stop fixed (PowerShell sent an empty
   form-encoded POST → Fastify 415; connector now accepts it and the tray sends JSON).
+
+## 2026-09-25 PWA "Techlio Pulse"
+
+- Name/logo in `apps/web/src/lib/brand.ts` (single place to rename). Logo `public/icons/logo.svg`
+  (+ `src/app/icon.svg`), PNG icons 192/512, maskable 192/512, `apple-touch-icon.png`, `favicon.ico`.
+- `src/app/manifest.ts` (standalone, shortcuts), metadata: appleWebApp, icons, title template.
+- `public/sw.js`: cache-first for `/_next/static` + icons only; pages network-first with
+  `public/offline.html`; API (other origin) and `/downloads` never touched. `/sw.js` served no-cache.
+  Registered in production only (`src/lib/pwa.tsx`).
+- `InstallAppButton` (header + login): Chrome/Edge/Android/Windows use the browser prompt; iOS Safari
+  shows "Share → Add to Home Screen"; hidden when running installed or after `appinstalled`
+  (reappears only if the browser offers install again, i.e. it was uninstalled).
+- Mobile: every text-like field (incl. date/time/untyped inputs) is 16px on touch screens → no iOS
+  focus zoom; `touch-action: manipulation` (no double-tap zoom, pinch kept); text-size-adjust;
+  safe-area insets for header/drawer/body in standalone; Android keyboard resizes content.

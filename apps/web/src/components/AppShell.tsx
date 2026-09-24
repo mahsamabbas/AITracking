@@ -11,6 +11,8 @@ import type { Role } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PlatformOrgTabBar } from "@/components/PlatformOrgTabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { InstallAppButton } from "@/components/InstallAppButton";
+import { BRAND } from "@/lib/brand";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { UserAvatar } from "@/components/UserAvatar";
 
@@ -196,12 +198,11 @@ export function AppShell({
   const sidebarInner = (
     <>
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-solid text-sm font-bold text-white">
-          T
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={BRAND.logo} alt="" width={32} height={32} className="h-8 w-8 shrink-0 rounded-lg" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-ink-900">Techlio</p>
-          <p className="truncate text-2xs text-ink-500">AI activity monitoring</p>
+          <p className="truncate text-sm font-semibold text-ink-900">{BRAND.name}</p>
+          <p className="truncate text-2xs text-ink-500">{BRAND.tagline}</p>
         </div>
       </div>
 
@@ -293,14 +294,17 @@ export function AppShell({
             className="backdrop-in absolute inset-0 bg-slate-950/40"
             onClick={() => setMenuOpen(false)}
           />
-          <aside className="drawer-in absolute left-0 top-0 flex h-full w-[260px] flex-col overflow-hidden bg-card shadow-modal">
+          <aside className="drawer-in absolute left-0 top-0 flex h-full w-[min(280px,85vw)] flex-col overflow-hidden bg-card pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-modal">
             {sidebarInner}
           </aside>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header ref={headerRef} className="sticky top-0 z-30 border-b border-line bg-card/85 backdrop-blur">
+        <header
+          ref={headerRef}
+          className="sticky top-0 z-30 border-b border-line bg-card/85 pt-[env(safe-area-inset-top)] backdrop-blur"
+        >
           <div className={`mx-auto w-full ${maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
             <PageHeader
               title={title ?? "Overview"}
@@ -321,6 +325,7 @@ export function AppShell({
               actions={
                 <>
                   {actions}
+                  <InstallAppButton compact />
                   <TimezoneSelect compact />
                   <ThemeToggle />
                 </>

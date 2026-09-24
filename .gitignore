@@ -12,4 +12,5 @@ dist
 .env*
 .next-build
 .next-dev
+.next-pwa
 apps/web/public/downloads/build/

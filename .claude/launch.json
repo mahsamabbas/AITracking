@@ -31,6 +31,15 @@
         "dev"
       ],
       "port": 3001
+    },
+    {
+      "name": "web-pwa",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && NEXT_DIST_DIR=.next-pwa npx next build && NEXT_DIST_DIR=.next-pwa npx next start -p 3002"
+      ],
+      "port": 3002
     }
   ]
 }
