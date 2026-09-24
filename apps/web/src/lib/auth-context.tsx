@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!r.ok) throw new Error(json.message ?? "Sign-in failed");
       setToken(json.token);
       setUser(json.user);
+      setConnectorViewer(json.user.developerId);
       try {
         localStorage.setItem(TOKEN_KEY, json.token);
       } catch {
@@ -104,10 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLocked(false);
       const role = json.user.role as PortalUser["role"];
       const devId = json.user.developerId as string | null | undefined;
-      const destination =
-        role === "developer" && devId
-          ? "/setup-connector"
-          : (json.homePath ?? homePathForRole(role, devId));
+      const destination = json.homePath ?? homePathForRole(role, devId);
       router.push(destination);
     },
     [router],
@@ -127,17 +125,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
     const nextUser = await fetchCurrentUser(stored);
+    setConnectorViewer(nextUser.developerId);
     setToken(stored);
     setUser(nextUser);
     setLocked(false);
-    router.push(
-      nextUser.role === "developer" && nextUser.developerId
-        ? "/setup-connector"
-        : homePathForRole(nextUser.role, nextUser.developerId),
-    );
+    router.push(homePathForRole(nextUser.role, nextUser.developerId));
   }, [router]);
 
   const applySession = useCallback((nextToken: string, nextUser: PortalUser) => {
+    setConnectorViewer(nextUser.developerId);
     setToken(nextToken);
     setUser(nextUser);
     try {
@@ -178,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     fetchCurrentUser(stored)
       .then((nextUser) => {
+        setConnectorViewer(nextUser.developerId);
         setToken(stored);
         setUser(nextUser);
       })
@@ -202,11 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublic = PUBLIC_PATHS.includes(pathname);
     if ((!token || locked) && !isPublic) router.replace("/login");
     if (token && !locked && isPublic) {
-      const dest =
-        user?.role === "developer" && user.developerId
-          ? "/setup-connector"
-          : homePathForRole(user?.role, user?.developerId);
-      router.replace(dest);
+      router.replace(homePathForRole(user?.role, user?.developerId));
     }
   }, [ready, token, locked, pathname, router, user?.role, user?.developerId]);
 

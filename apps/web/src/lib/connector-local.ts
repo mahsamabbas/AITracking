@@ -104,24 +104,7 @@ export function useConnectorOnline(pollMs = 8_000): {
   return { online, refresh };
 }
 
-export function useConnectorSetupPhase(pollMs = 5_000) {
-  const [phase, setPhase] = useState<
-    import("./connector-setup").ConnectorSetupPhase
-  >("loading");
-
-  const refresh = useCallback(async () => {
-    const { fetchConnectorSetupPhase } = await import("./connector-setup");
-    setPhase(await fetchConnectorSetupPhase());
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), pollMs);
-    return () => clearInterval(t);
-  }, [refresh, pollMs]);
-
-  return { phase, refresh };
-}
+export { useConnectorSetupPhase } from "./connector-setup";
 
 export function detectConnectorPlatform(): "mac" | "windows" | "other" {
   if (typeof navigator === "undefined") return "other";

@@ -18,6 +18,12 @@ fi
 
 vercel env ls production 2>/dev/null | grep -q '^ SKIP_REDIS ' || printf '%s\n' '1' | vercel env add SKIP_REDIS production
 
+if ! vercel env ls production 2>/dev/null | grep -q '^ ORG_TIMEZONE '; then
+  printf '%s\n' 'Asia/Karachi' | vercel env add ORG_TIMEZONE production
+else
+  echo "ORG_TIMEZONE already set on API (update in Vercel dashboard if you need to change it)"
+fi
+
 # Production values go to .env.production.local only. Never to .env.local:
 # local `pnpm dev` loads .env.local and must not point at the production DB.
 vercel env pull "$ROOT/apps/api/.env.production.local" --environment=production --yes

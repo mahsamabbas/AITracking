@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/Tabs";
 import { LoadingBlock } from "@/components/ui/States";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, type PortalUser } from "@/lib/auth-context";
 import { apiPatch } from "@/lib/api";
 import {
   biometricLabel,
@@ -75,9 +75,9 @@ function ProfileTab({
   token,
   applySession,
 }: {
-  user: NonNullable<ReturnType<typeof useAuth>["user"]>;
+  user: PortalUser;
   token: string | null;
-  applySession: (token: string, user: typeof user) => void;
+  applySession: (token: string, user: PortalUser) => void;
 }) {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [email, setEmail] = useState(user.email);
@@ -119,7 +119,7 @@ function ProfileTab({
         setMessage("Nothing to save.");
         return;
       }
-      const res = await apiPatch<{ user: typeof user; token: string }>("/v1/me", token, body);
+      const res = await apiPatch<{ user: PortalUser; token: string }>("/v1/me", token, body);
       applySession(res.token, res.user);
       setAvatarPayload(undefined);
       setMessage("Profile updated.");
@@ -196,7 +196,7 @@ function SecurityTab({
   user,
   token,
 }: {
-  user: NonNullable<ReturnType<typeof useAuth>["user"]>;
+  user: PortalUser;
   token: string | null;
 }) {
   const [currentPassword, setCurrentPassword] = useState("");

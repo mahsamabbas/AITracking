@@ -25,7 +25,7 @@ pull. If the dashboard is empty, that is the truth — do not seed it.
 | `JWT_SECRET` | `openssl rand -hex 32` (≥ 32 chars, not a placeholder) |
 | `NODE_ENV` | `production` |
 | `SKIP_REDIS` | `1` only if there is no Redis/worker (late events then recalculate inline) |
-| `ORG_TIMEZONE` | e.g. `Europe/London` — hour labels only; storage stays UTC |
+| `ORG_TIMEZONE` | e.g. `Asia/Karachi` (PKT) — hour labels only; storage stays UTC |
 
 Never set `TECHLIO_DEV_MODE` on a hosted runtime — the API refuses to boot with
 it. `ALLOW_DEV_HEADER_AUTH` no longer exists; remove it if present.

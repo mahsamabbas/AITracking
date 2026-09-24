@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnectorSetupPhase } from "@/lib/connector-local";
-import { developerNeedsLocalConnector } from "@/lib/connector-setup";
+import { connectorOnboardingActive, developerNeedsLocalConnector, syncConnectorViewer } from "@/lib/connector-setup";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import type { Role } from "@/lib/types";
@@ -135,11 +135,14 @@ export function AppShell({
   const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => {
+    syncConnectorViewer(user?.developerId);
+  }, [user?.developerId]);
+
   const onboardingLocked = Boolean(
     user &&
       developerNeedsLocalConnector(user.role, user.developerId) &&
-      connectorPhase !== "loading" &&
-      connectorPhase !== "ready",
+      connectorOnboardingActive(connectorPhase),
   );
 
   const nav = useMemo(() => {

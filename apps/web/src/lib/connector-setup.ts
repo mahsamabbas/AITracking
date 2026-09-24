@@ -1,6 +1,7 @@
 "use client";
 
-import { connectorFetch } from "./connector-local";
+import { useCallback, useEffect, useState } from "react";
+import { connectorFetch, setConnectorViewer } from "./connector-local";
 
 /** Routes developers may use until the local agent is installed and paired. */
 export const CONNECTOR_ONBOARDING_PATHS = [
@@ -11,6 +12,31 @@ export const CONNECTOR_ONBOARDING_PATHS = [
 ] as const;
 
 export type ConnectorSetupPhase = "loading" | "offline" | "unpaired" | "ready";
+
+const PHASE_CACHE_KEY = "techlio-connector-phase-v1";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+export function readCachedConnectorPhase(): Exclude<ConnectorSetupPhase, "loading"> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = sessionStorage.getItem(PHASE_CACHE_KEY);
+    if (v === "ready" || v === "offline" || v === "unpaired") return v;
+  } catch {
+    /* private mode */
+  }
+  return null;
+}
+
+function writeCachedConnectorPhase(phase: Exclude<ConnectorSetupPhase, "loading">): void {
+  try {
+    sessionStorage.setItem(PHASE_CACHE_KEY, phase);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function developerNeedsLocalConnector(
   role?: string | null,
@@ -28,14 +54,58 @@ export function isConnectorOnboardingPath(pathname: string): boolean {
 export async function fetchConnectorSetupPhase(): Promise<
   Exclude<ConnectorSetupPhase, "loading">
 > {
-  try {
-    const health = await connectorFetch("/health");
-    if (!health.ok) return "offline";
-    const r = await connectorFetch("/identity");
-    if (!r.ok) return "offline";
-    const json = (await r.json()) as { paired?: boolean };
-    return json.paired ? "ready" : "unpaired";
-  } catch {
-    return "offline";
+  const attempt = async (): Promise<Exclude<ConnectorSetupPhase, "loading">> => {
+    try {
+      const health = await connectorFetch("/health");
+      if (!health.ok) return "offline";
+      const r = await connectorFetch("/identity");
+      if (!r.ok) return "offline";
+      const json = (await r.json()) as { paired?: boolean };
+      return json.paired ? "ready" : "unpaired";
+    } catch {
+      return "offline";
+    }
+  };
+
+  let phase = await attempt();
+  // First probe after reload is often false "offline" before localhost / viewer id settles.
+  if (phase === "offline") {
+    await sleep(450);
+    phase = await attempt();
   }
+  writeCachedConnectorPhase(phase);
+  return phase;
+}
+
+/** Initial phase for hooks — optimistic "ready" avoids onboarding UI flash on reload. */
+export function initialConnectorSetupPhase(): ConnectorSetupPhase {
+  const cached = readCachedConnectorPhase();
+  return cached ?? "loading";
+}
+
+/** Call before probing so the correct connector is selected on shared machines. */
+export function syncConnectorViewer(developerId: string | null | undefined): void {
+  setConnectorViewer(developerId);
+}
+
+export function connectorOnboardingActive(
+  phase: ConnectorSetupPhase,
+): boolean {
+  return phase === "offline" || phase === "unpaired";
+}
+
+export function useConnectorSetupPhase(pollMs = 5_000) {
+  const [phase, setPhase] = useState<ConnectorSetupPhase>(() => initialConnectorSetupPhase());
+
+  const refresh = useCallback(async () => {
+    setPhase(await fetchConnectorSetupPhase());
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const t = setInterval(() => void refresh(), pollMs);
+    return () => clearInterval(t);
+  }, [refresh, pollMs]);
+
+  return { phase, refresh };
 }

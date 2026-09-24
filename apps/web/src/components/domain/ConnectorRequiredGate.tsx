@@ -3,9 +3,12 @@
 import { LoadingBlock } from "@/components/ui/States";
 import { useAuth } from "@/lib/auth-context";
 import {
+  connectorOnboardingActive,
   developerNeedsLocalConnector,
   fetchConnectorSetupPhase,
+  initialConnectorSetupPhase,
   isConnectorOnboardingPath,
+  syncConnectorViewer,
   type ConnectorSetupPhase,
 } from "@/lib/connector-setup";
 import { homePathForRole } from "@/lib/permissions";
@@ -19,19 +22,30 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
   const { token, user, ready, locked } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const [phase, setPhase] = useState<ConnectorSetupPhase>("loading");
+  const [phase, setPhase] = useState<ConnectorSetupPhase>(() => initialConnectorSetupPhase());
 
   const mustComplete = Boolean(
-    token && !locked && developerNeedsLocalConnector(user?.role, user?.developerId),
+    ready &&
+      token &&
+      !locked &&
+      user &&
+      developerNeedsLocalConnector(user.role, user.developerId),
   );
 
+  useEffect(() => {
+    syncConnectorViewer(user?.developerId);
+  }, [user?.developerId]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!mustComplete) setPhase("ready");
+  }, [ready, mustComplete]);
+
   const refresh = useCallback(async () => {
-    if (!mustComplete) {
-      setPhase("ready");
-      return;
-    }
+    if (!mustComplete) return;
+    syncConnectorViewer(user?.developerId);
     setPhase(await fetchConnectorSetupPhase());
-  }, [mustComplete]);
+  }, [mustComplete, user?.developerId]);
 
   useEffect(() => {
     void refresh();
@@ -51,10 +65,18 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
       return;
     }
 
-    if (!isConnectorOnboardingPath(pathname)) {
+    if (connectorOnboardingActive(phase) && !isConnectorOnboardingPath(pathname)) {
       router.replace("/setup-connector");
     }
   }, [ready, mustComplete, phase, pathname, router, user?.role, user?.developerId]);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-8">
+        <LoadingBlock rows={3} />
+      </div>
+    );
+  }
 
   if (!mustComplete) return children;
 
@@ -66,7 +88,7 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
     );
   }
 
-  if (phase !== "ready" && !isConnectorOnboardingPath(pathname)) {
+  if (connectorOnboardingActive(phase) && !isConnectorOnboardingPath(pathname)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-8">
         <LoadingBlock rows={3} />
