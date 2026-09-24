@@ -26,7 +26,13 @@ export class ProfileController {
   async updateMe(
     @Req() req: FastifyRequest,
     @Body()
-    body: { email?: string; displayName?: string; avatarUrl?: string | null },
+    body: {
+      email?: string;
+      displayName?: string;
+      avatarUrl?: string | null;
+      team?: string | null;
+      title?: string | null;
+    },
   ) {
     const user = userFromRequest(req);
     let avatarUrl: string | null | undefined;
@@ -43,6 +49,8 @@ export class ProfileController {
         email: body.email,
         displayName: body.displayName,
         avatarUrl,
+        team: body.team,
+        title: body.title,
       });
       const token = signUserToken({
         id: updated.id,

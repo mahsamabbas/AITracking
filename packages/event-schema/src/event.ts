@@ -77,6 +77,14 @@ export const MetadataSchema = z
     /** Prompt-cache token counts reported by OpenTelemetry (never content). */
     cache_read_tokens: z.number().int().nonnegative().optional(),
     cache_creation_tokens: z.number().int().nonnegative().optional(),
+    /**
+     * Commits (commit_created / commit_pushed). commit_ref is an opaque salted
+     * hash that links the two events — never the git hash, message, or author.
+     */
+    commit_ref: z.string().regex(/^[0-9a-f]{16,64}$/).optional(),
+    files_changed: z.number().int().nonnegative().optional(),
+    /** A passing check (CI gate, agent-run test/build) ran in the repo before this commit. */
+    verified: z.boolean().optional(),
   })
   .strict();
 

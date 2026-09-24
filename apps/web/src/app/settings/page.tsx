@@ -24,6 +24,8 @@ import { readAvatarFile, readLogoFile } from "@/lib/image-upload";
 import { useApi } from "@/lib/use-api";
 import { usePlatformOrgOptional } from "@/lib/platform-org";
 import { ROLE_LABEL } from "@/lib/permissions";
+import { formatDate } from "@/lib/format";
+import type { FilterMeta } from "@/lib/types";
 import Link from "next/link";
 
 type TabId = "profile" | "security" | "organization";
@@ -84,7 +86,10 @@ function ProfileTab({
   const [email, setEmail] = useState(user.email);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatarUrl ?? null);
   const [avatarPayload, setAvatarPayload] = useState<string | null | undefined>(undefined);
+  const [team, setTeam] = useState(user.employee?.team ?? "");
+  const [title, setTitle] = useState(user.employee?.title ?? "");
   const [busy, setBusy] = useState(false);
+  const meta = useApi<FilterMeta>(user.developerId ? "/v1/meta/filters" : null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +97,9 @@ function ProfileTab({
     setDisplayName(user.displayName);
     setEmail(user.email);
     setAvatarPreview(user.avatarUrl ?? null);
-  }, [user.displayName, user.email, user.avatarUrl]);
+    setTeam(user.employee?.team ?? "");
+    setTitle(user.employee?.title ?? "");
+  }, [user.displayName, user.email, user.avatarUrl, user.employee?.team, user.employee?.title]);
 
   async function onPickAvatar(file: File | null) {
     if (!file) return;
@@ -112,10 +119,24 @@ function ProfileTab({
     setError(null);
     setMessage(null);
     try {
-      const body: { displayName?: string; email?: string; avatarUrl?: string | null } = {};
+      const body: {
+        displayName?: string;
+        email?: string;
+        avatarUrl?: string | null;
+        team?: string | null;
+        title?: string | null;
+      } = {};
       if (displayName.trim() !== user.displayName) body.displayName = displayName.trim();
       if (email.trim().toLowerCase() !== user.email) body.email = email.trim();
       if (avatarPayload !== undefined) body.avatarUrl = avatarPayload;
+      if (user.developerId) {
+        const nextTeam = team.trim() || null;
+        const prevTeam = user.employee?.team ?? null;
+        const nextTitle = title.trim() || null;
+        const prevTitle = user.employee?.title ?? null;
+        if (nextTeam !== prevTeam) body.team = nextTeam;
+        if (nextTitle !== prevTitle) body.title = nextTitle;
+      }
       if (Object.keys(body).length === 0) {
         setMessage("Nothing to save.");
         return;
@@ -133,7 +154,10 @@ function ProfileTab({
 
   return (
     <Card>
-      <CardHeader title="Profile" subtitle="Name, email, and photo — shown in the header, employee directory, and profile card" />
+      <CardHeader
+        title="Profile"
+        subtitle="Account, directory details, and photo — shown in the header, employee directory, and profile card"
+      />
       <CardBody className="space-y-5">
         <div className="flex flex-wrap items-center gap-4">
           <UserAvatar name={displayName || user.displayName} src={avatarPreview} size="lg" />
@@ -178,6 +202,61 @@ function ProfileTab({
             />
           </label>
         </div>
+        {user.developerId ? (
+          <>
+            <p className="label">Employee directory</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label mb-1 block">Team</span>
+                <input
+                  className="field"
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                  placeholder="e.g. Platform"
+                  list="profile-team-suggestions"
+                  autoComplete="organization"
+                />
+                <datalist id="profile-team-suggestions">
+                  {(meta.data?.teams ?? []).map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </label>
+              <label className="block">
+                <span className="label mb-1 block">Job title</span>
+                <input
+                  className="field"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Software engineer"
+                  autoComplete="organization-title"
+                />
+              </label>
+            </div>
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="label">Directory status</dt>
+                <dd className="capitalize text-ink-700">{user.employee?.status ?? "active"}</dd>
+              </div>
+              <div>
+                <dt className="label">Joined</dt>
+                <dd className="text-ink-700">{formatDate(user.employee?.joinedAt ?? null)}</dd>
+              </div>
+            </dl>
+            <p className="text-2xs text-ink-500">
+              These fields appear on your{" "}
+              <Link href={`/employees/${user.developerId}`} className="text-brand-600 hover:text-brand-700">
+                employee profile
+              </Link>
+              . Status and join date are managed by your organisation.
+            </p>
+          </>
+        ) : (
+          <Callout tone="info" title="Directory profile">
+            Team and job title apply only to monitored developer accounts. Your role ({ROLE_LABEL[user.role]}) is
+            not linked to an employee record, so you can update name, email, and photo here.
+          </Callout>
+        )}
         <label className="block max-w-md">
           <span className="label mb-1 block">Display timezone</span>
           <TimezoneSelect />

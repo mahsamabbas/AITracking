@@ -9,7 +9,7 @@ import { connectorBase } from "./techlio-connector-port.mjs";
 const res = await fetch(`${connectorBase()}/hooks/ci-gate`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ status: "succeeded" }),
+  body: JSON.stringify({ status: "succeeded", cwd: process.cwd() }),
 }).catch(() => null);
 
 if (!res?.ok) {

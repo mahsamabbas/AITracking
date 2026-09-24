@@ -12,8 +12,44 @@ export const RANGE_PRESETS: { id: RangePreset; label: string }[] = [
 
 const DAY = 86_400_000;
 
-function startOfDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+/** Milliseconds `timeZone` is ahead of UTC at instant `t`. */
+function zoneOffsetMs(t: number, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(new Date(t))
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return asUtc - Math.floor(t / 1000) * 1000;
+}
+
+/**
+ * Midnight of `d`'s calendar day in `timeZone` (UTC when omitted), so "Today"
+ * matches the day keys every chart groups by.
+ */
+function startOfDay(d: Date, timeZone?: string): Date {
+  if (!timeZone || timeZone === "UTC") {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
+  try {
+    const local = new Intl.DateTimeFormat("en-CA", { timeZone }).format(d); // YYYY-MM-DD
+    const [y, m, day] = local.split("-").map(Number);
+    const guess = Date.UTC(y, m - 1, day);
+    // Two passes handle DST transitions around midnight.
+    const first = guess - zoneOffsetMs(guess, timeZone);
+    return new Date(guess - zoneOffsetMs(first, timeZone));
+  } catch {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
 }
 
 /**
@@ -25,6 +61,8 @@ export function resolveRange(input: {
   from?: string;
   to?: string;
   now?: Date;
+  /** Organisation / viewer timezone: day presets start at its midnight. */
+  timeZone?: string;
 }): { range: DateRange; preset: RangePreset } {
   const now = input.now ?? new Date();
 
@@ -36,7 +74,7 @@ export function resolveRange(input: {
     }
   }
 
-  const today = startOfDay(now);
+  const today = startOfDay(now, input.timeZone);
   switch (input.preset) {
     case "today":
       return { range: { from: today, to: new Date(today.getTime() + DAY) }, preset: "today" };

@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ActivityFeed } from "@/components/domain/ActivityFeed";
+import { VerifyShipCard } from "@/components/domain/VerifyShipCard";
+import { ChangeTrendChart } from "@/components/charts/ChangeTrendChart";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import {
@@ -294,40 +296,6 @@ export default function OverviewPage() {
             />
           </section>
 
-          {/* ---------------- Tools + patterns ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card>
-              <CardHeader title="AI tools in use" subtitle="By agent active time" />
-              <CardBody>
-                <BarList items={toolItems} />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title={SESSION_MIX.title}
-                subtitle={SESSION_MIX.subtitle}
-              />
-              <CardBody>
-                <DonutChart
-                  data={classificationSlices}
-                  centerValue={formatNumber(t!.sessions)}
-                  centerLabel="sessions"
-                />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Working-hour pattern"
-                subtitle="When agent activity happens (org timezone)"
-              />
-              <CardBody className="pt-2">
-                <HourPatternChart data={d!.hourPattern} />
-              </CardBody>
-            </Card>
-          </section>
-
           {/* ---------------- Trend + split ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
@@ -381,6 +349,61 @@ export default function OverviewPage() {
           </section>
 
           {/* ---------------- Teams & outcomes ---------------- */}
+          {/* ---------------- File changes, commits, Verify & ship ---------------- */}
+          {d!.changeTrend || d!.commits ? (
+            <section className="mt-5 grid gap-4 xl:grid-cols-2">
+              {d!.changeTrend ? (
+                <Card>
+                  <CardHeader
+                    title="File changes & commits"
+                    subtitle="Agent file edits and commits per day, from the same tracked events"
+                  />
+                  <CardBody>
+                    <ChangeTrendChart
+                      data={d!.changeTrend}
+                      aiUsageByDay={d!.dailyTrend.map((p) => ({ date: p.date, activeMs: p.activeMs }))}
+                    />
+                  </CardBody>
+                </Card>
+              ) : null}
+              {d!.commits ? <VerifyShipCard commits={d!.commits} showPerson={!isSelfScope} /> : null}
+            </section>
+          ) : null}
+
+          {/* ---------------- Tools + patterns ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card>
+              <CardHeader title="AI tools in use" subtitle="By agent active time" />
+              <CardBody>
+                <BarList items={toolItems} />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title={SESSION_MIX.title}
+                subtitle={SESSION_MIX.subtitle}
+              />
+              <CardBody>
+                <DonutChart
+                  data={classificationSlices}
+                  centerValue={formatNumber(t!.sessions)}
+                  centerLabel="sessions"
+                />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Working-hour pattern"
+                subtitle="When agent activity happens (org timezone)"
+              />
+              <CardBody className="pt-2">
+                <HourPatternChart data={d!.hourPattern} />
+              </CardBody>
+            </Card>
+          </section>
+
           <section className="mt-5 grid gap-4 xl:grid-cols-2">
             {canViewTeam(user?.role) ? (
               <Card>

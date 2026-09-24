@@ -201,6 +201,7 @@ export const ACTIVITY_TYPE: Record<string, { label: string; color: string }> = {
   file_change: { label: "File changes", color: "var(--chart-5)" },
   session: { label: "Session lifecycle", color: "var(--chart-6)" },
   coverage: { label: "Coverage signals", color: "var(--chart-4)" },
+  commit: { label: "Commits", color: "var(--chart-4)" },
   connector: { label: "Connector health", color: "var(--chart-idle)" },
 };
 
@@ -211,6 +212,7 @@ export const ACTIVITY_TYPE_ORDER = [
   "file_change",
   "session",
   "coverage",
+  "commit",
   "connector",
 ];
 
@@ -225,7 +227,13 @@ export const TOOL_CATEGORY_LABEL: Record<string, string> = {
   other: "Other",
 };
 
+const EVENT_LABELS: Record<string, string> = {
+  commit_created: "Commit",
+  commit_pushed: "Shipped (pushed)",
+};
+
 export function eventLabel(type: string): string {
+  if (EVENT_LABELS[type]) return EVENT_LABELS[type];
   return type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 

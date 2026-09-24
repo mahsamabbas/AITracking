@@ -31,6 +31,10 @@ export const EventTypes = {
   file_created: "file_created",
   file_modified: "file_modified",
   file_deleted: "file_deleted",
+  /** A local git commit by this computer's git user in a repo an agent worked in. */
+  commit_created: "commit_created",
+  /** That commit reached the remote (it is on a remote-tracking branch). */
+  commit_pushed: "commit_pushed",
   hour_opened: "hour_opened",
   hour_finalized: "hour_finalized",
   hour_recalculated: "hour_recalculated",

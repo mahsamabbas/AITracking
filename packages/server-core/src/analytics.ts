@@ -801,6 +801,10 @@ export interface OrganizationAnalytics {
   previousTotals: ActivityTotals;
   headcount: { total: number; active: number; connected: number };
   dailyTrend: TrendPoint[];
+  /** Agent file changes + commits per day (same day keys as dailyTrend). */
+  changeTrend: ChangeTrendPoint[];
+  /** Commit → Verified → Shipped for the range. */
+  commits: CommitSummary;
   tools: ToolUsage[];
   hourPattern: HourPattern[];
   weekdayPattern: WeekdayPattern[];
@@ -839,6 +843,8 @@ export async function organizationAnalytics(input: {
     coverage,
     headcountRes,
     teamRes,
+    changeTrend,
+    commits,
   ] = await Promise.all([
     activityTotals(scope, input.range),
     activityTotals(scope, prev),
@@ -857,6 +863,8 @@ export async function organizationAnalytics(input: {
              )::int AS connected
       FROM employees e
       WHERE e.organization_id = ${input.organizationId} AND e.status = 'active'
+        ${input.team ? sql`AND e.team = ${input.team}` : sql``}
+        ${input.developerIds?.length ? sql`AND e.id IN (${sql.join(input.developerIds.map((id) => sql`${id}`), sql`, `)})` : sql``}
     `),
     db.execute<{ team: string; active_ms: string; sessions: number; employees: number }>(sql`
       SELECT COALESCE(e.team, 'Unassigned') AS team,
@@ -869,6 +877,8 @@ export async function organizationAnalytics(input: {
       GROUP BY COALESCE(e.team, 'Unassigned')
       ORDER BY active_ms DESC
     `),
+    fileChangeTrend(scope, input.range),
+    commitSummary(scope, input.range),
   ]);
 
   return {
@@ -893,6 +903,8 @@ export async function organizationAnalytics(input: {
       sessions: r.sessions,
       employees: r.employees,
     })),
+    changeTrend,
+    commits,
   };
 }
 
@@ -1145,28 +1157,198 @@ export async function workspaceFileChanges(
 }
 
 /** Daily file-change counts. This is agent file activity, not git commits. */
-export async function fileChangeTrend(
-  f: ScopeFilters,
-  range: DateRange,
-): Promise<{ date: string; fileChanges: number }[]> {
-  const tz = await scopeTimezone(f);
-  const res = await db.execute<{ day: string; file_changes: number }>(sql`
-    SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
-           COUNT(*)::int AS file_changes
-    FROM activity_events e
-    WHERE ${eventScope(f, range)}
-    GROUP BY day
-    ORDER BY day ASC
-  `);
-  const byDay = new Map(res.rows.map((r) => [r.day, r.file_changes]));
-  const out: { date: string; fileChanges: number }[] = [];
-  const cursor = new Date(range.from);
-  const dayMs = 86_400_000;
-  const spanDays = Math.max(1, Math.ceil((range.to.getTime() - range.from.getTime()) / dayMs));
-  for (let i = 0; i < spanDays; i++) {
-    const day = cursor.toISOString().slice(0, 10);
-    out.push({ date: day, fileChanges: byDay.get(day) ?? 0 });
-    cursor.setTime(cursor.getTime() + dayMs);
+/** Calendar days covered by `range`, as YYYY-MM-DD in `tz` (same keys SQL groups by). */
+function dayKeysInRange(range: DateRange, tz: string): string[] {
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz });
+  const keys: string[] = [];
+  for (let t = range.from.getTime(); t < range.to.getTime(); t += 3_600_000) {
+    const key = fmt.format(new Date(t));
+    if (keys[keys.length - 1] !== key) keys.push(key);
   }
-  return out;
+  return keys.length ? keys : [fmt.format(range.from)];
+}
+
+export interface ChangeTrendPoint {
+  date: string;
+  /** Agent-reported file changes that day. */
+  fileChanges: number;
+  /** Commits made that day by the person/people in scope (counts only). */
+  commits: number;
+  /** Of those commits, how many had a passing check first / reached the remote. */
+  verifiedCommits: number;
+  shippedCommits: number;
+  /** Files changed across those commits (git numstat). */
+  committedFiles: number;
+}
+
+/**
+ * Daily agent file changes and commits from the same event table, bucketed by
+ * the same timezone day keys, so the chart, the KPIs, and the activity feed
+ * always agree. Commits are omitted on provider-scoped views (a commit is not
+ * attributable to one AI tool).
+ */
+export async function fileChangeTrend(f: ScopeFilters, range: DateRange): Promise<ChangeTrendPoint[]> {
+  const tz = await scopeTimezone(f);
+  const [files, commits] = await Promise.all([
+    db.execute<{ day: string; file_changes: number }>(sql`
+      SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+             COUNT(*)::int AS file_changes
+      FROM activity_events e
+      WHERE ${eventScope(f, range)}
+      GROUP BY day
+    `),
+    f.provider
+      ? Promise.resolve({ rows: [] as CommitDayRow[] })
+      : db.execute<CommitDayRow>(sql`
+          SELECT to_char((c.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+                 COUNT(*)::int AS commits,
+                 COUNT(*) FILTER (WHERE (c.payload->'metadata'->>'verified')::boolean)::int AS verified,
+                 COUNT(p.event_id)::int AS shipped,
+                 COALESCE(SUM((c.payload->'metadata'->>'files_changed')::int), 0)::int AS files
+          FROM activity_events c
+          LEFT JOIN LATERAL (
+            SELECT x.event_id FROM activity_events x
+            WHERE x.organization_id = c.organization_id AND x.developer_id = c.developer_id
+              AND x.event_type = 'commit_pushed'
+              AND x.payload->'metadata'->>'commit_ref' = c.payload->'metadata'->>'commit_ref'
+            LIMIT 1
+          ) p ON TRUE
+          WHERE ${commitScope(f, range)}
+          GROUP BY day
+        `),
+  ]);
+  const fileByDay = new Map(files.rows.map((r) => [r.day, r.file_changes]));
+  const commitByDay = new Map(commits.rows.map((r) => [r.day, r]));
+  return dayKeysInRange(range, tz).map((day) => {
+    const c = commitByDay.get(day);
+    return {
+      date: day,
+      fileChanges: fileByDay.get(day) ?? 0,
+      commits: c?.commits ?? 0,
+      verifiedCommits: c?.verified ?? 0,
+      shippedCommits: c?.shipped ?? 0,
+      committedFiles: c?.files ?? 0,
+    };
+  });
+}
+
+type CommitDayRow = Record<string, unknown> & {
+  day: string;
+  commits: number;
+  verified: number;
+  shipped: number;
+  files: number;
+};
+
+function commitScope(f: ScopeFilters, range: DateRange) {
+  const parts = [
+    sql`c.organization_id = ${f.organizationId}`,
+    sql`c.event_type = 'commit_created'`,
+    sql`c.occurred_at >= ${range.from}`,
+    sql`c.occurred_at < ${range.to}`,
+  ];
+  if (f.developerId) parts.push(sql`c.developer_id = ${f.developerId}`);
+  if (f.developerIds?.length) {
+    parts.push(sql`c.developer_id IN (${sql.join(f.developerIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
+  if (f.team) {
+    parts.push(
+      sql`c.developer_id IN (SELECT id FROM employees WHERE organization_id = ${f.organizationId} AND team = ${f.team})`,
+    );
+  }
+  return sql.join(parts, sql` AND `);
+}
+
+export interface CommitSummary {
+  commits: number;
+  verified: number;
+  shipped: number;
+  filesChanged: number;
+  linesAdded: number;
+  linesDeleted: number;
+  repos: { name: string; commits: number; shipped: number }[];
+  recent: {
+    ref: string;
+    occurredAt: string;
+    repo: string | null;
+    filesChanged: number;
+    linesAdded: number;
+    linesDeleted: number;
+    verified: boolean;
+    shippedAt: string | null;
+    developerId: string;
+    developerName: string | null;
+  }[];
+}
+
+/**
+ * Commit → Verified → Shipped for the scope and range (commit time in range;
+ * shipped = a matching commit_pushed exists, whenever it happened).
+ */
+export async function commitSummary(f: ScopeFilters, range: DateRange): Promise<CommitSummary> {
+  if (f.provider) {
+    return { commits: 0, verified: 0, shipped: 0, filesChanged: 0, linesAdded: 0, linesDeleted: 0, repos: [], recent: [] };
+  }
+  const res = await db.execute<{
+    ref: string;
+    occurred_at: Date;
+    repo: string | null;
+    files: number | null;
+    added: number | null;
+    deleted: number | null;
+    verified: boolean | null;
+    shipped_at: Date | null;
+    developer_id: string;
+    display_name: string | null;
+  }>(sql`
+    SELECT c.payload->'metadata'->>'commit_ref' AS ref, c.occurred_at,
+           c.payload->'metadata'->>'path_category' AS repo,
+           (c.payload->'metadata'->>'files_changed')::int AS files,
+           (c.payload->'metadata'->>'lines_added')::int AS added,
+           (c.payload->'metadata'->>'lines_deleted')::int AS deleted,
+           (c.payload->'metadata'->>'verified')::boolean AS verified,
+           p.occurred_at AS shipped_at, c.developer_id, emp.display_name
+    FROM activity_events c
+    LEFT JOIN employees emp ON emp.id = c.developer_id
+    LEFT JOIN LATERAL (
+      SELECT x.occurred_at FROM activity_events x
+      WHERE x.organization_id = c.organization_id AND x.developer_id = c.developer_id
+        AND x.event_type = 'commit_pushed'
+        AND x.payload->'metadata'->>'commit_ref' = c.payload->'metadata'->>'commit_ref'
+      ORDER BY x.occurred_at LIMIT 1
+    ) p ON TRUE
+    WHERE ${commitScope(f, range)}
+    ORDER BY c.occurred_at DESC
+    LIMIT 500
+  `);
+  const rows = res.rows;
+  const repos = new Map<string, { name: string; commits: number; shipped: number }>();
+  for (const r of rows) {
+    const name = r.repo ?? "Unknown repository";
+    const entry = repos.get(name) ?? { name, commits: 0, shipped: 0 };
+    entry.commits++;
+    if (r.shipped_at) entry.shipped++;
+    repos.set(name, entry);
+  }
+  return {
+    commits: rows.length,
+    verified: rows.filter((r) => r.verified).length,
+    shipped: rows.filter((r) => r.shipped_at).length,
+    filesChanged: rows.reduce((s, r) => s + (r.files ?? 0), 0),
+    linesAdded: rows.reduce((s, r) => s + (r.added ?? 0), 0),
+    linesDeleted: rows.reduce((s, r) => s + (r.deleted ?? 0), 0),
+    repos: [...repos.values()].sort((a, b) => b.commits - a.commits).slice(0, 10),
+    recent: rows.slice(0, 25).map((r) => ({
+      ref: r.ref,
+      occurredAt: new Date(r.occurred_at).toISOString(),
+      repo: r.repo,
+      filesChanged: r.files ?? 0,
+      linesAdded: r.added ?? 0,
+      linesDeleted: r.deleted ?? 0,
+      verified: Boolean(r.verified),
+      shippedAt: r.shipped_at ? new Date(r.shipped_at).toISOString() : null,
+      developerId: r.developer_id,
+      developerName: r.display_name,
+    })),
+  };
 }

@@ -405,10 +405,16 @@ export async function getSessionDetail(
         .orderBy(asc(activityEvents.occurredAt))
         .limit(500),
       session.projectId
-        ? db.select().from(projects).where(eq(projects.id, session.projectId))
+        ? db
+            .select()
+            .from(projects)
+            .where(and(eq(projects.id, session.projectId), eq(projects.organizationId, organizationId)))
         : Promise.resolve([]),
       session.workItemId
-        ? db.select().from(workItems).where(eq(workItems.id, session.workItemId))
+        ? db
+            .select()
+            .from(workItems)
+            .where(and(eq(workItems.id, session.workItemId), eq(workItems.organizationId, organizationId)))
         : Promise.resolve([]),
       db
         .select({ id: agentSessions.id })

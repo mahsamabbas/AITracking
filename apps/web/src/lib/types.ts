@@ -95,7 +95,41 @@ export interface CoverageSummary {
   employeesWithoutTelemetry: number;
 }
 
+/** Daily agent file changes and commits (same day keys as the usage trend). */
+export interface ChangeTrendPoint {
+  date: string;
+  fileChanges: number;
+  commits?: number;
+  verifiedCommits?: number;
+  shippedCommits?: number;
+  committedFiles?: number;
+}
+
+export interface CommitSummary {
+  commits: number;
+  verified: number;
+  shipped: number;
+  filesChanged: number;
+  linesAdded: number;
+  linesDeleted: number;
+  repos: { name: string; commits: number; shipped: number }[];
+  recent: {
+    ref: string;
+    occurredAt: string;
+    repo: string | null;
+    filesChanged: number;
+    linesAdded: number;
+    linesDeleted: number;
+    verified: boolean;
+    shippedAt: string | null;
+    developerId: string;
+    developerName: string | null;
+  }[];
+}
+
 export interface OrganizationAnalytics {
+  changeTrend?: ChangeTrendPoint[];
+  commits?: CommitSummary;
   preset: string;
   range: { from: string; to: string };
   totals: Totals;
@@ -238,7 +272,9 @@ export interface EmployeeAnalytics {
     sessions: number;
     activeMs: number;
   }[];
-  fileChangeTrend: { date: string; fileChanges: number }[];
+  fileChangeTrend: ChangeTrendPoint[];
+  /** Commit → Verified → Shipped (null when unavailable). */
+  commits?: CommitSummary | null;
   aiSubscriptions?: EmployeeAiSubscription[];
   idlePeriods: IdlePeriod[];
   recentSessions: SessionRow[];

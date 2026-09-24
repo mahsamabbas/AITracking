@@ -26,9 +26,11 @@ import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge } from "@/components/domain/Badges";
 import { EmployeeProfileCard } from "@/components/domain/EmployeeProfileCard";
+import { DeleteEmployeePanel } from "@/components/domain/DeleteEmployeePanel";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
+import { VerifyShipCard } from "@/components/domain/VerifyShipCard";
 import { EmployeeAiPlanUsage } from "@/components/domain/EmployeeAiPlanUsage";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
@@ -50,7 +52,7 @@ import {
   SESSION_MIX,
   TOOL_CATEGORY_LABEL,
 } from "@/lib/vocab";
-import { canViewTeam } from "@/lib/permissions";
+import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
@@ -407,6 +409,12 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
+          {/* ---------------- Commit → Verified → Shipped ---------------- */}
+          {d.commits ? (
+            <section className="mt-5">
+              <VerifyShipCard commits={d.commits} />
+            </section>
+          ) : null}
 
           {/* ---------------- AI subscription usage ---------------- */}
           <section className="mt-5">
@@ -501,6 +509,12 @@ export default function EmployeeDetailPage() {
 
             <ActivityFeed range={range} developerId={employeeId} />
           </section>
+
+          {canManageUsers(user?.role) && !isSelf && d ? (
+            <section className="mt-8">
+              <DeleteEmployeePanel employeeId={employeeId} displayName={d.employee.displayName} />
+            </section>
+          ) : null}
         </>
       )}
     </AppShell>

@@ -1,7 +1,7 @@
 import { organizationDisabled } from "./platform.js";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { db } from "./db.js";
+import { db, pool } from "./db.js";
 import { portalUsers, auditLog, employees } from "./schema.js";
 import { ORG_ASSIGNABLE_ROLES, type OrgAssignableRole, type Role } from "./roles.js";
 import { devAffordancesEnabled } from "./runtime.js";
@@ -88,6 +88,13 @@ export function verifyPassword(password: string, stored: string): { ok: boolean;
   return { ok: false, legacy: false }; // disabled sentinel or unknown format
 }
 
+export type PortalEmployeeDirectory = {
+  team: string | null;
+  title: string | null;
+  status: string;
+  joinedAt: string | null;
+};
+
 export type PortalUserPublic = {
   id: string;
   email: string;
@@ -96,19 +103,22 @@ export type PortalUserPublic = {
   organizationId: string;
   developerId: string | null;
   avatarUrl: string | null;
+  /** Present when this sign-in account is linked to a monitored employee row. */
+  employee: PortalEmployeeDirectory | null;
 };
 
 export async function seedPortalUsers(): Promise<void> {
   if (!devAffordancesEnabled()) return;
   try {
     for (const u of DEMO_USERS) {
+      const hash = hashPassword(u.password);
       await db
         .insert(portalUsers)
         .values({
           id: u.id,
           organizationId: DEV_ORG,
           email: u.email,
-          passwordHash: hashPassword(u.password),
+          passwordHash: hash,
           displayName: u.displayName,
           role: u.role,
           developerId: u.developerId ?? null,
@@ -116,8 +126,21 @@ export async function seedPortalUsers(): Promise<void> {
         // Dev only: restores demo passwords that migration 008 disabled.
         .onConflictDoUpdate({
           target: portalUsers.email,
-          set: { passwordHash: hashPassword(u.password) },
+          set: {
+            passwordHash: hash,
+            displayName: u.displayName,
+            role: u.role,
+            developerId: u.developerId ?? null,
+            organizationId: DEV_ORG,
+          },
         });
+    }
+    // Migration 008 sets `!disabled-default-credential` — refresh any demo row left disabled.
+    for (const u of DEMO_USERS) {
+      await db
+        .update(portalUsers)
+        .set({ passwordHash: hashPassword(u.password) })
+        .where(eq(portalUsers.email, u.email));
     }
   } catch {
     /* table may not exist until migration 004 */
@@ -162,7 +185,7 @@ export async function authenticatePortalUser(
         /* directory row is best-effort so login still succeeds */
       }
     }
-    return toPublic(row);
+    return attachEmployeeDirectory(toPublic(row));
   }
 
   // No hardcoded-credential fallback: a user exists in portal_users or does
@@ -170,7 +193,7 @@ export async function authenticatePortalUser(
   return null;
 }
 
-function toPublic(row: typeof portalUsers.$inferSelect): PortalUserPublic {
+function toPublic(row: typeof portalUsers.$inferSelect): Omit<PortalUserPublic, "employee"> {
   return {
     id: row.id,
     email: row.email,
@@ -182,14 +205,48 @@ function toPublic(row: typeof portalUsers.$inferSelect): PortalUserPublic {
   };
 }
 
+async function attachEmployeeDirectory(
+  base: Omit<PortalUserPublic, "employee">,
+): Promise<PortalUserPublic> {
+  if (!base.developerId) return { ...base, employee: null };
+  const rows = await db
+    .select({
+      team: employees.team,
+      title: employees.title,
+      status: employees.status,
+      joinedAt: employees.joinedAt,
+    })
+    .from(employees)
+    .where(eq(employees.id, base.developerId))
+    .limit(1);
+  const e = rows[0];
+  if (!e) return { ...base, employee: null };
+  return {
+    ...base,
+    employee: {
+      team: e.team ?? null,
+      title: e.title ?? null,
+      status: e.status,
+      joinedAt: e.joinedAt ? e.joinedAt.toISOString() : null,
+    },
+  };
+}
+
 export async function getPortalUserById(id: string): Promise<PortalUserPublic | null> {
   const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, id)).limit(1);
-  return rows[0] ? toPublic(rows[0]) : null;
+  if (!rows[0]) return null;
+  return attachEmployeeDirectory(toPublic(rows[0]));
 }
 
 export async function updatePortalProfile(
   userId: string,
-  input: { email?: string; displayName?: string; avatarUrl?: string | null },
+  input: {
+    email?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+    team?: string | null;
+    title?: string | null;
+  },
 ): Promise<PortalUserPublic> {
   const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, userId)).limit(1);
   const row = rows[0];
@@ -201,6 +258,17 @@ export async function updatePortalProfile(
   if (nextName !== undefined && (nextName.length < 1 || nextName.length > 120)) {
     throw new Error("invalid_name");
   }
+
+  const normOptional = (v: string | null | undefined): string | null | undefined => {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    const t = v.trim();
+    return t.length ? t.slice(0, 120) : null;
+  };
+  const nextTeam = normOptional(input.team);
+  const nextTitle = normOptional(input.title);
+  if (nextTeam !== undefined && nextTeam && nextTeam.length > 120) throw new Error("invalid_team");
+  if (nextTitle !== undefined && nextTitle && nextTitle.length > 120) throw new Error("invalid_title");
 
   if (nextEmail && nextEmail !== row.email) {
     const used = await db
@@ -230,6 +298,19 @@ export async function updatePortalProfile(
       .where(eq(employees.id, row.developerId));
   }
 
+  if (
+    row.developerId &&
+    (nextTeam !== undefined || nextTitle !== undefined)
+  ) {
+    await db
+      .update(employees)
+      .set({
+        ...(nextTeam !== undefined ? { team: nextTeam } : {}),
+        ...(nextTitle !== undefined ? { title: nextTitle } : {}),
+      })
+      .where(eq(employees.id, row.developerId));
+  }
+
   await db.insert(auditLog).values({
     organizationId: row.organizationId,
     actorId: userId,
@@ -238,6 +319,8 @@ export async function updatePortalProfile(
       email: nextEmail !== undefined,
       displayName: nextName !== undefined,
       avatar: input.avatarUrl !== undefined,
+      team: nextTeam !== undefined,
+      title: nextTitle !== undefined,
     },
     createdAt: new Date(),
   });
@@ -278,7 +361,7 @@ export async function listPortalUsers(
     .select()
     .from(portalUsers)
     .where(eq(portalUsers.organizationId, organizationId));
-  return rows.map(toPublic);
+  return Promise.all(rows.map((r) => attachEmployeeDirectory(toPublic(r))));
 }
 
 export async function createPortalUser(input: {
@@ -323,7 +406,7 @@ export async function createPortalUser(input: {
     detail: { email, role: input.role },
     createdAt: new Date(),
   });
-  return {
+  return attachEmployeeDirectory({
     id,
     email,
     displayName: input.displayName.trim(),
@@ -331,7 +414,7 @@ export async function createPortalUser(input: {
     organizationId: input.organizationId,
     developerId,
     avatarUrl: null,
-  };
+  });
 }
 
 /** Directory row the analytics screens join on. Login alone is not enough. */
@@ -405,4 +488,139 @@ export function getOrgPolicySync() {
       "summary_failed",
     ],
   };
+}
+
+export interface EmployeeDeleteSummary {
+  employeeId: string;
+  displayName: string;
+  portalUsersRemoved: number;
+  devicesRemoved: number;
+  sessionsRemoved: number;
+  contextVersionsRemoved: number;
+  eventsRemoved: number;
+  hourlySnapshotsRemoved: number;
+  providerIdentitiesRemoved: number;
+}
+
+/** Permanently removes a monitored person and all telemetry for their developer_id. */
+export async function deleteEmployeeWithData(input: {
+  organizationId: string;
+  employeeId: string;
+  actorId: string;
+}): Promise<EmployeeDeleteSummary> {
+  const { organizationId, employeeId, actorId } = input;
+
+  const row = await db.execute<{ display_name: string }>(sql`
+    SELECT display_name FROM employees
+    WHERE id = ${employeeId} AND organization_id = ${organizationId}
+    LIMIT 1
+  `);
+  const displayName = row.rows[0]?.display_name;
+  if (!displayName) throw new Error("employee_not_found");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const ctx = await client.query(
+      `DELETE FROM session_context_versions
+       WHERE organization_id = $1
+         AND session_id IN (
+           SELECT id FROM agent_sessions
+           WHERE organization_id = $1 AND developer_id = $2
+         )`,
+      [organizationId, employeeId],
+    );
+
+    const sessions = await client.query(
+      `DELETE FROM agent_sessions
+       WHERE organization_id = $1 AND developer_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    const events = await client.query(
+      `DELETE FROM activity_events
+       WHERE organization_id = $1 AND developer_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    const hourly = await client.query(
+      `DELETE FROM hourly_snapshots
+       WHERE organization_id = $1 AND developer_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    await client.query(
+      `DELETE FROM connector_health
+       WHERE organization_id = $1
+         AND device_id IN (
+           SELECT id FROM devices WHERE organization_id = $1 AND developer_id = $2
+         )`,
+      [organizationId, employeeId],
+    );
+
+    const devices = await client.query(
+      `DELETE FROM devices WHERE organization_id = $1 AND developer_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    const identities = await client.query(
+      `DELETE FROM employee_provider_identities
+       WHERE organization_id = $1 AND employee_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    const portalUsersRemoved = await client.query(
+      `DELETE FROM portal_users
+       WHERE organization_id = $1 AND developer_id = $2`,
+      [organizationId, employeeId],
+    );
+
+    const emp = await client.query(
+      `DELETE FROM employees WHERE organization_id = $1 AND id = $2`,
+      [organizationId, employeeId],
+    );
+
+    if ((emp.rowCount ?? 0) < 1) {
+      throw new Error("employee_not_found");
+    }
+
+    await client.query(
+      `INSERT INTO audit_log (organization_id, actor_id, action, detail, created_at)
+       VALUES ($1, $2, $3, $4::jsonb, NOW())`,
+      [
+        organizationId,
+        actorId,
+        "employees.delete",
+        JSON.stringify({
+          employeeId,
+          displayName,
+          portalUsersRemoved: portalUsersRemoved.rowCount ?? 0,
+          devicesRemoved: devices.rowCount ?? 0,
+          sessionsRemoved: sessions.rowCount ?? 0,
+          eventsRemoved: events.rowCount ?? 0,
+          hourlySnapshotsRemoved: hourly.rowCount ?? 0,
+        }),
+      ],
+    );
+
+    await client.query("COMMIT");
+
+    return {
+      employeeId,
+      displayName,
+      portalUsersRemoved: portalUsersRemoved.rowCount ?? 0,
+      devicesRemoved: devices.rowCount ?? 0,
+      sessionsRemoved: sessions.rowCount ?? 0,
+      contextVersionsRemoved: ctx.rowCount ?? 0,
+      eventsRemoved: events.rowCount ?? 0,
+      hourlySnapshotsRemoved: hourly.rowCount ?? 0,
+      providerIdentitiesRemoved: identities.rowCount ?? 0,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }

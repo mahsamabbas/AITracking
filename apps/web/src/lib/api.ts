@@ -77,8 +77,12 @@ export async function apiPatch<T>(path: string, token: string | null, body?: unk
   return apiSend<T>("PATCH", path, token, body);
 }
 
+export async function apiDelete<T>(path: string, token: string | null): Promise<T> {
+  return apiSend<T>("DELETE", path, token);
+}
+
 async function apiSend<T>(
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "DELETE",
   path: string,
   token: string | null,
   body?: unknown,
@@ -86,11 +90,10 @@ async function apiSend<T>(
   const r = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(method !== "DELETE" ? { "Content-Type": "application/json" } : {}),
       ...authHeaders(token),
     },
-    // Fastify rejects Content-Type: application/json with an empty body.
-    body: JSON.stringify(body ?? {}),
+    body: method === "DELETE" ? undefined : JSON.stringify(body ?? {}),
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {

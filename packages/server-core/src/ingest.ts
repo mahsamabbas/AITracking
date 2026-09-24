@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ActivityEventSchema, type ActivityEvent } from "@techlio/event-schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, auditLog, hourlySnapshots } from "./schema.js";
 import { scanEventForSecrets } from "./security.js";
@@ -267,6 +267,19 @@ export async function recordSessionContext(input: {
   developerId: string;
   deviceId: string;
 }): Promise<ActivityEvent> {
+  // A project / work item must belong to the same organisation (tenant isolation).
+  if (input.projectId) {
+    const p = await db.execute(
+      sql`SELECT 1 FROM projects WHERE id = ${input.projectId} AND organization_id = ${input.organizationId}`,
+    );
+    if (!p.rows.length) throw new Error("project_not_found");
+  }
+  if (input.workItemId) {
+    const w = await db.execute(
+      sql`SELECT 1 FROM work_items WHERE id = ${input.workItemId} AND organization_id = ${input.organizationId}`,
+    );
+    if (!w.rows.length) throw new Error("work_item_not_found");
+  }
   const event: ActivityEvent = {
     event_id: randomUUID(),
     schema_version: "1.0.0",

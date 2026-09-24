@@ -19,6 +19,10 @@ function metaSummary(e: ActivityEventRow): string | null {
     parts.push(`${Number(m.token_input).toLocaleString()} in / ${Number(m.token_output ?? 0).toLocaleString()} out tokens`);
   }
   if (m.gap_reason) parts.push(`reason: ${m.gap_reason}`);
+  if (e.event_type === "commit_created") {
+    parts.push(`${m.files_changed ?? 0} files · +${m.lines_added ?? 0} / −${m.lines_deleted ?? 0}`);
+    parts.push(m.verified ? "verified" : "no check before commit");
+  }
   return parts.length ? parts.join(" · ") : null;
 }
 

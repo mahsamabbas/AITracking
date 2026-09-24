@@ -160,3 +160,23 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - **Unprovided data removed, not placeholdered:** tokens/tests/builds/models/capability badges,
   leaderboard Tokens/Provider-requests columns, AI subscription card, project column appear
   only when some agent/provider reported them.
+
+## 2026-09-24 commits, Verify & ship, integrity pass
+
+- **Commit → Verified → Shipped:** the connector's git watcher (`apps/connector/src/git-watch.ts`)
+  watches repos the agents work in (hook `cwd`), reports each commit by the local git user as
+  `commit_created` (files changed, lines +/−, `verified` = a passing check — CI gate/pre-commit or
+  agent test/build tool — ran in that repo ≤30 min before) and `commit_pushed` when it appears on a
+  remote-tracking branch. Only counts + an opaque salted `commit_ref`; never hash, message, author,
+  or code. Deterministic event ids (no double counting). The husky post-commit hook now only
+  triggers an immediate scan (the old `build_completed/git_commit` signal is gone for new data).
+- **Analytics:** `commitSummary` + commits in `fileChangeTrend` (same events, same tz day keys);
+  `VerifyShipCard` (funnel + recent commits with state) on overview and employee hub; commits in
+  the File changes chart (bars) and the activity feed.
+- **Integrity fixes:** "Today"/day presets now start at the org/viewer local midnight (was UTC);
+  file-change trend day keys use the same timezone as its SQL grouping; overview headcount honours
+  the team filter; overview puts graphs first (usage trend → file changes & commits → tools).
+- **Tenant isolation:** project/work-item lookups and assignment validated against the org;
+  unused `/v1/stream/sse` (token in URL, no role check) removed; super-admin tenant view
+  (`X-Techlio-Org` header) verified: non-super-admins can never switch organisations.
+- **Schema:** EXPECTED_SCHEMA_MIGRATION = 014 (014 was added without bumping it).

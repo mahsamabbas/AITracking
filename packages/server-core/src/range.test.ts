@@ -36,4 +36,18 @@ describe("resolveRange", () => {
   it("falls back to the preset when from is not a valid date", () => {
     expect(resolveRange({ preset: "30d", from: "not-a-date", now: NOW }).preset).toBe("30d");
   });
+
+  it("starts 'today' at the organisation's local midnight", () => {
+    // 01:30 in Karachi (UTC+5) is still the previous day in UTC.
+    const now = new Date("2026-09-18T20:30:00.000Z"); // 2026-09-19 01:30 Asia/Karachi
+    const { range } = resolveRange({ preset: "today", now, timeZone: "Asia/Karachi" });
+    expect(range.from.toISOString()).toBe("2026-09-18T19:00:00.000Z");
+    expect(range.to.toISOString()).toBe("2026-09-19T19:00:00.000Z");
+  });
+
+  it("handles a zone behind UTC", () => {
+    const now = new Date("2026-09-18T02:00:00.000Z"); // 2026-09-17 19:00 in Los Angeles (UTC-7)
+    const { range } = resolveRange({ preset: "today", now, timeZone: "America/Los_Angeles" });
+    expect(range.from.toISOString()).toBe("2026-09-17T07:00:00.000Z");
+  });
 });

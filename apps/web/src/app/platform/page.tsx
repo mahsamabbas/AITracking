@@ -189,14 +189,14 @@ export default function PlatformPage() {
         ))}
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <Card className="xl:col-span-2 card-table">
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Card className="card-table order-2 lg:order-1 lg:col-span-2">
           <CardHeader
             title="Customer organisations"
             subtitle={`${formatNumber(filtered.length)} shown`}
             action={
               <input
-                className="field h-9 w-44 text-xs"
+                className="field h-9 w-full min-w-0 sm:w-44 text-xs"
                 placeholder="Search…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -210,8 +210,8 @@ export default function PlatformPage() {
           ) : filtered.length === 0 ? (
             <EmptyState compact title="No organisations yet" body="Create the first tenant on the right." />
           ) : (
-            <TableScroll>
-              <table className="tbl min-w-[820px]">
+            <TableScroll className="overflow-x-auto">
+              <table className="tbl min-w-[640px] w-full">
                 <thead>
                   <tr>
                     <th>Organisation</th>
@@ -225,46 +225,47 @@ export default function PlatformPage() {
                 <tbody>
                   {filtered.map((o) => (
                     <tr key={o.id}>
-                      <td>
-                        <div className="flex items-center gap-2">
+                      <td className="min-w-[140px] max-w-[220px]">
+                        <div className="flex min-w-0 items-center gap-2">
                           {o.logoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={o.logoUrl} alt="" className="h-8 w-8 rounded object-contain ring-1 ring-line" />
+                            <img src={o.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain ring-1 ring-line" />
                           ) : (
-                            <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-2xs text-ink-400 dark:bg-white/5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-2xs text-ink-400 dark:bg-white/5">
                               —
                             </span>
                           )}
-                          <div>
-                            <p className="text-sm font-medium text-ink-900">{o.name}</p>
-                            <p className="hint">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-ink-900">{o.name}</p>
+                            <p className="hint truncate">
                               {o.timezone} · {formatNumber(o.users)} accounts · {formatNumber(o.administrators)} admins
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="num text-right">{o.employees}</td>
-                      <td className="num text-right">{o.connectors}</td>
-                      <td className="text-sm text-ink-500">
+                      <td className="num whitespace-nowrap text-right">{o.employees}</td>
+                      <td className="num whitespace-nowrap text-right">{o.connectors}</td>
+                      <td className="whitespace-nowrap text-sm text-ink-500">
                         {o.lastActivityAt ? formatRelative(o.lastActivityAt) : "—"}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {o.disabled ? (
                           <span className="badge-bad">Disabled</span>
                         ) : (
                           <span className="badge-ok">Active</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap text-right">
+                      <td className="max-w-[min(100%,20rem)] text-right align-top">
+                        <div className="flex flex-wrap items-center justify-end gap-1 py-0.5">
                         <Link
                           href={`/platform/${o.id}/overview`}
-                          className="btn-primary h-8 px-3 text-xs"
+                          className="btn-primary h-8 shrink-0 px-2.5 text-2xs sm:px-3 sm:text-xs"
                         >
                           Open workspace
                         </Link>
                         <button
                           type="button"
-                          className="btn-ghost h-8 text-xs"
+                          className="btn-ghost h-8 shrink-0 px-2 text-2xs sm:text-xs"
                           disabled={busy || o.disabled}
                           onClick={() => {
                             setAdminFor(o);
@@ -273,7 +274,7 @@ export default function PlatformPage() {
                         >
                           Add admin
                         </button>
-                        <label className="btn-ghost h-8 cursor-pointer px-2 text-xs">
+                        <label className="btn-ghost h-8 shrink-0 cursor-pointer px-2 text-2xs sm:text-xs">
                           Logo
                           <input
                             type="file"
@@ -289,12 +290,13 @@ export default function PlatformPage() {
                         </label>
                         <button
                           type="button"
-                          className="btn-ghost h-8 text-xs"
+                          className="btn-ghost h-8 shrink-0 px-2 text-2xs sm:text-xs"
                           disabled={busy}
                           onClick={() => void toggle(o)}
                         >
                           {o.disabled ? "Enable" : "Disable"}
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -304,7 +306,7 @@ export default function PlatformPage() {
           )}
         </Card>
 
-        <Card>
+        <Card className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start">
           <CardHeader
             title={adminFor ? `Administrator · ${adminFor.name}` : "New organisation"}
             subtitle={

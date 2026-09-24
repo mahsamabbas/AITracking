@@ -41,6 +41,7 @@ export class AuthController {
         organizationId: user.organizationId,
         developerId: user.developerId ?? null,
         avatarUrl: user.avatarUrl ?? null,
+        employee: user.employee ?? null,
       },
       homePath,
     };

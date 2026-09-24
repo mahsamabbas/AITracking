@@ -31,6 +31,7 @@ import { loadOrCreateSigningKey, publicSigningKey } from "./signing.js";
 import { sanitizeEvent } from "./redaction.js";
 import { uploadBatch } from "./uploader.js";
 import { BASE_PORT, PORT_COUNT, choosePort, osUser, recordUserPort } from "./port.js";
+import { createGitWatcher } from "./git-watch.js";
 import { createServer } from "node:net";
 
 // Pause is the employee's choice and must survive restarts and reboots.
@@ -99,6 +100,11 @@ function describeEvent(event: ActivityEvent): string {
   if (event.event_type === "file_modified" || event.event_type === "file_created" || event.event_type === "file_deleted") {
     return `${who} · ${event.event_type.replace("file_", "file ")}${file}${where}`;
   }
+  if (event.event_type === "commit_created") {
+    const m = event.metadata ?? {};
+    return `commit${where} · ${m.files_changed ?? 0} files +${m.lines_added ?? 0}/-${m.lines_deleted ?? 0}${m.verified ? " · verified" : ""}`;
+  }
+  if (event.event_type === "commit_pushed") return `commit shipped (pushed)${where}`;
   if (event.event_type === "session_started") return `${who} · session started${where}`;
   if (event.event_type === "session_ended") return `${who} · session ended${where}`;
   if (event.event_type === "session_heartbeat") return `${who} · session still open${where}`;
@@ -168,6 +174,9 @@ const DEVICE_LEVEL_EVENTS = new Set<string>([
   "telemetry_gap_started",
   "telemetry_gap_ended",
   "upload_failed",
+  // Commits belong to a repo, not to an agent session.
+  "commit_created",
+  "commit_pushed",
 ]);
 
 function baseEvent(
@@ -318,6 +327,38 @@ function dashboardOriginAllowed(origin: string): boolean {
 }
 
 const app = Fastify({ logger: false });
+
+// Commit → Verified → Shipped for repos the agents work in (see git-watch.ts).
+const gitWatch = createGitWatcher({
+  stateDir: identityDir(),
+  isActive: () => Boolean(identity) && !paused,
+  emit: (signal) => {
+    const event = baseEvent(signal.type as ActivityEvent["event_type"], {
+      event_id: signal.eventId,
+      occurred_at: signal.occurredAt,
+      status: "succeeded",
+      metadata: {
+        commit_ref: signal.ref,
+        path_category: signal.repo,
+        tool_name: "git",
+        telemetry_source: "connector",
+        ...(signal.type === "commit_created"
+          ? {
+              files_changed: signal.filesChanged ?? 0,
+              lines_added: signal.linesAdded ?? 0,
+              lines_deleted: signal.linesDeleted ?? 0,
+              verified: signal.verified ?? false,
+            }
+          : {}),
+      },
+    });
+    const clean = event ? sanitizeEvent(event) : null;
+    if (!clean) return;
+    queue.enqueue([clean]);
+    note(describeEvent(clean));
+    void flushQueue();
+  },
+});
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
 
@@ -758,6 +799,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
     );
     return duration ? { ...event, duration_ms: duration } : event;
   });
+  void gitWatch.observe(payload.cwd);
   let clean = events
     .map(sanitizeEvent)
     .filter((event): event is NonNullable<typeof event> => event !== null);
@@ -787,6 +829,17 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
   for (const event of clean) noteProvider(event.provider, "hook");
   if (firstSighting) void postApiHeartbeat();
   if (!clean.length) return { accepted: 0, provider };
+  // A passing agent-run test or build marks the repo as verified for the next commit.
+  if (
+    clean.some(
+      (e) =>
+        e.event_type === "tool_completed" &&
+        e.status !== "failed" &&
+        (e.metadata?.tool_category === "test" || e.metadata?.tool_category === "build"),
+    )
+  ) {
+    void gitWatch.markCheck(payload.cwd);
+  }
   const fresh = clean.filter((event) => {
     // Same-provider repeat guard (e.g. native + Claude-format both under Cursor).
     const key = `${event.provider}:${event.session_id ?? ""}:${payload.tool_use_id ?? ""}:${actionKey(event)}`;
@@ -813,8 +866,9 @@ app.post("/hooks/agent", async (req) => {
  */
 app.post("/hooks/ci-gate", async (req) => {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
-  const body = (req.body ?? {}) as { status?: string };
+  const body = (req.body ?? {}) as { status?: string; cwd?: string };
   if (body.status === "failed") return { accepted: 0 };
+  void gitWatch.markCheck(typeof body.cwd === "string" ? body.cwd : undefined);
   const event = baseEvent(EventTypes.test_completed, {
     session_id: workflowSessionId(),
     status: "succeeded",
@@ -833,24 +887,14 @@ app.post("/hooks/ci-gate", async (req) => {
 /**
  * Local git post-commit hook. Allowlisted signal only — no commit message or hash.
  */
+/**
+ * Local git post-commit hook: scan that repo now. The commit is reported by
+ * the git watcher (counts only — no hash, message, or code), exactly once.
+ */
 app.post("/hooks/git-commit", async (req) => {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
-  const body = (req.body ?? {}) as { status?: string };
-  if (body.status === "failed") return { accepted: 0 };
-  const repo = contextLabel?.slice(0, 64);
-  const event = baseEvent(EventTypes.build_completed, {
-    session_id: workflowSessionId(),
-    status: "succeeded",
-    metadata: {
-      tool_name: "git_commit",
-      tool_category: "build",
-      telemetry_source: "connector",
-      ...(repo ? { path_category: repo } : {}),
-    },
-  });
-  const clean = event ? sanitizeEvent(event) : null;
-  if (!clean) return { accepted: 0 };
-  emitAgentEvent(clean);
+  const body = (req.body ?? {}) as { cwd?: string };
+  await gitWatch.scanNow(typeof body.cwd === "string" ? body.cwd : undefined);
   return { accepted: 1 };
 });
 
@@ -957,6 +1001,7 @@ void (async () => {
       }
       console.log(`Techlio connector is running at http://127.0.0.1:${port} for ${osUser()}`);
       closeStoppedGap();
+      gitWatch.start();
       const hooks = ensureAgentHooks();
       console.log("Dashboard pings are hidden. Agent events print below as they happen.");
       if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");

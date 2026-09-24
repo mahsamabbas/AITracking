@@ -12,6 +12,7 @@ export type ActivityType =
   | "file_change"
   | "session"
   | "coverage"
+  | "commit"
   | "connector";
 
 export const ACTIVITY_TYPES: ActivityType[] = [
@@ -21,6 +22,7 @@ export const ACTIVITY_TYPES: ActivityType[] = [
   "file_change",
   "session",
   "coverage",
+  "commit",
   "connector",
 ];
 
@@ -77,6 +79,7 @@ export function activityTypeOf(eventType: string): ActivityType {
     return "engineering_check";
   }
   if (eventType.startsWith("file_")) return "file_change";
+  if (eventType.startsWith("commit_")) return "commit";
   if (eventType.startsWith("session_") || eventType === "task_context_changed") {
     return "session";
   }

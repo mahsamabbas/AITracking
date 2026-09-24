@@ -4,7 +4,7 @@ import { ChangeTrendChart } from "@/components/charts/ChangeTrendChart";
 import { BarList } from "@/components/charts/BarList";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { formatDuration, formatNumber } from "@/lib/format";
-import type { Totals, TrendPoint } from "@/lib/types";
+import type { ChangeTrendPoint, Totals, TrendPoint } from "@/lib/types";
 
 export function ProjectsFileChangesCard({
   trend,
@@ -13,7 +13,7 @@ export function ProjectsFileChangesCard({
   totals,
   subtitle,
 }: {
-  trend: { date: string; fileChanges: number }[];
+  trend: ChangeTrendPoint[];
   workspaces: {
     name: string;
     fileChanges: number;
@@ -29,10 +29,10 @@ export function ProjectsFileChangesCard({
   return (
     <Card>
       <CardHeader
-        title="AI usage, workspaces & file changes"
+        title="File changes & commits"
         subtitle={
           subtitle ??
-          "Where the agent spent AI active time, which workspaces it edited, and daily file changes. This is not a git commit history."
+          "Agent file edits per day, commits made in the repos the agents work in, and AI active time — all from the same tracked events."
         }
       />
       {totals ? (
@@ -62,6 +62,12 @@ export function ProjectsFileChangesCard({
               <span className="h-2 w-4 rounded-sm bg-[var(--chart-2)]/40" aria-hidden />
               File changes
             </span>
+            {trend.some((d) => (d.commits ?? 0) > 0) ? (
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2.5 rounded-sm bg-[var(--chart-4)]/60" aria-hidden />
+                Commits
+              </span>
+            ) : null}
             {aiByDay ? (
               <span className="flex items-center gap-1.5">
                 <span

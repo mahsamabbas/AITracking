@@ -6,7 +6,6 @@ import { ConnectorsController } from "./connectors.controller.js";
 import { ProjectsController } from "./projects.controller.js";
 import { SessionsController } from "./sessions.controller.js";
 import { ExportsController } from "./exports.controller.js";
-import { StreamController } from "./stream.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
 import { OrgController } from "./org.controller.js";
 import { HealthController } from "./health.controller.js";
@@ -25,7 +24,6 @@ import { ProfileController } from "./profile.controller.js";
     ProjectsController,
     SessionsController,
     ExportsController,
-    StreamController,
     PlatformController,
     ProfileController,
   ],

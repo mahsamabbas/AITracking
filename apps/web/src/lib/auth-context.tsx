@@ -30,6 +30,12 @@ export interface PortalUser {
   organizationId: string;
   developerId?: string | null;
   avatarUrl?: string | null;
+  employee?: {
+    team: string | null;
+    title: string | null;
+    status: string;
+    joinedAt: string | null;
+  } | null;
 }
 
 interface AuthState {

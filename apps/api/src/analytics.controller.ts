@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   NotFoundException,
@@ -7,6 +8,7 @@ import {
   Query,
   Req,
   UseGuards,
+  BadRequestException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
@@ -47,7 +49,9 @@ import {
   weekdayPattern,
   workspaceFileChanges,
   fileChangeTrend,
+  commitSummary,
   employeeAiSubscriptions,
+  deleteEmployeeWithData,
   type AuthUser,
   type DateRange,
 } from "@techlio/server-core";
@@ -63,8 +67,17 @@ interface RangeQuery {
   to?: string;
 }
 
-function rangeFrom(q: RangeQuery): { range: DateRange; preset: string } {
-  return resolveRange({ preset: q.preset, from: q.from, to: q.to });
+/**
+ * Resolves the page's date filter in the organisation / viewer timezone, so
+ * "Today" is the same local day that every chart and the workday groups by.
+ */
+async function rangeFor(
+  req: FastifyRequest,
+  organizationId: string,
+  q: RangeQuery,
+): Promise<{ range: DateRange; preset: string }> {
+  const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+  return resolveRange({ preset: q.preset, from: q.from, to: q.to, timeZone });
 }
 
 /** Developers may only ever resolve to their own record (FR-002, FR-004). */
@@ -104,7 +117,7 @@ export class AnalyticsController {
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer"]);
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const data = await organizationAnalytics({
       organizationId: organizationId,
@@ -163,7 +176,7 @@ export class AnalyticsController {
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager"]);
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const sort: LeaderboardSort = LEADERBOARD_SORTS.includes(q.sort as LeaderboardSort)
       ? (q.sort as LeaderboardSort)
       : "active";
@@ -206,7 +219,7 @@ export class AnalyticsController {
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     assertCanViewPeople(user);
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const rows = await listEmployeeDirectory({
       organizationId: organizationId,
@@ -240,6 +253,27 @@ export class AnalyticsController {
   // -------------------------------------------------------------------------
   // Employee detail
   // -------------------------------------------------------------------------
+  @Delete("employees/:id")
+  async removeEmployee(@Param("id") id: string, @Req() req: FastifyRequest) {
+    const { organizationId, actor: user } = await orgAccessFromRequest(req);
+    requireRoles(user, ["administrator"]);
+    if (user.developerId === id) {
+      throw new BadRequestException("cannot_delete_own_employee_record");
+    }
+    try {
+      const summary = await deleteEmployeeWithData({
+        organizationId,
+        employeeId: id,
+        actorId: user.id,
+      });
+      return { ok: true, summary };
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "delete_failed";
+      if (code === "employee_not_found") throw new NotFoundException(code);
+      throw new BadRequestException(code);
+    }
+  }
+
   @Get("employees/:id")
   async employee(
     @Param("id") id: string,
@@ -250,7 +284,7 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
 
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
@@ -276,6 +310,7 @@ export class AnalyticsController {
       fileChangeTrendSeries,
       aiSubscriptions,
       progress,
+      commits,
     ] = await Promise.all([
       activityTotals(scope, range),
       activityTotals(scope, prev),
@@ -300,6 +335,7 @@ export class AnalyticsController {
       safeAnalytics("fileChangeTrend", () => fileChangeTrend(scope, range), []),
       employeeAiSubscriptions(organizationId, id),
       aiProgress({ organizationId: organizationId, developerId: id, range, timeZone }),
+      safeAnalytics("commitSummary", () => commitSummary(scope, range), null),
     ]);
 
     return {
@@ -319,6 +355,8 @@ export class AnalyticsController {
       projects: projectUsage,
       fileChangeWorkspaces,
       fileChangeTrend: fileChangeTrendSeries,
+      /** Commit → Verified → Shipped (counts only; from commit_created / commit_pushed events). */
+      commits,
       aiSubscriptions,
       /** Unified AI Progress: per-provider rollup, effective capabilities, Tier B daily, coverage. */
       aiProgress: progress,
@@ -342,7 +380,7 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
 
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
@@ -450,7 +488,7 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (q.developerId && !canViewDeveloper(user, q.developerId)) throw new ForbiddenException("out_of_scope");
     const scoped = scopeDeveloperIds(user);
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const feed = await listActivityFeed({
       organizationId: organizationId,
       range,
@@ -499,7 +537,7 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
 
-    const { range, preset } = rangeFrom(q);
+    const { range, preset } = await rangeFor(req, organizationId, q);
     const pageSize = Math.min(Number(q.pageSize ?? 25) || 25, 100);
     const page = Math.max(Number(q.page ?? 1) || 1, 1);
 
@@ -567,7 +605,7 @@ export class AnalyticsController {
   @Get("analytics/coverage")
   async coverage(@Req() req: FastifyRequest, @Query() q: RangeQuery) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    const { range } = rangeFrom(q);
+    const { range } = await rangeFor(req, organizationId, q);
     return coverageSummary(organizationId, range, scopeDeveloperIds(user));
   }
 }
