@@ -69,9 +69,8 @@ export function VerifyShipCard({ commits, showPerson = false }: { commits: Commi
           />
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Stage label="Committed" value={commits.commits} hint="Commits by the tracked people" color="var(--chart-4)" />
-              <Stage label="Verified" value={commits.verified} of={commits.commits} hint="A passing check ran first" color="var(--chart-3)" />
               <Stage label="Shipped" value={commits.shipped} of={commits.commits} hint="Pushed to the remote" color="var(--chart-2)" />
             </div>
             <p className="hint mt-3">
@@ -79,25 +78,27 @@ export function VerifyShipCard({ commits, showPerson = false }: { commits: Commi
               {formatNumber(commits.linesDeleted)} lines across these commits
               {commits.repos.length ? ` · ${commits.repos.map((r) => `${r.name} (${r.commits})`).join(", ")}` : ""}
             </p>
-            <ul className="mt-4 divide-y divide-line">
-              {commits.recent.map((c) => (
-                <li key={c.ref} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
-                  <span className="num w-24 shrink-0 text-xs text-ink-500">{formatRelative(c.occurredAt)}</span>
-                  {showPerson ? (
-                    <Link href={`/employees/${c.developerId}`} className="text-sm font-medium text-ink-900 hover:text-brand-600">
-                      {c.developerName ?? "Unknown"}
-                    </Link>
-                  ) : null}
-                  <span className="min-w-0 truncate text-sm text-ink-700">{c.repo ?? "Repository"}</span>
-                  <span className="num text-xs text-ink-500">
-                    {c.filesChanged} files · +{c.linesAdded} / −{c.linesDeleted}
-                  </span>
-                  <span className="ml-auto">
-                    <StateChip verified={c.verified} shipped={Boolean(c.shippedAt)} />
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="scroll-y-sm mt-4 rounded-lg border border-line">
+              <ul className="divide-y divide-line">
+                {commits.recent.map((c) => (
+                  <li key={c.ref} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2.5">
+                    <span className="num w-24 shrink-0 text-xs text-ink-500">{formatRelative(c.occurredAt)}</span>
+                    {showPerson ? (
+                      <Link href={`/employees/${c.developerId}`} className="text-sm font-medium text-ink-900 hover:text-brand-600">
+                        {c.developerName ?? "Unknown"}
+                      </Link>
+                    ) : null}
+                    <span className="min-w-0 truncate text-sm text-ink-700">{c.repo ?? "Repository"}</span>
+                    <span className="num text-xs text-ink-500">
+                      {c.filesChanged} files · +{c.linesAdded} / −{c.linesDeleted}
+                    </span>
+                    <span className="ml-auto">
+                      <StateChip verified={c.verified} shipped={Boolean(c.shippedAt)} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </>
         )}
       </CardBody>
