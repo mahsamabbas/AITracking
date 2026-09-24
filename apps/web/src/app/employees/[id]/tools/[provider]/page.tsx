@@ -27,7 +27,7 @@ import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
-import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { classificationDonutSlices, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
 import type { ToolAnalytics } from "@/lib/types";
 
 export default function EmployeeToolPage() {
@@ -212,18 +212,13 @@ export default function EmployeeToolPage() {
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Session outcomes" subtitle="What sessions with this tool produced" />
+              <CardHeader
+                title="Session outcomes"
+                subtitle="Engineering output, assisted editing, exploration, and mostly idle"
+              />
               <CardBody>
                 <DonutChart
-                  data={d.classifications.map((c) => {
-                    const info = classificationOf(c.classification);
-                    return {
-                      name: info.label,
-                      value: c.sessions,
-                      formatted: String(c.sessions),
-                      color: info.productive ? meta.color : "var(--chart-idle)",
-                    };
-                  })}
+                  data={classificationDonutSlices(d.classifications)}
                   centerValue={formatNumber(t.sessions)}
                   centerLabel="sessions"
                 />

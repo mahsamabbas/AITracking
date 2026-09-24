@@ -30,33 +30,35 @@ export function DonutChart({
 }) {
   const anim = useChartAnimation();
   const total = data.reduce((s, d) => s + d.value, 0);
+  const pieData = data.filter((d) => d.value > 0);
+  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
   return (
     <div className="flex flex-wrap items-center gap-4">
       <div className="relative min-w-[160px] flex-1">
         <ChartFrame height={height} isEmpty={total === 0} emptyBody={emptyBody} emptyVariant={emptyVariant}>
           <PieChart>
             <Pie {...anim}
-              data={data}
+              data={pieData}
               dataKey="value"
               nameKey="name"
               innerRadius="62%"
               outerRadius="92%"
-              paddingAngle={2}
+              paddingAngle={pieData.length > 1 ? 2 : 0}
               stroke="none"
             >
-              {data.map((d, i) => (
+              {pieData.map((d, i) => (
                 <Cell key={d.name} fill={d.color ?? CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
             <Tooltip
               content={({ active, payload }) =>
-                active && payload?.length ? (
+                active && payload?.length && pieTotal > 0 ? (
                   <TooltipShell
                     title={String(payload[0]?.name)}
                     rows={[
                       {
                         label: "Share",
-                        value: `${Math.round(((payload[0]?.value as number) / total) * 100)}%`,
+                        value: `${Math.round(((payload[0]?.value as number) / pieTotal) * 100)}%`,
                       },
                       {
                         label: "Value",
@@ -78,12 +80,15 @@ export function DonutChart({
           </div>
         ) : null}
       </div>
-      {total > 0 ? (
+      {total > 0 || data.some((d) => d.value === 0) ? (
         <ul
-          className={`min-w-[140px] flex-1 space-y-1.5 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
+          className={`min-w-[148px] flex-1 space-y-1.5 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
         >
           {data.map((d, i) => (
-            <li key={d.name} className="flex items-center gap-2 text-xs">
+            <li
+              key={d.name}
+              className={`flex items-center gap-2 text-xs ${d.value === 0 ? "opacity-55" : ""}`}
+            >
               <span
                 className="h-2 w-2 shrink-0 rounded-[2px]"
                 style={{ background: d.color ?? CHART_COLORS[i % CHART_COLORS.length] }}

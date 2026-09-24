@@ -68,6 +68,45 @@ export function classificationOf(id: string) {
   return CLASSIFICATION[id as Classification] ?? CLASSIFICATION.exploration;
 }
 
+/** Stable colours for session-outcome donuts (org, employee, tool pages). */
+export const CLASSIFICATION_CHART_COLOR: Record<Classification, string> = {
+  engineering_output: "var(--chart-2)",
+  assisted_editing: "var(--chart-1)",
+  exploration: "var(--chart-6)",
+  idle_dominant: "var(--chart-idle)",
+};
+
+export const CLASSIFICATION_ORDER: Classification[] = [
+  "engineering_output",
+  "assisted_editing",
+  "exploration",
+  "idle_dominant",
+];
+
+export interface ClassificationDonutSlice {
+  name: string;
+  value: number;
+  formatted: string;
+  color: string;
+}
+
+/** Every observed session pattern — includes zero counts so the legend stays complete. */
+export function classificationDonutSlices(
+  rows: { classification: string; sessions: number }[],
+): ClassificationDonutSlice[] {
+  const byId = new Map(rows.map((r) => [r.classification, r.sessions]));
+  return CLASSIFICATION_ORDER.map((id) => {
+    const info = CLASSIFICATION[id];
+    const sessions = byId.get(id) ?? 0;
+    return {
+      name: info.label,
+      value: sessions,
+      formatted: String(sessions),
+      color: CLASSIFICATION_CHART_COLOR[id],
+    };
+  });
+}
+
 export const ACTIVITY_TYPE: Record<string, { label: string; color: string }> = {
   model: { label: "Model calls", color: "var(--chart-1)" },
   tool: { label: "Tool use", color: "var(--chart-2)" },

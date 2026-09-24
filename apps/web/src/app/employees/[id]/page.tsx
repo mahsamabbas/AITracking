@@ -42,7 +42,7 @@ import {
   formatRelative,
   initialsOf,
 } from "@/lib/format";
-import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { classificationDonutSlices, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
@@ -90,21 +90,10 @@ export default function EmployeeDetailPage() {
   }, [d?.projects]);
 
 
-  const classificationSlices = (d?.classifications ?? []).map((c) => {
-    const info = classificationOf(c.classification);
-    return {
-      name: info.label,
-      value: c.sessions,
-      formatted: String(c.sessions),
-      color: info.productive
-        ? c.classification === "engineering_output"
-          ? "var(--chart-2)"
-          : c.classification === "assisted_editing"
-            ? "var(--chart-1)"
-            : "var(--chart-6)"
-        : "var(--chart-idle)",
-    };
-  });
+  const classificationSlices = useMemo(
+    () => classificationDonutSlices(d?.classifications ?? []),
+    [d?.classifications],
+  );
 
   const crumbs = canViewTeam(user?.role)
     ? [
@@ -341,7 +330,10 @@ export default function EmployeeDetailPage() {
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Activity mix" subtitle="Sessions by observed outcome" />
+              <CardHeader
+                title="Session outcomes"
+                subtitle="Engineering output, assisted editing, exploration, and mostly idle — session counts"
+              />
               <CardBody>
                 <DonutChart
                   data={classificationSlices}

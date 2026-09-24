@@ -33,7 +33,7 @@ import { useAuth } from "@/lib/auth-context";
 import { API_BASE, apiPost, qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
-import { classificationOf } from "@/lib/vocab";
+import { classificationDonutSlices } from "@/lib/vocab";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
   FilterMeta,
@@ -102,22 +102,7 @@ export default function OverviewPage() {
   );
 
   const classificationSlices = useMemo(
-    () =>
-      (d?.classifications ?? []).map((c) => {
-        const info = classificationOf(c.classification);
-        return {
-          name: info.label,
-          value: c.sessions,
-          formatted: `${c.sessions}`,
-          color: info.productive
-            ? c.classification === "engineering_output"
-              ? "var(--chart-2)"
-              : c.classification === "assisted_editing"
-                ? "var(--chart-1)"
-                : "var(--chart-6)"
-            : "var(--chart-idle)",
-        };
-      }),
+    () => classificationDonutSlices(d?.classifications ?? []),
     [d?.classifications],
   );
 
@@ -313,7 +298,7 @@ export default function OverviewPage() {
             <Card>
               <CardHeader
                 title="Session outcomes"
-                subtitle="How many sessions fell into each observed pattern (not the same as time in Observed time split)"
+                subtitle="Engineering output, assisted editing, exploration, and mostly idle — session counts, not time in Observed time split"
               />
               <CardBody>
                 <DonutChart
