@@ -17,6 +17,11 @@ import {
 } from "@/components/ui/States";
 import { BarList } from "@/components/charts/BarList";
 import { EventTimeline } from "@/components/domain/EventTimeline";
+import {
+  ListTimeSortButton,
+  sortEventsByTime,
+  type SortDirection,
+} from "@/components/ui/SortControl";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { MetricGrid } from "@/components/domain/MetricGrid";
 import {
@@ -49,6 +54,7 @@ export default function SessionDetailPage() {
   const id = params.id as string;
   const [tab, setTab] = useState<TabId>("timeline");
   const [typeFilter, setTypeFilter] = useState<string>("");
+  const [timeSort, setTimeSort] = useState<SortDirection>("asc");
 
   const query = useApi<SessionDetail>(`/v1/sessions/${id}`);
   const d = query.data;
@@ -69,10 +75,11 @@ export default function SessionDetailPage() {
       ...e,
       activity_type: e.activity_type ?? inferType(e.event_type),
     }));
-    return typeFilter
+    const filtered = typeFilter
       ? withType.filter((e) => e.activity_type === typeFilter)
       : withType;
-  }, [d?.events, typeFilter]);
+    return sortEventsByTime(filtered, timeSort);
+  }, [d?.events, typeFilter, timeSort]);
 
   if (query.status === 404) {
     return (
@@ -304,27 +311,33 @@ export default function SessionDetailPage() {
                 {tab === "timeline" ? (
                   <>
                     <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-5 py-3">
-                      <button
-                        type="button"
-                        className={typeFilter === "" ? "seg-item-on" : "seg-item border border-line"}
-                        onClick={() => setTypeFilter("")}
-                      >
-                        All {d.events.length}
-                      </button>
-                      {ACTIVITY_TYPE_ORDER.filter((t) => eventsByType.has(t)).map((t) => (
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                         <button
-                          key={t}
                           type="button"
-                          className={typeFilter === t ? "seg-item-on" : "seg-item border border-line"}
-                          onClick={() => setTypeFilter(typeFilter === t ? "" : t)}
+                          className={typeFilter === "" ? "seg-item-on" : "seg-item border border-line"}
+                          onClick={() => setTypeFilter("")}
                         >
-                          <span
-                            className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
-                            style={{ background: ACTIVITY_TYPE[t]?.color }}
-                          />
-                          {ACTIVITY_TYPE[t]?.label ?? t} {eventsByType.get(t)}
+                          All {d.events.length}
                         </button>
-                      ))}
+                        {ACTIVITY_TYPE_ORDER.filter((t) => eventsByType.has(t)).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            className={typeFilter === t ? "seg-item-on" : "seg-item border border-line"}
+                            onClick={() => setTypeFilter(typeFilter === t ? "" : t)}
+                          >
+                            <span
+                              className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+                              style={{ background: ACTIVITY_TYPE[t]?.color }}
+                            />
+                            {ACTIVITY_TYPE[t]?.label ?? t} {eventsByType.get(t)}
+                          </button>
+                        ))}
+                      </div>
+                      <ListTimeSortButton
+                        direction={timeSort}
+                        onToggle={() => setTimeSort((d) => (d === "asc" ? "desc" : "asc"))}
+                      />
                     </div>
                     <CardBody className="max-h-[720px] overflow-y-auto pt-2">
                       {filteredEvents.length === 0 ? (

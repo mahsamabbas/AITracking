@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { TableScroll } from "@/components/ui/TableScroll";
@@ -28,6 +28,7 @@ import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { AGENT_WORK_SHARE } from "@/lib/vocab";
+import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import type { EmployeeRow, FilterMeta } from "@/lib/types";
 
 type SortKey = "activity" | "sessions" | "recent" | "name";
@@ -55,6 +56,7 @@ export default function EmployeesPage() {
   const [provider, setProvider] = useState("");
   const [connectorState, setConnectorState] = useState("");
   const [sort, setSort] = useState<SortKey>("activity");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
 
   const meta = useApi<FilterMeta>("/v1/meta/filters");
   const query = useApi<{
@@ -78,6 +80,29 @@ export default function EmployeesPage() {
   );
 
   const rows = query.data?.employees ?? [];
+
+  const displayedRows = useMemo(() => {
+    const copy = [...rows];
+    const mul = sortDir === "asc" ? 1 : -1;
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if (sort === "name") cmp = a.displayName.localeCompare(b.displayName);
+      else if (sort === "sessions") cmp = a.sessions - b.sessions;
+      else if (sort === "recent") {
+        cmp =
+          new Date(a.lastActiveAt ?? 0).getTime() - new Date(b.lastActiveAt ?? 0).getTime();
+      } else cmp = a.activeMs - b.activeMs;
+      return mul * cmp;
+    });
+    return copy;
+  }, [rows, sort, sortDir]);
+
+  function onColumnSort(key: SortKey, direction: SortDirection) {
+    setSort(key);
+    setSortDir(direction);
+  }
+
+  const defaultDir = (key: SortKey): SortDirection => (key === "name" ? "asc" : "desc");
 
   const chips = [
     search ? { label: `Search: ${search}`, onRemove: () => setSearch("") } : null,
@@ -196,23 +221,53 @@ export default function EmployeesPage() {
               <table className="tbl min-w-[960px]">
                 <thead>
                   <tr>
-                    <SortHeader label="Employee" sortKey="name" current={sort} onSort={setSort} />
+                    <SortableTh
+                      label="Employee"
+                      sortKey="name"
+                      activeKey={sort}
+                      direction={sortDir}
+                      onSort={onColumnSort}
+                      defaultDirection={defaultDir("name")}
+                    />
                     <th>Connector</th>
                     <th>AI tools used</th>
-                    <SortHeader label="AI active time" sortKey="activity" current={sort} onSort={setSort} align="right" />
+                    <SortableTh
+                      label="AI active time"
+                      sortKey="activity"
+                      activeKey={sort}
+                      direction={sortDir}
+                      onSort={onColumnSort}
+                      align="right"
+                      defaultDirection={defaultDir("activity")}
+                    />
                     <th className="text-right" title={AGENT_WORK_SHARE.help}>
                       {AGENT_WORK_SHARE.label}
                     </th>
-                    <SortHeader label="Sessions" sortKey="sessions" current={sort} onSort={setSort} align="right" />
+                    <SortableTh
+                      label="Sessions"
+                      sortKey="sessions"
+                      activeKey={sort}
+                      direction={sortDir}
+                      onSort={onColumnSort}
+                      align="right"
+                      defaultDirection={defaultDir("sessions")}
+                    />
                     <th className="text-right">Avg session</th>
                     <th>Trend</th>
-                    <SortHeader label="Last active" sortKey="recent" current={sort} onSort={setSort} />
+                    <SortableTh
+                      label="Last active"
+                      sortKey="recent"
+                      activeKey={sort}
+                      direction={sortDir}
+                      onSort={onColumnSort}
+                      defaultDirection={defaultDir("recent")}
+                    />
                     <th className="text-right">This hour</th>
                     <th aria-label="Open" />
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => {
+                  {displayedRows.map((r) => {
                     const productivePct =
                       r.activeMs > 0 ? Math.round((r.productiveMs / r.activeMs) * 100) : 0;
                     return (
@@ -318,40 +373,5 @@ export default function EmployeesPage() {
         effort — planning, review, meetings, and manual coding are invisible to this system.
       </p>
     </AppShell>
-  );
-}
-
-/** Column header that sorts server-side; exposes the state via aria-sort. */
-function SortHeader({
-  label,
-  sortKey,
-  current,
-  onSort,
-  align = "left",
-}: {
-  label: string;
-  sortKey: SortKey;
-  current: SortKey;
-  onSort: (k: SortKey) => void;
-  align?: "left" | "right";
-}) {
-  const active = current === sortKey;
-  // The API sorts names ascending and every metric descending.
-  const direction = sortKey === "name" ? "ascending" : "descending";
-  return (
-    <th aria-sort={active ? direction : "none"} className={align === "right" ? "text-right" : undefined}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={`inline-flex items-center gap-1 uppercase tracking-[0.06em] transition-colors duration-fast hover:text-ink-900 ${
-          active ? "text-ink-900" : ""
-        }`}
-      >
-        {label}
-        <span aria-hidden className={active ? "text-brand-600" : "text-ink-400 opacity-0"}>
-          {direction === "ascending" ? "↑" : "↓"}
-        </span>
-      </button>
-    </th>
   );
 }

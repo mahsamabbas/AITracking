@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { EventTimeline } from "@/components/domain/EventTimeline";
+import { ListTimeSortButton, sortEventsByTime, type SortDirection } from "@/components/ui/SortControl";
 import { LoadingBlock } from "@/components/ui/States";
 import { rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
@@ -67,6 +68,7 @@ export function ActivityFeed({
   const [olderCursor, setOlderCursor] = useState<string | null>(null);
   const [pagedOlder, setPagedOlder] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [timeSort, setTimeSort] = useState<SortDirection>("desc");
 
   useEffect(() => {
     setLoaded(new Map());
@@ -102,13 +104,10 @@ export function ActivityFeed({
     }
   }
 
-  const events = useMemo(
-    () =>
-      [...loaded.values()].sort(
-        (a, b) => b.occurred_at.localeCompare(a.occurred_at) || b.event_id.localeCompare(a.event_id),
-      ),
-    [loaded],
-  );
+  const events = useMemo(() => {
+    const list = [...loaded.values()];
+    return sortEventsByTime(list, timeSort);
+  }, [loaded, timeSort]);
   const groups = useMemo(() => {
     const out: { day: string; events: ActivityEventRow[] }[] = [];
     for (const e of events) {
@@ -129,6 +128,14 @@ export function ActivityFeed({
           first.data
             ? `${formatNumber(total)} agent event${total === 1 ? "" : "s"} · ${rangeLabel(range)}${live ? " · updates live" : ""} · heartbeats hidden`
             : `Agent events · ${rangeLabel(range)}`
+        }
+        action={
+          events.length > 0 ? (
+            <ListTimeSortButton
+              direction={timeSort}
+              onToggle={() => setTimeSort((d) => (d === "asc" ? "desc" : "asc"))}
+            />
+          ) : null
         }
       />
       <CardBody className="pt-1">

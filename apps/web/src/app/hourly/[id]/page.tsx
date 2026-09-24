@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ErrorState, LoadingBlock, NotFoundState } from "@/components/ui/States";
 import { MetricGrid } from "@/components/domain/MetricGrid";
 import { EventTimeline } from "@/components/domain/EventTimeline";
+import { ListTimeSortButton, sortEventsByTime, type SortDirection } from "@/components/ui/SortControl";
 import { useApi } from "@/lib/use-api";
 import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import type { ActivityEventRow } from "@/lib/types";
@@ -32,6 +34,12 @@ export default function HourlyDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const query = useApi<SnapshotDetail>(`/v1/hourly-snapshots/${id}`);
+  const [timeSort, setTimeSort] = useState<SortDirection>("asc");
+
+  const sortedSourceEvents = useMemo(
+    () => sortEventsByTime(query.data?.sourceEvents ?? [], timeSort),
+    [query.data?.sourceEvents, timeSort],
+  );
 
   if (query.status === 404) {
     return (
@@ -181,9 +189,15 @@ export default function HourlyDetailPage() {
             <CardHeader
               title="Source events"
               subtitle={`${d.sourceEvents.length} events in this clock hour`}
+              action={
+                <ListTimeSortButton
+                  direction={timeSort}
+                  onToggle={() => setTimeSort((dir) => (dir === "asc" ? "desc" : "asc"))}
+                />
+              }
             />
             <CardBody className="max-h-[640px] overflow-y-auto pt-2">
-              <EventTimeline events={d.sourceEvents} limit={300} scroll={false} />
+              <EventTimeline events={sortedSourceEvents} limit={300} scroll={false} />
             </CardBody>
           </Card>
         </>

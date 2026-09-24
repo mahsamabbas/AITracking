@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import { formatDateTime, formatDuration } from "@/lib/format";
+import { sortSessions, type SessionSortKey } from "@/lib/sort-sessions";
 import type { SessionRow } from "@/lib/types";
 import { ClassificationBadge, CoverageBadge, ProviderBadge } from "./Badges";
 import { EmptyState } from "@/components/ui/States";
@@ -19,6 +22,18 @@ export function SessionTable({
   emptyBody?: string;
 }) {
   const router = useRouter();
+  const [sortKey, setSortKey] = useState<SessionSortKey>("startedAt");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+
+  const sorted = useMemo(
+    () => sortSessions(sessions, sortKey, sortDir),
+    [sessions, sortKey, sortDir],
+  );
+
+  function onSort(key: SessionSortKey, direction: SortDirection) {
+    setSortKey(key);
+    setSortDir(direction);
+  }
 
   // Projects are assigned by people, never by agents: show the column only
   // when some session in view actually has one.
@@ -36,19 +51,54 @@ export function SessionTable({
       <table className="tbl min-w-[720px]">
         <thead>
           <tr>
-            <th>Started</th>
+            <SortableTh
+              label="Started"
+              sortKey="startedAt"
+              activeKey={sortKey}
+              direction={sortDir}
+              onSort={onSort}
+              defaultDirection="desc"
+            />
             {showProvider ? <th>AI tool</th> : null}
             {showProject ? <th>Project / work item</th> : null}
-            <th className="text-right">Agent active</th>
-            <th className="text-right">Session span</th>
-            <th className="text-right">Model · Tools</th>
-            <th className="text-right">Files & checks</th>
+            <SortableTh
+              label="Agent active"
+              sortKey="activeDurationMs"
+              activeKey={sortKey}
+              direction={sortDir}
+              onSort={onSort}
+              align="right"
+            />
+            <SortableTh
+              label="Session span"
+              sortKey="elapsedSpanMs"
+              activeKey={sortKey}
+              direction={sortDir}
+              onSort={onSort}
+              align="right"
+            />
+            <SortableTh
+              label="Model · Tools"
+              sortKey="modelRequests"
+              activeKey={sortKey}
+              direction={sortDir}
+              onSort={onSort}
+              align="right"
+            />
+            <SortableTh
+              label="Files & checks"
+              sortKey="fileChanges"
+              activeKey={sortKey}
+              direction={sortDir}
+              onSort={onSort}
+              align="right"
+            />
             <th>Session pattern</th>
             <th aria-label="Open" />
           </tr>
         </thead>
         <tbody>
-          {sessions.map((s) => (
+          {sorted.map((s) => (
             <tr
               key={s.id}
               className="row-link"
