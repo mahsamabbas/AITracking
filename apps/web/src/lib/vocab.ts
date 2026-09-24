@@ -42,7 +42,7 @@ export const CLASSIFICATION: Record<
     label: "Verify & ship",
     tone: "ok",
     productive: true,
-    help: "Tests, builds, lint, or type-checks were observed — from the agent or from a local CI gate after checks passed (not from git commits alone).",
+    help: "Tests, builds, lint, type-checks, local CI, or a git commit (via connector hook) — not commits GitHub sees unless the hook ran.",
   },
   assisted_editing: {
     label: "Writing code",

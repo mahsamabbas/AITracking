@@ -102,6 +102,18 @@ describe("computeSessionMetrics", () => {
     expect(computeSessionMetrics(events).classification).toBe("engineering_output");
   });
 
+  it("classifies local git commit signals as verify and ship", () => {
+    const events = [
+      ev("session_started", T0),
+      ev("build_completed", T0 + 10 * S, {
+        duration_ms: 5 * S,
+        metadata: { tool_name: "git_commit", tool_category: "build", telemetry_source: "connector" },
+      }),
+      ev("session_ended", T0 + M),
+    ];
+    expect(computeSessionMetrics(events).classification).toBe("engineering_output");
+  });
+
   it("classifies a session with engineering checks as engineering output", () => {
     const events = [
       ev("session_started", T0),

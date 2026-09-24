@@ -87,10 +87,10 @@ forbids merging them into one headline number:
 (`engineering_output`, `assisted_editing`, `exploration`, `idle_dominant`) that
 describes *observed agent activity*, never a person's effort or worth.
 
-**Verify & ship** (`engineering_output`) needs observed check signals in the session
-(test/build/lint/typecheck events, agent test/build tools, or a local CI gate — not
-git commits or GitHub Actions by themselves). Optional pre-commit hook:
-`.husky/pre-commit` runs lint/tests then `scripts/techlio-ci-gate.mjs` (connector must be running).
+**Verify & ship** (`engineering_output`) needs observed check or ship signals in the session
+(test/build/lint/typecheck, agent tools, local CI gate, or **git commit** via the post-commit hook).
+Git and GitHub do not send events by themselves — the connector must receive `POST /hooks/git-commit`
+after each local commit (see `.husky/post-commit`). The connector must be running at commit time.
 
 Metrics a provider does not report render as **“Not available from provider”**,
 never as zero. Coverage gaps, pauses, stale connectors, and unassigned sessions

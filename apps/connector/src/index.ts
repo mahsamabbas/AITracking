@@ -56,6 +56,14 @@ let hostProvider = config.provider;
 let contextLabel: string | undefined;
 let identity: ConnectorIdentity | null = loadIdentity();
 let activeSessionId: string | undefined = identity ? crypto.randomUUID() : undefined;
+/** Commits / CI signals when no agent session is active. */
+let localWorkflowSessionId: string | undefined;
+
+function workflowSessionId(): string {
+  if (activeSessionId) return activeSessionId;
+  if (!localWorkflowSessionId) localWorkflowSessionId = crypto.randomUUID();
+  return localWorkflowSessionId;
+}
 let flushing = false;
 const modelStartedAt = new Map<string, number>();
 const toolStartedAt = new Map<string, number>();
@@ -808,11 +816,36 @@ app.post("/hooks/ci-gate", async (req) => {
   const body = (req.body ?? {}) as { status?: string };
   if (body.status === "failed") return { accepted: 0 };
   const event = baseEvent(EventTypes.test_completed, {
+    session_id: workflowSessionId(),
     status: "succeeded",
     metadata: {
       tool_name: "ci_gate",
       tool_category: "test",
       telemetry_source: "connector",
+    },
+  });
+  const clean = event ? sanitizeEvent(event) : null;
+  if (!clean) return { accepted: 0 };
+  emitAgentEvent(clean);
+  return { accepted: 1 };
+});
+
+/**
+ * Local git post-commit hook. Allowlisted signal only — no commit message or hash.
+ */
+app.post("/hooks/git-commit", async (req) => {
+  if (paused || !identity) return { accepted: 0, unpaired: !identity };
+  const body = (req.body ?? {}) as { status?: string };
+  if (body.status === "failed") return { accepted: 0 };
+  const repo = contextLabel?.slice(0, 64);
+  const event = baseEvent(EventTypes.build_completed, {
+    session_id: workflowSessionId(),
+    status: "succeeded",
+    metadata: {
+      tool_name: "git_commit",
+      tool_category: "build",
+      telemetry_source: "connector",
+      ...(repo ? { path_category: repo } : {}),
     },
   });
   const clean = event ? sanitizeEvent(event) : null;

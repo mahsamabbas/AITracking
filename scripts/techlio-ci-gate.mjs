@@ -4,22 +4,9 @@
  * after lint/tests in pre-commit). Requires the connector to be running.
  * Does not send git metadata — only an allowlisted test_completed signal.
  */
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { connectorBase } from "./techlio-connector-port.mjs";
 
-function connectorPort() {
-  try {
-    const p = Number(readFileSync(join(homedir(), ".techlio-connector", "port"), "utf8").trim());
-    if (p > 0) return p;
-  } catch {
-    /* default */
-  }
-  return 9477;
-}
-
-const port = connectorPort();
-const res = await fetch(`http://127.0.0.1:${port}/hooks/ci-gate`, {
+const res = await fetch(`${connectorBase()}/hooks/ci-gate`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ status: "succeeded" }),

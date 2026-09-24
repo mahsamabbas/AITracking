@@ -45,22 +45,19 @@ export function isAgentReported(event: {
   }
   // Local repo CI gate posts allowlisted check events through the connector — no command text.
   const t = event.event_type ?? "";
-  if (
-    m.telemetry_source === "connector" &&
-    m.tool_name === "ci_gate" &&
-    (t.startsWith("test_") ||
-      t.startsWith("build_") ||
-      t.startsWith("lint_") ||
-      t.startsWith("typecheck_"))
-  ) {
-    return true;
+  const tool = typeof m.tool_name === "string" ? m.tool_name : "";
+  if (m.telemetry_source === "connector") {
+    if (tool === "ci_gate" && (t.startsWith("test_") || t.startsWith("build_") || t.startsWith("lint_") || t.startsWith("typecheck_"))) {
+      return true;
+    }
+    if (tool === "git_commit" && t === "build_completed") return true;
   }
   return false;
 }
 
 /** SQL twin of isAgentReported for an activity_events alias. */
 export const AGENT_REPORTED_SQL = (alias: string) =>
-  `(${alias}.payload->'metadata'->>'tool_name' IS NOT NULL OR ${alias}.payload->'metadata'->>'telemetry_source' IN ('hook','otel','provider_api'))`;
+  `(${alias}.payload->'metadata'->>'tool_name' IS NOT NULL OR ${alias}.payload->'metadata'->>'telemetry_source' IN ('hook','otel','provider_api') OR (${alias}.payload->'metadata'->>'telemetry_source' = 'connector' AND ${alias}.payload->'metadata'->>'tool_name' IN ('ci_gate','git_commit')))`;
 
 /** Editor (IDE companion) file saves and task runs: not agent activity. */
 export function isEditorOnlyEvent(event: ActivityEvent): boolean {
@@ -122,7 +119,7 @@ export const CLASSIFICATION_LABELS: Record<SessionClassification, string> = {
 
 export const CLASSIFICATION_DESCRIPTIONS: Record<SessionClassification, string> = {
   engineering_output:
-    "The agent ran tests, builds, lint, or type-checks in this session.",
+    "The agent ran tests or builds, or a local git commit was reported through the connector hook in this session.",
   assisted_editing:
     "The agent changed files in this session; no test or build events were observed.",
   exploration:
