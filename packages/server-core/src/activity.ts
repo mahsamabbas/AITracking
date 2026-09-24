@@ -98,20 +98,21 @@ export const PRODUCTIVE_CLASSIFICATIONS: SessionClassification[] = [
 ];
 
 export const CLASSIFICATION_LABELS: Record<SessionClassification, string> = {
-  engineering_output: "Engineering output",
-  assisted_editing: "Assisted editing",
-  exploration: "Exploration",
-  idle_dominant: "Mostly idle",
+  engineering_output: "Verify & ship",
+  assisted_editing: "Writing code",
+  exploration: "Research & planning",
+  idle_dominant: "Long quiet gaps",
 };
 
 export const CLASSIFICATION_DESCRIPTIONS: Record<SessionClassification, string> = {
   engineering_output:
-    "Agent activity produced test, build, lint, or type-check outcomes.",
-  assisted_editing: "Agent activity produced file changes, without checks.",
+    "The agent ran tests, builds, lint, or type-checks in this session.",
+  assisted_editing:
+    "The agent changed files in this session; no test or build events were observed.",
   exploration:
-    "Model and tool activity with no file changes observed — reads, searches, questions.",
+    "The agent used the model or tools without changing files — reads, search, questions, planning.",
   idle_dominant:
-    "More than half the session span had no observed agent activity. Not a conclusion about the person.",
+    "Most of the session span had little or no agent telemetry. Not a conclusion about the person.",
 };
 
 /** The idle gap after which a session is considered no longer interactive (§11). */

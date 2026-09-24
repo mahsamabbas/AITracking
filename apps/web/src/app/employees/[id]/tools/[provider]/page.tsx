@@ -27,7 +27,7 @@ import { useApi } from "@/lib/use-api";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
-import { classificationDonutSlices, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { classificationDonutSlices, SESSION_MIX, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
 import type { ToolAnalytics } from "@/lib/types";
 
 export default function EmployeeToolPage() {
@@ -191,7 +191,7 @@ export default function EmployeeToolPage() {
               }
             />
             <StatTile
-              label="Engineering output"
+              label="Files & checks"
               value={formatNumber(t.fileChanges)}
               unit="file changes"
               hint={`${t.testsRun} tests · ${t.buildsRun} builds`}
@@ -213,8 +213,8 @@ export default function EmployeeToolPage() {
             </Card>
             <Card>
               <CardHeader
-                title="Session outcomes"
-                subtitle="Engineering output, assisted editing, exploration, and mostly idle"
+                title={SESSION_MIX.title}
+                subtitle={SESSION_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart

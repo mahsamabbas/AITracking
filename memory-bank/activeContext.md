@@ -45,7 +45,7 @@ productivity scores and rankings (§3, SEC-009). Resolved by classifying
 **observed agent activity**, not people:
 
 `engineering_output` · `assisted_editing` · `exploration` count as productive
-agent activity; `idle_dominant` reads "Mostly idle" and its explanation says
+agent activity; `idle_dominant` reads "Long quiet gaps" and its explanation says
 plainly that it describes the telemetry, not the person. Coverage gaps are a
 third, separate category — never folded into idle.
 

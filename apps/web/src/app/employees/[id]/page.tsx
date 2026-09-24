@@ -42,7 +42,14 @@ import {
   formatRelative,
   initialsOf,
 } from "@/lib/format";
-import { classificationDonutSlices, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import {
+  AGENT_WORK_SHARE,
+  classificationDonutSlices,
+  LONG_QUIET_GAPS,
+  REVIEWING_NO_AI,
+  SESSION_MIX,
+  TOOL_CATEGORY_LABEL,
+} from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
@@ -300,21 +307,21 @@ export default function EmployeeDetailPage() {
               previous={d.previousTotals.sessions}
             />
             <StatTile
-              label="Productive share"
+              label={AGENT_WORK_SHARE.label}
               value={t.activeMs ? `${Math.round((t.productiveMs / t.activeMs) * 100)}%` : "—"}
               hint={`${formatDuration(t.productiveMs)} of agent activity`}
               accent="teal"
-              help="Share of agent active time in sessions that produced file changes, tests, builds, or exploration work. It describes observed telemetry, not a rating of the person."
+              help={AGENT_WORK_SHARE.help}
             />
             <StatTile
-              label="In-session idle"
+              label={LONG_QUIET_GAPS.label}
               value={formatDuration(t.idleMs, { compact: true })}
               hint={`${d.idlePeriods.length} gaps over 10 min`}
               accent="slate"
               invertDelta
               current={t.idleMs}
               previous={d.previousTotals.idleMs}
-              help="Gaps over the idle threshold inside sessions. The person may have been working without the agent."
+              help={LONG_QUIET_GAPS.kpiHelp}
             />
           </section>
 
@@ -331,8 +338,8 @@ export default function EmployeeDetailPage() {
             </Card>
             <Card>
               <CardHeader
-                title="Session outcomes"
-                subtitle="Engineering output, assisted editing, exploration, and mostly idle — session counts"
+                title={SESSION_MIX.title}
+                subtitle={SESSION_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart
@@ -372,7 +379,7 @@ export default function EmployeeDetailPage() {
             <Card className="xl:col-span-2">
               <CardHeader
                 title="Daily usage trend"
-                subtitle="Agent active time and in-session idle time"
+                subtitle={LONG_QUIET_GAPS.trendSubtitle}
               />
               <CardBody className="pt-2">
                 <TrendChart
@@ -401,16 +408,16 @@ export default function EmployeeDetailPage() {
                       help: "Tool, test, and build execution time not overlapping a model call.",
                     },
                     {
-                      label: "In-session, agent idle",
+                      label: REVIEWING_NO_AI.label,
                       ms: Math.max(0, t.elapsedMs - t.activeMs - t.idleMs),
                       color: "var(--chart-muted)",
-                      help: "Inside the interactive span with no agent operation running — reading, typing, reviewing.",
+                      help: REVIEWING_NO_AI.help,
                     },
                     {
-                      label: "Idle gaps",
+                      label: LONG_QUIET_GAPS.label,
                       ms: t.idleMs,
                       color: "var(--chart-idle)",
-                      help: "Gaps over 10 minutes. Excluded from the interactive span by the aggregation rules.",
+                      help: LONG_QUIET_GAPS.durationBandHelp,
                     },
                   ]}
                 />
@@ -481,17 +488,17 @@ export default function EmployeeDetailPage() {
             </Card>
           </section>
 
-          <section className="mt-5 grid gap-4 xl:grid-cols-2">
+          <section className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
             <Card>
               <CardHeader
-                title="Idle & coverage periods"
-                subtitle="Gaps over 10 minutes, capped at 4 hours"
+                title={LONG_QUIET_GAPS.listTitle}
+                subtitle={LONG_QUIET_GAPS.listSubtitle}
               />
               {d.idlePeriods.length === 0 ? (
                 <EmptyState
                   compact
                   title="No long gaps observed"
-                  body="Agent activity in this period had no break longer than the 10-minute idle threshold."
+                  body={LONG_QUIET_GAPS.emptyBody}
                 />
               ) : (
                 <ul className={`divide-y divide-line ${d.idlePeriods.length > 6 ? "scroll-y-sm" : ""}`}>

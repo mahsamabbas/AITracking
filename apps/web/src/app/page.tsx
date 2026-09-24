@@ -33,7 +33,14 @@ import { useAuth } from "@/lib/auth-context";
 import { API_BASE, apiPost, qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
-import { classificationDonutSlices } from "@/lib/vocab";
+import {
+  AGENT_ACTIVITY_COUNTS,
+  classificationDonutSlices,
+  LONG_QUIET_GAPS,
+  OBSERVED_TIME_SPLIT,
+  REVIEWING_NO_AI,
+  SESSION_MIX,
+} from "@/lib/vocab";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
   FilterMeta,
@@ -297,8 +304,8 @@ export default function OverviewPage() {
 
             <Card>
               <CardHeader
-                title="Session outcomes"
-                subtitle="Engineering output, assisted editing, exploration, and mostly idle — session counts, not time in Observed time split"
+                title={SESSION_MIX.title}
+                subtitle={SESSION_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart
@@ -325,7 +332,7 @@ export default function OverviewPage() {
             <Card className="xl:col-span-2">
               <CardHeader
                 title="AI usage over time"
-                subtitle="Agent active time and in-session idle time, per day"
+                subtitle={LONG_QUIET_GAPS.trendSubtitle}
               />
               <CardBody className="pt-2">
                 <TrendChart data={d!.dailyTrend} />
@@ -334,8 +341,8 @@ export default function OverviewPage() {
 
             <Card>
               <CardHeader
-                title="Observed time split"
-                subtitle="Never presented as a single number"
+                title={OBSERVED_TIME_SPLIT.title}
+                subtitle={OBSERVED_TIME_SPLIT.subtitle}
               />
               <CardBody>
                 <DurationSplit
@@ -343,28 +350,28 @@ export default function OverviewPage() {
                   totalLabel="Total session span observed"
                   bands={[
                     {
-                      label: "Productive agent activity",
+                      label: OBSERVED_TIME_SPLIT.verifyCodeResearch.label,
                       ms: t!.productiveMs,
                       color: "var(--chart-2)",
-                      help: "Merged model and tool time in sessions that produced file changes, tests, builds, or exploration work.",
+                      help: OBSERVED_TIME_SPLIT.verifyCodeResearch.help,
                     },
                     {
-                      label: "Other agent activity",
+                      label: OBSERVED_TIME_SPLIT.otherAgentActivity.label,
                       ms: Math.max(0, t!.activeMs - t!.productiveMs),
                       color: "var(--chart-1)",
-                      help: "Agent operations in sessions dominated by idle time.",
+                      help: OBSERVED_TIME_SPLIT.otherAgentActivity.help,
                     },
                     {
-                      label: "In-session idle",
+                      label: LONG_QUIET_GAPS.label,
                       ms: t!.idleMs,
                       color: "var(--chart-idle)",
-                      help: "Gaps over 10 minutes inside a session. The person may have been working without the agent — this is not non-work.",
+                      help: LONG_QUIET_GAPS.durationBandHelp,
                     },
                     {
-                      label: "Session, agent not running",
+                      label: REVIEWING_NO_AI.label,
                       ms: Math.max(0, t!.elapsedMs - t!.activeMs - t!.idleMs),
                       color: "var(--chart-muted)",
-                      help: "Time inside the interactive session with no model or tool operation executing — reading, typing, reviewing.",
+                      help: REVIEWING_NO_AI.help,
                     },
                   ]}
                 />
@@ -393,8 +400,8 @@ export default function OverviewPage() {
 
             <Card className={canViewTeam(user?.role) ? undefined : "xl:col-span-2"}>
               <CardHeader
-                title="Engineering outcomes"
-                subtitle="Aggregate counts for the range — per-person breakdown is on Employees and Leaderboard"
+                title={AGENT_ACTIVITY_COUNTS.title}
+                subtitle={AGENT_ACTIVITY_COUNTS.subtitle}
               />
               <CardBody>
                 <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-line">
@@ -483,27 +490,28 @@ export default function OverviewPage() {
             </section>
           ) : null}
 
-          {/* ---------------- Live strip ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-2">
-            {/* Follows the page's range: "Today" is the whole day, "7 days" the whole week. */}
+          {/* ---------------- Activity + coverage (stacked — avoids empty stretch beside tall feed) ---------------- */}
+          <section className="mt-5">
             <ActivityFeed range={range} provider={provider || undefined} team={team || undefined} showPerson title="Activity feed" />
+          </section>
 
-            <Card>
-              <CardHeader
-                title="Coverage summary"
-                subtitle="Gap and assignment quality for this range · alerts and device actions on Connectors"
-                href={canViewTeam(user?.role) ? "/connectors" : undefined}
-                hrefLabel="Connectors"
-              />
-              {coverage ? (
-                <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
+          {canViewTeam(user?.role) && coverage ? (
+            <section className="mt-4" aria-label="Coverage summary">
+              <Card>
+                <CardHeader
+                  title="Coverage summary"
+                  subtitle="Gap and assignment quality for this range · device actions on Connectors"
+                  href="/connectors"
+                  hrefLabel="Connectors"
+                />
+                <div className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
                   {[
                     ["Gap events", coverage.gapEvents],
                     ["Partial sessions", coverage.partialSessions],
-                    ["Unassigned", coverage.unassignedSessions],
+                    ["Unassigned sessions", coverage.unassignedSessions],
                     ["No telemetry", coverage.employeesWithoutTelemetry],
                   ].map(([label, value]) => (
-                    <div key={String(label)} className="bg-card px-4 py-3">
+                    <div key={String(label)} className="bg-card px-4 py-2.5">
                       <p className="label">{label}</p>
                       <p className="num mt-0.5 text-sm font-semibold text-ink-900">
                         {formatNumber(Number(value))}
@@ -511,13 +519,9 @@ export default function OverviewPage() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <CardBody>
-                  <p className="hint">Coverage metrics load with organisation analytics.</p>
-                </CardBody>
-              )}
-            </Card>
-          </section>
+              </Card>
+            </section>
+          ) : null}
         </>
       )}
     </AppShell>

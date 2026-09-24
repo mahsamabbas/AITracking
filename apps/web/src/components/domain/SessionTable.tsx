@@ -42,8 +42,8 @@ export function SessionTable({
             <th className="text-right">Agent active</th>
             <th className="text-right">Session span</th>
             <th className="text-right">Model · Tools</th>
-            <th className="text-right">Output</th>
-            <th>Activity</th>
+            <th className="text-right">Files & checks</th>
+            <th>Session pattern</th>
             <th aria-label="Open" />
           </tr>
         </thead>

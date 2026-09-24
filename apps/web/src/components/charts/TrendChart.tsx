@@ -13,6 +13,7 @@ import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFram
 import { formatDate, formatDuration } from "@/lib/format";
 import type { TrendPoint } from "@/lib/types";
 import type { EmptyVariant } from "@/components/ui/States";
+import { TREND_CHART } from "@/lib/vocab";
 
 /** Daily active vs idle time. Two bands so they are never read as one number. */
 export function TrendChart({
@@ -80,7 +81,7 @@ export function TrendChart({
                     color: "var(--chart-1)",
                   },
                   {
-                    label: "Idle in session",
+                    label: TREND_CHART.idleTooltip,
                     value: formatDuration(Number(payload[0]?.payload.idleMs)),
                     color: "var(--chart-idle)",
                   },
@@ -99,7 +100,7 @@ export function TrendChart({
           stroke="var(--chart-idle)"
           strokeWidth={1.5}
           fill="url(#gIdle)"
-          name="Idle"
+          name={TREND_CHART.idleSeries}
         />
         <Area {...anim}
           type="monotone"

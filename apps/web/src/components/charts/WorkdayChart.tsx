@@ -13,6 +13,9 @@ import {
 import { useChartAnimation } from "@/lib/use-reduced-motion";
 import { AXIS, ChartFrame, GRID, TooltipShell } from "./ChartFrame";
 import { formatDuration, formatNumber } from "@/lib/format";
+import { WORKDAY_SERIES } from "@/lib/vocab";
+
+export { WORKDAY_SERIES };
 
 /**
  * One day, hour by hour: working span, AI active, idle, exploration, editing
@@ -55,14 +58,6 @@ export interface WorkdayData {
   };
   providers: string[];
 }
-
-export const WORKDAY_SERIES = [
-  { key: "workingMs", label: "Working with AI", color: "var(--chart-6)", dash: "4 3", hint: "Time between agent events with no gap over 10 min" },
-  { key: "activeMs", label: "AI active", color: "var(--chart-1)", hint: "Model or tool running (merged)" },
-  { key: "idleMs", label: "Idle", color: "var(--chart-idle)", hint: "Working span with no agent running — reviewing, typing, waiting" },
-  { key: "explorationMs", label: "Exploration", color: "var(--chart-3)", hint: "AI active in sessions that changed no files — reading, asking, planning" },
-  { key: "editingMs", label: "Editing", color: "var(--chart-2)", hint: "AI active in sessions that changed files or ran tests/builds" },
-] as const;
 
 const minutes = (ms: number) => Math.round((ms / 60_000) * 10) / 10;
 

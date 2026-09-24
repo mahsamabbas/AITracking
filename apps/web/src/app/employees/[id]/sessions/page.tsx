@@ -85,7 +85,7 @@ function SessionsInner() {
     provider ? { label: `Tool: ${providerLabel(provider)}`, onRemove: () => setProvider("") } : null,
     classification
       ? {
-          label: `Activity: ${CLASSIFICATION[classification as keyof typeof CLASSIFICATION]?.label ?? classification}`,
+          label: `Session pattern: ${CLASSIFICATION[classification as keyof typeof CLASSIFICATION]?.label ?? classification}`,
           onRemove: () => setClassification(""),
         }
       : null,
@@ -152,10 +152,10 @@ function SessionsInner() {
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
         <SelectFilter
-          label="Activity type"
+          label="Session pattern"
           value={classification}
           onChange={setClassification}
-          allLabel="All activity"
+          allLabel="All patterns"
           width="w-[180px]"
           options={CLASSIFICATION_OPTIONS}
         />

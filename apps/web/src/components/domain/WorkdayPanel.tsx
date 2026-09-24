@@ -90,8 +90,8 @@ export function WorkdayPanel({
               <Stat label="Last activity" value={d.lastActivityAt ? clockIn(d.lastActivityAt, d.timezone) : "—"} hint="When the last agent activity ended" />
               <Stat label="Working with AI" value={formatDuration(t.workingMs)} hint={WORKDAY_SERIES[0].hint} />
               <Stat label="AI active" value={formatDuration(t.activeMs)} hint={WORKDAY_SERIES[1].hint} />
-              <Stat label="Idle" value={formatDuration(t.idleMs)} hint={WORKDAY_SERIES[2].hint} />
-              <Stat label="Exploration" value={formatDuration(t.explorationMs)} hint={WORKDAY_SERIES[3].hint} />
+              <Stat label={WORKDAY_SERIES[2].label} value={formatDuration(t.idleMs)} hint={WORKDAY_SERIES[2].hint} />
+              <Stat label={WORKDAY_SERIES[3].label} value={formatDuration(t.explorationMs)} hint={WORKDAY_SERIES[3].hint} />
               <Stat
                 label="Files changed"
                 value={formatNumber(t.fileChanges)}

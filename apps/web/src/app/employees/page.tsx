@@ -27,6 +27,7 @@ import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
+import { AGENT_WORK_SHARE } from "@/lib/vocab";
 import type { EmployeeRow, FilterMeta } from "@/lib/types";
 
 type SortKey = "activity" | "sessions" | "recent" | "name";
@@ -199,7 +200,9 @@ export default function EmployeesPage() {
                     <th>Connector</th>
                     <th>AI tools used</th>
                     <SortHeader label="AI active time" sortKey="activity" current={sort} onSort={setSort} align="right" />
-                    <th className="text-right">Productive</th>
+                    <th className="text-right" title={AGENT_WORK_SHARE.help}>
+                      {AGENT_WORK_SHARE.label}
+                    </th>
                     <SortHeader label="Sessions" sortKey="sessions" current={sort} onSort={setSort} align="right" />
                     <th className="text-right">Avg session</th>
                     <th>Trend</th>

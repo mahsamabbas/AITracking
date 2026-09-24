@@ -70,7 +70,7 @@ Each is a distinct variant in `components/ui/States.tsx`, never interchangeable:
 - No timesheet entity, endpoint, or field. `POST /v1/events/timesheet` returns 404.
 - No leaderboard or score. The directory sorts on user request; the product never ranks.
 - Session classification describes *observed agent activity*. `idle_dominant`
-  reads “Mostly idle” and its explanation says plainly that it describes the
+  reads “Long quiet gaps” and its explanation says plainly that it describes the
   telemetry, not the person.
 - Every screen that shows usage carries the caveat that planning, review,
   meetings, and manual coding are invisible to the system.

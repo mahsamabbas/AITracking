@@ -37,6 +37,8 @@ import {
   ACTIVITY_TYPE_ORDER,
   TOOL_CATEGORY_LABEL,
   classificationOf,
+  LONG_QUIET_GAPS,
+  REVIEWING_NO_AI,
 } from "@/lib/vocab";
 import type { SessionDetail } from "@/lib/types";
 
@@ -185,7 +187,7 @@ export default function SessionDetailPage() {
                 )}
               </div>
               <div className="bg-card p-5">
-                <p className="label">Classification</p>
+                <p className="label">Session pattern</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <ProviderBadge provider={s.provider} size="sm" />
                   <ClassificationBadge id={s.classification} />
@@ -221,16 +223,16 @@ export default function SessionDetailPage() {
                         help: "Tool, test, and build time that does not overlap a model call. Overlaps are merged before summing.",
                       },
                       {
-                        label: "Interactive, agent idle",
+                        label: REVIEWING_NO_AI.label,
                         ms: Math.max(0, s.interactiveSpanMs - s.activeDurationMs),
                         color: "var(--chart-muted)",
-                        help: "Inside the interactive span with no agent operation executing.",
+                        help: REVIEWING_NO_AI.help,
                       },
                       {
-                        label: "Idle gaps",
+                        label: LONG_QUIET_GAPS.label,
                         ms: s.idleDurationMs,
                         color: "var(--chart-idle)",
-                        help: "Gaps over the 10-minute idle threshold, excluded from the interactive span.",
+                        help: LONG_QUIET_GAPS.durationBandHelp,
                       },
                     ]}
                   />
@@ -357,7 +359,7 @@ export default function SessionDetailPage() {
                       />
                     </div>
                     <div>
-                      <p className="label mb-2">Engineering outcomes</p>
+                      <p className="label mb-2">Verify & ship signals</p>
                       <MetricGrid
                         columns={4}
                         metrics={[
