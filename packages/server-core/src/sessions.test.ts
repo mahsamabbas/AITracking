@@ -78,6 +78,30 @@ describe("computeSessionMetrics", () => {
     expect(m.elapsedSpanMs).toBe(m.interactiveSpanMs + m.idleDurationMs);
   });
 
+  it("classifies agent test/build tool categories as verify and ship", () => {
+    const events = [
+      ev("session_started", T0),
+      ev("tool_completed", T0 + 30 * S, {
+        duration_ms: 10 * S,
+        metadata: { tool_category: "test", tool_name: "RunTests", telemetry_source: "hook" },
+      }),
+      ev("session_ended", T0 + 2 * M),
+    ];
+    expect(computeSessionMetrics(events).classification).toBe("engineering_output");
+  });
+
+  it("classifies local CI gate events as verify and ship", () => {
+    const events = [
+      ev("session_started", T0),
+      ev("test_completed", T0 + 10 * S, {
+        duration_ms: 5 * S,
+        metadata: { tool_name: "ci_gate", tool_category: "test", telemetry_source: "connector" },
+      }),
+      ev("session_ended", T0 + M),
+    ];
+    expect(computeSessionMetrics(events).classification).toBe("engineering_output");
+  });
+
   it("classifies a session with engineering checks as engineering output", () => {
     const events = [
       ev("session_started", T0),

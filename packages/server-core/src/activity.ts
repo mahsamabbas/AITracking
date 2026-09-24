@@ -31,15 +31,31 @@ export const ACTIVITY_TYPES: ActivityType[] = [
  * are a person's own edits, which must never count as AI file changes.
  */
 export function isAgentReported(event: {
+  event_type?: string;
   metadata?: { tool_name?: unknown; telemetry_source?: unknown } | null;
 }): boolean {
   const m = event.metadata ?? {};
-  return (
+  if (
     (typeof m.tool_name === "string" && m.tool_name.length > 0) ||
     m.telemetry_source === "hook" ||
     m.telemetry_source === "otel" ||
     m.telemetry_source === "provider_api"
-  );
+  ) {
+    return true;
+  }
+  // Local repo CI gate posts allowlisted check events through the connector — no command text.
+  const t = event.event_type ?? "";
+  if (
+    m.telemetry_source === "connector" &&
+    m.tool_name === "ci_gate" &&
+    (t.startsWith("test_") ||
+      t.startsWith("build_") ||
+      t.startsWith("lint_") ||
+      t.startsWith("typecheck_"))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** SQL twin of isAgentReported for an activity_events alias. */

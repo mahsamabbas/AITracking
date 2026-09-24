@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+pnpm lint
+pnpm exec turbo run test --filter='!@techlio/e2e' --continue
+node scripts/techlio-ci-gate.mjs

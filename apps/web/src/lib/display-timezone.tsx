@@ -53,15 +53,17 @@ export function DisplayTimezoneProvider({ children }: { children: ReactNode }) {
       setTimezoneState(stored);
       setApiDisplayTimezone(stored);
       setUserChosen(true);
-    } else {
-      setApiDisplayTimezone(DEFAULT_TIMEZONE);
+      return;
     }
+    setTimezoneState(DEFAULT_TIMEZONE);
+    setApiDisplayTimezone(DEFAULT_TIMEZONE);
   }, []);
 
   useEffect(() => {
-    if (userChosen || !orgTimezone) return;
-    setTimezoneState(orgTimezone);
-    setApiDisplayTimezone(orgTimezone);
+    if (userChosen) return;
+    const next = orgTimezone?.trim() || DEFAULT_TIMEZONE;
+    setTimezoneState(next);
+    setApiDisplayTimezone(next);
   }, [orgTimezone, userChosen]);
 
   const setTimezone = useCallback((id: string) => {

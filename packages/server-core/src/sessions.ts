@@ -65,6 +65,8 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
   let buildsRun = 0;
   let buildsFailed = 0;
   let fileChanges = 0;
+  /** Signals that count toward Verify & ship (tests, builds, lint, typecheck, or test/build tools). */
+  let verifySignals = 0;
   let failures = 0;
   let tokenInput = 0;
   let tokenOutput = 0;
@@ -106,17 +108,24 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
         toolIntervals.push({ startMs: start - (e.duration_ms ?? 0), endMs: start });
         const cat = e.metadata?.tool_category ?? "other";
         toolCategories[cat] = (toolCategories[cat] ?? 0) + 1;
+        if (cat === "test" || cat === "build") verifySignals++;
       }
     } else if (type === "engineering_check") {
       if (e.event_type === "test_completed") {
         testsRun++;
+        verifySignals++;
         testsPassed += e.metadata?.test_passed ?? 0;
         testsFailed += e.metadata?.test_failed ?? 0;
         toolIntervals.push({ startMs: start - (e.duration_ms ?? 0), endMs: start });
       }
       if (e.event_type === "build_completed") {
         buildsRun++;
+        verifySignals++;
         if (e.status === "failed") buildsFailed++;
+        toolIntervals.push({ startMs: start - (e.duration_ms ?? 0), endMs: start });
+      }
+      if (e.event_type === "lint_completed" || e.event_type === "typecheck_completed") {
+        verifySignals++;
         toolIntervals.push({ startMs: start - (e.duration_ms ?? 0), endMs: start });
       }
     } else if (type === "file_change") {
@@ -169,7 +178,7 @@ export function computeSessionMetrics(events: ActivityEvent[]): SessionMetrics {
   let classification: SessionClassification;
   if (idleDurationMs > elapsedSpanMs * 0.5 && elapsedSpanMs > 15 * 60_000) {
     classification = "idle_dominant";
-  } else if (testsRun + buildsRun > 0) {
+  } else if (verifySignals > 0) {
     classification = "engineering_output";
   } else if (fileChanges > 0) {
     classification = "assisted_editing";

@@ -799,6 +799,28 @@ app.post("/hooks/agent", async (req) => {
   return acceptAgentHook((req.body ?? {}) as ClaudeHookPayload, "claude_code");
 });
 
+/**
+ * Local repo CI gate (husky pre-commit, etc.). Emits test_completed with
+ * allowlisted metadata only — no command output or commit messages.
+ */
+app.post("/hooks/ci-gate", async (req) => {
+  if (paused || !identity) return { accepted: 0, unpaired: !identity };
+  const body = (req.body ?? {}) as { status?: string };
+  if (body.status === "failed") return { accepted: 0 };
+  const event = baseEvent(EventTypes.test_completed, {
+    status: "succeeded",
+    metadata: {
+      tool_name: "ci_gate",
+      tool_category: "test",
+      telemetry_source: "connector",
+    },
+  });
+  const clean = event ? sanitizeEvent(event) : null;
+  if (!clean) return { accepted: 0 };
+  emitAgentEvent(clean);
+  return { accepted: 1 };
+});
+
 app.post("/hooks/claude", async (req) => {
   const body = (req.body ?? {}) as ClaudeHookPayload;
   return acceptAgentHook({ ...body, provider: "claude_code" }, "claude_code");

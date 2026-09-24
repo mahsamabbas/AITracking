@@ -42,7 +42,7 @@ export const CLASSIFICATION: Record<
     label: "Verify & ship",
     tone: "ok",
     productive: true,
-    help: "The agent ran tests, builds, lint, or type-checks in this session.",
+    help: "Tests, builds, lint, or type-checks were observed — from the agent or from a local CI gate after checks passed (not from git commits alone).",
   },
   assisted_editing: {
     label: "Writing code",
@@ -141,13 +141,13 @@ export const WORKDAY_SERIES = [
     key: "explorationMs" as const,
     label: "Research & planning",
     color: "var(--chart-3)",
-    hint: "Agent active without file changes — reads, search, questions, planning",
+    hint: "Agent active without file writes or verify/build tools — model time, reads, search, planning",
   },
   {
     key: "editingMs" as const,
     label: "Writing & verify",
     color: "var(--chart-2)",
-    hint: "Agent active while changing files or running tests and builds",
+    hint: "Agent active on file writes, tests, builds, lint, or typecheck",
   },
 ];
 

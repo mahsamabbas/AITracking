@@ -28,9 +28,11 @@
     "admin:create": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/create-admin.ts",
     "admin:create:prod": "bash scripts/admin-create-prod.sh",
     "db:migrate:check:prod": "node scripts/migrate.mjs --check --production",
-    "db:purge-demo": "node scripts/purge-demo-data.mjs"
+    "db:purge-demo": "node scripts/purge-demo-data.mjs",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8",
