@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { TableScroll } from "@/components/ui/TableScroll";
-import { StatTile } from "@/components/ui/StatTile";
-import { EmptyState, ErrorState, LoadingBlock, StatSkeleton } from "@/components/ui/States";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import {
@@ -78,14 +77,6 @@ export default function EmployeesPage() {
   );
 
   const rows = query.data?.employees ?? [];
-
-  const summary = query.data?.summary ?? {
-    listed: rows.length,
-    withActivity: 0,
-    activeMs: 0,
-    sessions: 0,
-    coverageWarnings: 0,
-  };
 
   const chips = [
     search ? { label: `Search: ${search}`, onRemove: () => setSearch("") } : null,
@@ -171,42 +162,11 @@ export default function EmployeesPage() {
 
       <ActiveFilters chips={chips} onClear={clearAll} />
 
-      {query.loading ? (
-        <StatSkeleton />
-      ) : (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Directory summary">
-          <StatTile
-            label="Employees listed"
-            value={rows.length}
-            hint={`${summary.withActivity} with observed activity`}
-            accent="brand"
-          />
-          <StatTile
-            label="Combined AI active time"
-            value={formatDuration(summary.activeMs, { compact: true })}
-            hint="merged model + tool time"
-            accent="teal"
-          />
-          <StatTile
-            label="Sessions"
-            value={formatNumber(summary.sessions)}
-            hint="in the selected range"
-            accent="slate"
-          />
-          <StatTile
-            label="Coverage warnings"
-            value={summary.coverageWarnings}
-            hint="stale, paused, or offline connectors"
-            accent={summary.coverageWarnings > 0 ? "amber" : "slate"}
-          />
-        </section>
-      )}
-
       <div className="mt-5">
         <Card className="card-table">
           <CardHeader
             title="Directory"
-            subtitle="Click a row to open that employee's analytics"
+            subtitle={`${rows.length} people · open a row for full analytics · totals for the range are on Organisation overview`}
             action={
               query.refreshing ? <span className="hint">Refreshing…</span> : null
             }

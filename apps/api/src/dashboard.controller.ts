@@ -18,7 +18,6 @@ import {
   getOrgPolicy,
   hourlySnapshots,
   isDatabaseReady,
-  orgTimezone,
   sql,
 } from "@techlio/server-core";
 import { and, desc, eq, gte } from "drizzle-orm";
@@ -26,6 +25,7 @@ import { providerLabel } from "@techlio/event-schema";
 import { listRecentEvents } from "./services/ingest.js";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 import { orgAccessFromRequest } from "./auth/org-scope.js";
+import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
 
 const STALE_MS = 5 * 60 * 1000;
 
@@ -319,7 +319,7 @@ export class DashboardController {
       people,
       alerts,
       recentEvents,
-      policy: getOrgPolicy(),
+      policy: await getOrgPolicy(organizationId),
       viewer: viewerOf(user),
       generatedAt: new Date().toISOString(),
     };
@@ -350,7 +350,7 @@ export class DashboardController {
         ),
       )
       .orderBy(desc(hourlySnapshots.hourStart));
-    const tz = orgTimezone();
+    const tz = await reportingTimezoneFromRequest(req, organizationId);
     const hourFmt = new Intl.DateTimeFormat("en-GB", {
       timeZone: tz,
       weekday: "short",

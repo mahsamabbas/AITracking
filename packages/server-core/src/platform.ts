@@ -3,6 +3,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { auditLog, organizations } from "./schema.js";
 import { createPortalUser } from "./users.js";
+import { DEFAULT_TIMEZONE } from "./timezone.js";
+import { normalizeLogoDataUrl } from "./images.js";
 
 /**
  * Multi-tenant platform. A super admin (role `super_admin`, living in the
@@ -15,6 +17,7 @@ export interface OrganizationSummary {
   id: string;
   name: string;
   timezone: string;
+  logoUrl: string | null;
   createdAt: string;
   disabled: boolean;
   administrators: number;
@@ -35,6 +38,7 @@ export async function listOrganizations(): Promise<OrganizationSummary[]> {
     name: string;
     timezone: string;
     created_at: Date;
+    logo_url: string | null;
     disabled_at: Date | null;
     administrators: number;
     users: number;
@@ -42,7 +46,7 @@ export async function listOrganizations(): Promise<OrganizationSummary[]> {
     connectors: number;
     last_activity: Date | null;
   }>(sql`
-    SELECT o.id, o.name, o.timezone, o.created_at, o.disabled_at,
+    SELECT o.id, o.name, o.timezone, o.logo_url, o.created_at, o.disabled_at,
            (SELECT COUNT(*)::int FROM portal_users u WHERE u.organization_id = o.id AND u.role = 'administrator') AS administrators,
            (SELECT COUNT(*)::int FROM portal_users u WHERE u.organization_id = o.id) AS users,
            (SELECT COUNT(*)::int FROM employees e WHERE e.organization_id = o.id) AS employees,
@@ -57,6 +61,7 @@ export async function listOrganizations(): Promise<OrganizationSummary[]> {
     id: r.id,
     name: r.name,
     timezone: r.timezone,
+    logoUrl: r.logo_url ?? null,
     createdAt: new Date(r.created_at).toISOString(),
     disabled: r.disabled_at != null,
     administrators: r.administrators,
@@ -88,7 +93,7 @@ export async function createOrganization(input: {
 }): Promise<{ organization: { id: string; name: string }; admin: { email: string; password: string } }> {
   const name = input.name.trim();
   if (name.length < 2 || name.length > 120) throw new Error("invalid_name");
-  const timezone = input.timezone?.trim() || "UTC";
+  const timezone = input.timezone?.trim() || DEFAULT_TIMEZONE;
   try {
     new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
@@ -169,4 +174,33 @@ export async function organizationDisabled(organizationId: string): Promise<bool
     .from(organizations)
     .where(eq(organizations.id, organizationId));
   return rows[0]?.disabledAt != null;
+}
+
+export async function getOrganizationBranding(organizationId: string): Promise<{
+  id: string;
+  name: string;
+  logoUrl: string | null;
+} | null> {
+  const rows = await db
+    .select({ id: organizations.id, name: organizations.name, logoUrl: organizations.logoUrl })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return { id: row.id, name: row.name, logoUrl: row.logoUrl ?? null };
+}
+
+export async function updateOrganizationLogo(input: {
+  organizationId: string;
+  actorId: string;
+  logoUrl: string | null;
+}): Promise<{ logoUrl: string | null }> {
+  const rows = await db.select().from(organizations).where(eq(organizations.id, input.organizationId)).limit(1);
+  const org = rows[0];
+  if (!org || org.kind === "platform") throw new Error("organization_not_found");
+  const logoUrl = normalizeLogoDataUrl(input.logoUrl);
+  await db.update(organizations).set({ logoUrl }).where(eq(organizations.id, input.organizationId));
+  await audit(input.organizationId, input.actorId, "organization.logo_updated", { hasLogo: Boolean(logoUrl) });
+  return { logoUrl };
 }

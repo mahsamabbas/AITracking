@@ -27,7 +27,7 @@ export function formatNumber(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
-export function formatDateTime(iso?: string | null): string {
+export function formatDateTime(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -36,6 +36,7 @@ export function formatDateTime(iso?: string | null): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }
 
@@ -47,11 +48,11 @@ export function formatTime(iso?: string | null, timeZone?: string): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone });
 }
 
-export function formatDate(iso?: string | null): string {
+export function formatDate(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone });
 }
 
 export function formatRelative(iso?: string | null): string {

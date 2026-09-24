@@ -11,11 +11,13 @@ import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPatch, apiPost } from "@/lib/api";
 import { formatDate, formatNumber, formatRelative } from "@/lib/format";
+import { readLogoFile } from "@/lib/image-upload";
 
 interface Organization {
   id: string;
   name: string;
   timezone: string;
+  logoUrl: string | null;
   createdAt: string;
   disabled: boolean;
   administrators: number;
@@ -32,14 +34,14 @@ interface Issued {
 }
 
 const input =
-  "h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "h-10 w-full rounded-lg border border-line bg-card px-3 text-base text-ink-900 shadow-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm";
 
 export default function PlatformPage() {
   const { user, token } = useAuth();
   const allowed = user?.role === "super_admin";
   const query = useApi<{ organizations: Organization[] }>(allowed ? "/v1/platform/organizations" : null);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ name: "", timezone: "UTC", adminName: "", adminEmail: "" });
+  const [form, setForm] = useState({ name: "", timezone: "Asia/Karachi", adminName: "", adminEmail: "" });
   const [adminFor, setAdminFor] = useState<Organization | null>(null);
   const [adminForm, setAdminForm] = useState({ name: "", email: "" });
   const [issued, setIssued] = useState<Issued | null>(null);
@@ -94,7 +96,7 @@ export default function PlatformPage() {
         form,
       );
       setIssued({ organization: res.organization.name, ...res.admin });
-      setForm({ name: "", timezone: "UTC", adminName: "", adminEmail: "" });
+      setForm({ name: "", timezone: "Asia/Karachi", adminName: "", adminEmail: "" });
     });
 
   const addAdmin = () =>
@@ -121,6 +123,12 @@ export default function PlatformPage() {
         return;
       }
       await apiPatch(`/v1/platform/organizations/${org.id}`, token, { disabled: !org.disabled });
+    });
+
+  const uploadOrgLogo = (org: Organization, file: File) =>
+    run(async () => {
+      const logoUrl = await readLogoFile(file);
+      await apiPatch(`/v1/platform/organizations/${org.id}`, token, { logoUrl });
     });
 
   return (
@@ -218,10 +226,22 @@ export default function PlatformPage() {
                   {filtered.map((o) => (
                     <tr key={o.id}>
                       <td>
-                        <p className="text-sm font-medium text-ink-900">{o.name}</p>
-                        <p className="hint">
-                          {o.timezone} · {formatNumber(o.users)} accounts · {formatNumber(o.administrators)} admins
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {o.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={o.logoUrl} alt="" className="h-8 w-8 rounded object-contain ring-1 ring-line" />
+                          ) : (
+                            <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-2xs text-ink-400 dark:bg-white/5">
+                              —
+                            </span>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-ink-900">{o.name}</p>
+                            <p className="hint">
+                              {o.timezone} · {formatNumber(o.users)} accounts · {formatNumber(o.administrators)} admins
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       <td className="num text-right">{o.employees}</td>
                       <td className="num text-right">{o.connectors}</td>
@@ -253,6 +273,20 @@ export default function PlatformPage() {
                         >
                           Add admin
                         </button>
+                        <label className="btn-ghost h-8 cursor-pointer px-2 text-xs">
+                          Logo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            disabled={busy}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) void uploadOrgLogo(o, file);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
                         <button
                           type="button"
                           className="btn-ghost h-8 text-xs"

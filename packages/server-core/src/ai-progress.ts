@@ -2,7 +2,8 @@ import { AGENT_REPORTED_SQL } from "./activity.js";
 import { sql } from "drizzle-orm";
 import { PROVIDER_CAPABILITIES, providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
-import { orgTimezone, type DateRange } from "./analytics.js";
+import { type DateRange } from "./analytics.js";
+import { resolveReportingTimezone } from "./timezone.js";
 
 /**
  * AI Progress — the per-person, per-provider rollup behind the employee hub.
@@ -150,9 +151,10 @@ export async function aiProgress(input: {
   organizationId: string;
   developerId: string;
   range: DateRange;
+  timeZone?: string;
 }): Promise<AiProgress> {
   const { organizationId, developerId, range } = input;
-  const tz = orgTimezone();
+  const tz = await resolveReportingTimezone(organizationId, input.timeZone);
 
   const [bySession, models, tierB, gaps, caps] = await Promise.all([
     db.execute<Record<string, unknown> & { provider: string }>(sql`
@@ -330,9 +332,10 @@ export async function aiProgressTimeline(input: {
   organizationId: string;
   developerId: string;
   date: string; // YYYY-MM-DD in org timezone
+  timeZone?: string;
 }): Promise<ProgressTimeline> {
-  const tz = orgTimezone();
   const { organizationId, developerId, date } = input;
+  const tz = await resolveReportingTimezone(organizationId, input.timeZone);
   const [events, sessions] = await Promise.all([
     db.execute<{ hour: number; provider: string; event_type: string; status: string | null; count: number }>(sql`
       SELECT EXTRACT(HOUR FROM (e.occurred_at AT TIME ZONE ${tz}))::int AS hour,
@@ -430,10 +433,11 @@ export async function activityCalendar(input: {
   organizationId: string;
   developerId: string;
   days?: number;
+  timeZone?: string;
 }): Promise<ActivityCalendar> {
   const { organizationId, developerId } = input;
   const span = Math.min(Math.max(input.days ?? 365, 7), 371);
-  const tz = orgTimezone();
+  const tz = await resolveReportingTimezone(organizationId, input.timeZone);
   const to = new Date();
   const from = new Date(to.getTime() - span * 86_400_000);
 

@@ -15,6 +15,7 @@ const TABS = [
   { segment: "/users", label: "Access" },
   { segment: "/audit", label: "Audit" },
   { segment: "/policy", label: "Policy" },
+  { segment: "/settings", label: "Settings" },
 ] as const;
 
 export function PlatformOrgTabBar() {

@@ -6,6 +6,7 @@ import {
   getCustomerOrganization,
   listOrganizations,
   setOrganizationDisabled,
+  updateOrganizationLogo,
 } from "@techlio/server-core";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 
@@ -84,10 +85,28 @@ export class PlatformController {
   }
 
   @Patch("organizations/:id")
-  async update(@Req() req: FastifyRequest, @Param("id") id: string, @Body() body: { disabled?: boolean }) {
+  async update(
+    @Req() req: FastifyRequest,
+    @Param("id") id: string,
+    @Body() body: { disabled?: boolean; logoUrl?: string | null },
+  ) {
     const user = userFromRequest(req);
     requireRoles(user, ["super_admin"]);
-    if (typeof body.disabled !== "boolean") throw new BadRequestException("disabled_required");
+    if (body.logoUrl !== undefined) {
+      try {
+        return {
+          ok: true,
+          ...(await updateOrganizationLogo({
+            organizationId: id,
+            actorId: user.id,
+            logoUrl: body.logoUrl,
+          })),
+        };
+      } catch (err) {
+        throw new BadRequestException(err instanceof Error ? err.message : "invalid_image");
+      }
+    }
+    if (typeof body.disabled !== "boolean") throw new BadRequestException("disabled_or_logo_required");
     try {
       await setOrganizationDisabled({ actor: user, organizationId: id, disabled: body.disabled });
     } catch (err) {

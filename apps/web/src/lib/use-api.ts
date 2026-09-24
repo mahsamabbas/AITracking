@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiGet } from "./api";
 import { useAuth } from "./auth-context";
+import { useDisplayTimezoneVersion } from "./display-timezone";
 
 export interface QueryState<T> {
   data: T | null;
@@ -25,6 +26,7 @@ export function useApi<T>(
   options?: { pollMs?: number },
 ): QueryState<T> {
   const { token, ready } = useAuth();
+  const displayTzVersion = useDisplayTimezoneVersion();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<number | null>(null);
@@ -85,7 +87,7 @@ export function useApi<T>(
     return () => {
       cancelled = true;
     };
-  }, [path, token, ready, nonce, options?.pollMs]);
+  }, [path, token, ready, nonce, options?.pollMs, displayTzVersion]);
 
   return { data, error, status, loading, refreshing, fetchedAt, reload };
 }

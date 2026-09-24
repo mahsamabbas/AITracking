@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ActivityFeed } from "@/components/domain/ActivityFeed";
-import { TableScroll } from "@/components/ui/TableScroll";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import {
@@ -19,7 +18,6 @@ import { TrendChart } from "@/components/charts/TrendChart";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
-import { AlertList } from "@/components/domain/AlertList";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
 import { DurationSplit } from "@/components/domain/DurationSplit";
 import { FilterBar, SelectFilter } from "@/components/filters/FilterBar";
@@ -35,7 +33,7 @@ import { useAuth } from "@/lib/auth-context";
 import { API_BASE, apiPost, qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
-import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
+import { classificationOf } from "@/lib/vocab";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
   FilterMeta,
@@ -303,6 +301,40 @@ export default function OverviewPage() {
             />
           </section>
 
+          {/* ---------------- Tools + patterns ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card>
+              <CardHeader title="AI tools in use" subtitle="By agent active time" />
+              <CardBody>
+                <BarList items={toolItems} />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Session outcomes"
+                subtitle="How many sessions fell into each observed pattern (not the same as time in Observed time split)"
+              />
+              <CardBody>
+                <DonutChart
+                  data={classificationSlices}
+                  centerValue={formatNumber(t!.sessions)}
+                  centerLabel="sessions"
+                />
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Working-hour pattern"
+                subtitle="When agent activity happens (org timezone)"
+              />
+              <CardBody className="pt-2">
+                <HourPatternChart data={d!.hourPattern} />
+              </CardBody>
+            </Card>
+          </section>
+
           {/* ---------------- Trend + split ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
@@ -355,42 +387,8 @@ export default function OverviewPage() {
             </Card>
           </section>
 
-          {/* ---------------- Tools ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card>
-              <CardHeader title="AI tools in use" subtitle="By agent active time" />
-              <CardBody>
-                <BarList items={toolItems} />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Session activity mix"
-                subtitle="What the agent was observed doing"
-              />
-              <CardBody>
-                <DonutChart
-                  data={classificationSlices}
-                  centerValue={formatNumber(t!.sessions)}
-                  centerLabel="sessions"
-                />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Working-hour pattern"
-                subtitle="When agent activity happens (org timezone)"
-              />
-              <CardBody className="pt-2">
-                <HourPatternChart data={d!.hourPattern} />
-              </CardBody>
-            </Card>
-          </section>
-
-          {/* ---------------- Teams / categories / outcomes ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+          {/* ---------------- Teams & outcomes ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
             {canViewTeam(user?.role) ? (
               <Card>
                 <CardHeader title="Teams" subtitle="Agent active time by team" href="/employees" />
@@ -408,22 +406,11 @@ export default function OverviewPage() {
               </Card>
             ) : null}
 
-            <Card>
-              <CardHeader title="Tool categories" subtitle="Allowlisted categories only" />
-              <CardBody>
-                <BarList
-                  items={d!.toolCategories.slice(0, 7).map((c) => ({
-                    label: TOOL_CATEGORY_LABEL[c.category] ?? c.category,
-                    value: c.calls,
-                    formatted: formatNumber(c.calls),
-                    color: "var(--chart-5)",
-                  }))}
-                />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader title="Engineering outcomes" subtitle="Observed check results" />
+            <Card className={canViewTeam(user?.role) ? undefined : "xl:col-span-2"}>
+              <CardHeader
+                title="Engineering outcomes"
+                subtitle="Aggregate counts for the range — per-person breakdown is on Employees and Leaderboard"
+              />
               <CardBody>
                 <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-line">
                   {[
@@ -518,21 +505,20 @@ export default function OverviewPage() {
 
             <Card>
               <CardHeader
-                title="Coverage & connector health"
-                subtitle="Telemetry limitations, not activity judgements"
+                title="Coverage summary"
+                subtitle="Gap and assignment quality for this range · alerts and device actions on Connectors"
                 href={canViewTeam(user?.role) ? "/connectors" : undefined}
                 hrefLabel="Connectors"
               />
-              <AlertList alerts={live.data?.alerts ?? []} />
               {coverage ? (
-                <div className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
                   {[
                     ["Gap events", coverage.gapEvents],
                     ["Partial sessions", coverage.partialSessions],
                     ["Unassigned", coverage.unassignedSessions],
                     ["No telemetry", coverage.employeesWithoutTelemetry],
                   ].map(([label, value]) => (
-                    <div key={String(label)} className="bg-card px-4 py-2.5">
+                    <div key={String(label)} className="bg-card px-4 py-3">
                       <p className="label">{label}</p>
                       <p className="num mt-0.5 text-sm font-semibold text-ink-900">
                         {formatNumber(Number(value))}
@@ -540,66 +526,13 @@ export default function OverviewPage() {
                     </div>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <CardBody>
+                  <p className="hint">Coverage metrics load with organisation analytics.</p>
+                </CardBody>
+              )}
             </Card>
           </section>
-
-          {/* ---------------- Connector table ---------------- */}
-          {canViewTeam(user?.role) && (live.data?.connectors.length ?? 0) > 0 ? (
-            <section className="mt-5">
-              <Card className="card-table">
-                <CardHeader
-                  title="Connectors"
-                  subtitle="One registered installation per employee and AI tool"
-                  href="/connectors"
-                />
-                <TableScroll>
-                  <table className="tbl min-w-[640px]">
-                    <thead>
-                      <tr>
-                        <th>Employee</th>
-                        <th>AI tool</th>
-                        <th>State</th>
-                        <th>Last heartbeat</th>
-                        <th className="text-right">Queue</th>
-                        <th>Version</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {live.data!.connectors.map((c) => (
-                        <tr key={c.deviceId}>
-                          <td>
-                            <OrgLink
-                              href={`/employees/${c.developerId}`}
-                              className="text-sm font-medium text-ink-900 hover:text-brand-600"
-                            >
-                              {c.displayName}
-                            </OrgLink>
-                            <span className="hint block">{c.team}</span>
-                          </td>
-                          <td>
-                            <ProviderBadge provider={c.provider} size="sm" />
-                          </td>
-                          <td>
-                            <ConnectorBadge state={c.state} />
-                          </td>
-                          <td className="num text-sm text-ink-500">
-                            {formatRelative(c.lastHeartbeat)}
-                          </td>
-                          <td className="num text-right text-sm text-ink-500">
-                            {c.queueDepth ?? "—"}
-                          </td>
-                          <td className="num text-sm text-ink-500">
-                            {c.connectorVersion ?? "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TableScroll>
-              </Card>
-            </section>
-          ) : null}
         </>
       )}
     </AppShell>

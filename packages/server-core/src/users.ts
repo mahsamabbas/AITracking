@@ -5,6 +5,7 @@ import { db } from "./db.js";
 import { portalUsers, auditLog, employees } from "./schema.js";
 import { ORG_ASSIGNABLE_ROLES, type OrgAssignableRole, type Role } from "./roles.js";
 import { devAffordancesEnabled } from "./runtime.js";
+import { resolveOrgTimezone, timezoneFromEnv } from "./timezone.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
 export const DEV_DEVELOPER_ALEX = "550e8400-e29b-41d4-a716-446655440011";
@@ -94,6 +95,7 @@ export type PortalUserPublic = {
   role: Role;
   organizationId: string;
   developerId: string | null;
+  avatarUrl: string | null;
 };
 
 export async function seedPortalUsers(): Promise<void> {
@@ -176,7 +178,97 @@ function toPublic(row: typeof portalUsers.$inferSelect): PortalUserPublic {
     role: row.role as Role,
     organizationId: row.organizationId,
     developerId: row.developerId ?? null,
+    avatarUrl: row.avatarUrl ?? null,
   };
+}
+
+export async function getPortalUserById(id: string): Promise<PortalUserPublic | null> {
+  const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, id)).limit(1);
+  return rows[0] ? toPublic(rows[0]) : null;
+}
+
+export async function updatePortalProfile(
+  userId: string,
+  input: { email?: string; displayName?: string; avatarUrl?: string | null },
+): Promise<PortalUserPublic> {
+  const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, userId)).limit(1);
+  const row = rows[0];
+  if (!row) throw new Error("user_not_found");
+
+  const nextEmail = input.email !== undefined ? input.email.toLowerCase().trim() : undefined;
+  const nextName = input.displayName !== undefined ? input.displayName.trim() : undefined;
+  if (nextEmail !== undefined && !nextEmail.includes("@")) throw new Error("invalid_email");
+  if (nextName !== undefined && (nextName.length < 1 || nextName.length > 120)) {
+    throw new Error("invalid_name");
+  }
+
+  if (nextEmail && nextEmail !== row.email) {
+    const used = await db
+      .select({ id: portalUsers.id })
+      .from(portalUsers)
+      .where(eq(portalUsers.email, nextEmail))
+      .limit(1);
+    if (used[0] && used[0].id !== userId) throw new Error("email_already_used");
+  }
+
+  const patch: Partial<typeof portalUsers.$inferInsert> = {};
+  if (nextEmail !== undefined) patch.email = nextEmail;
+  if (nextName !== undefined) patch.displayName = nextName;
+  if (input.avatarUrl !== undefined) patch.avatarUrl = input.avatarUrl;
+
+  if (Object.keys(patch).length) {
+    await db.update(portalUsers).set(patch).where(eq(portalUsers.id, userId));
+  }
+
+  if (row.developerId && (nextEmail !== undefined || nextName !== undefined)) {
+    await db
+      .update(employees)
+      .set({
+        ...(nextEmail !== undefined ? { email: nextEmail } : {}),
+        ...(nextName !== undefined ? { displayName: nextName } : {}),
+      })
+      .where(eq(employees.id, row.developerId));
+  }
+
+  await db.insert(auditLog).values({
+    organizationId: row.organizationId,
+    actorId: userId,
+    action: "profile.update",
+    detail: {
+      email: nextEmail !== undefined,
+      displayName: nextName !== undefined,
+      avatar: input.avatarUrl !== undefined,
+    },
+    createdAt: new Date(),
+  });
+
+  const updated = await getPortalUserById(userId);
+  if (!updated) throw new Error("user_not_found");
+  return updated;
+}
+
+export async function changePortalPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (newPassword.length < 8) throw new Error("password_too_short");
+  const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, userId)).limit(1);
+  const row = rows[0];
+  if (!row) throw new Error("user_not_found");
+  const check = verifyPassword(currentPassword, row.passwordHash);
+  if (!check.ok) throw new Error("invalid_password");
+  await db
+    .update(portalUsers)
+    .set({ passwordHash: hashPassword(newPassword) })
+    .where(eq(portalUsers.id, userId));
+  await db.insert(auditLog).values({
+    organizationId: row.organizationId,
+    actorId: userId,
+    action: "profile.password_changed",
+    detail: {},
+    createdAt: new Date(),
+  });
 }
 
 export async function listPortalUsers(
@@ -238,6 +330,7 @@ export async function createPortalUser(input: {
     role: input.role,
     organizationId: input.organizationId,
     developerId,
+    avatarUrl: null,
   };
 }
 
@@ -274,10 +367,31 @@ export async function listAuditLog(
     .limit(limit);
 }
 
-export function getOrgPolicy() {
+export async function getOrgPolicy(organizationId: string) {
+  const retentionEventsDays = Number(process.env.RETENTION_DAYS ?? 90);
+  const timezone = await resolveOrgTimezone(organizationId);
+  return {
+    timezone,
+    retentionEventsDays,
+    retentionSummariesDays: 365,
+    staleHeartbeatMinutes: 5,
+    idleThresholdMinutes: 10,
+    monitoringNoticeStatus: "draft" as const,
+    notificationRules: [
+      "stale_connector",
+      "upload_failed",
+      "unsupported_version",
+      "unassigned_session",
+      "summary_failed",
+    ],
+  };
+}
+
+/** @deprecated Use {@link getOrgPolicy} with an organisation id. */
+export function getOrgPolicySync() {
   const retentionEventsDays = Number(process.env.RETENTION_DAYS ?? 90);
   return {
-    timezone: process.env.ORG_TIMEZONE ?? "UTC",
+    timezone: timezoneFromEnv(),
     retentionEventsDays,
     retentionSummariesDays: 365,
     staleHeartbeatMinutes: 5,

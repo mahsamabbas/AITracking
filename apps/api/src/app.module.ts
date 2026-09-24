@@ -11,6 +11,7 @@ import { AuthController } from "./auth/auth.controller.js";
 import { OrgController } from "./org.controller.js";
 import { HealthController } from "./health.controller.js";
 import { PlatformController } from "./platform.controller.js";
+import { ProfileController } from "./profile.controller.js";
 
 @Module({
   controllers: [
@@ -26,6 +27,7 @@ import { PlatformController } from "./platform.controller.js";
     ExportsController,
     StreamController,
     PlatformController,
+    ProfileController,
   ],
 })
 export class AppModule {}

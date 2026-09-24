@@ -5,14 +5,28 @@ import {
   connectorStateOf,
   rollupConnectorState,
 } from "./connector-state.js";
+import { resolveOrgTimezone, resolveReportingTimezone, timezoneFromEnv } from "./timezone.js";
 
 export interface DateRange {
   from: Date;
   to: Date;
 }
 
+/** Env fallback only — prefer {@link scopeTimezone} when you have an organisation id. */
 export function orgTimezone(): string {
-  return process.env.ORG_TIMEZONE ?? "UTC";
+  return timezoneFromEnv();
+}
+
+async function scopeTimezone(f: ScopeFilters): Promise<string> {
+  if (f.timeZone?.trim()) {
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: f.timeZone.trim() });
+      return f.timeZone.trim();
+    } catch {
+      /* invalid override */
+    }
+  }
+  return resolveOrgTimezone(f.organizationId);
 }
 
 /** Same-length window immediately before `range`, for period-over-period deltas. */
@@ -65,12 +79,13 @@ export interface EmployeeDirectoryFilters {
   connectorState?: string;
   developerIds?: string[];
   sort?: "name" | "activity" | "sessions" | "recent";
+  timeZone?: string;
 }
 
 export async function listEmployeeDirectory(
   f: EmployeeDirectoryFilters,
 ): Promise<EmployeeDirectoryRow[]> {
-  const tz = orgTimezone();
+  const tz = await resolveReportingTimezone(f.organizationId, f.timeZone);
 
   const base = await db.execute<{
     id: string;
@@ -388,6 +403,8 @@ interface ScopeFilters {
   provider?: string;
   team?: string;
   projectId?: string;
+  /** Viewer display timezone — overrides org timezone for date/hour bucketing. */
+  timeZone?: string;
 }
 
 function developerIdIn(column: string, developerIds?: string[]) {
@@ -446,7 +463,7 @@ export async function dailyTrend(
   f: ScopeFilters,
   range: DateRange,
 ): Promise<TrendPoint[]> {
-  const tz = orgTimezone();
+  const tz = await scopeTimezone(f);
   const res = await db.execute<{
     day: string;
     active_ms: string;
@@ -568,7 +585,7 @@ export async function hourOfDayPattern(
   f: ScopeFilters,
   range: DateRange,
 ): Promise<HourPattern[]> {
-  const tz = orgTimezone();
+  const tz = await scopeTimezone(f);
   const res = await db.execute<{ hour: number; active_ms: string; sessions: number }>(sql`
     SELECT EXTRACT(HOUR FROM (s.started_at AT TIME ZONE ${tz}))::int AS hour,
            SUM(s.active_duration_ms)                                 AS active_ms,
@@ -598,7 +615,7 @@ export async function weekdayPattern(
   f: ScopeFilters,
   range: DateRange,
 ): Promise<WeekdayPattern[]> {
-  const tz = orgTimezone();
+  const tz = await scopeTimezone(f);
   const res = await db.execute<{ dow: number; active_ms: string; sessions: number }>(sql`
     SELECT EXTRACT(DOW FROM (s.started_at AT TIME ZONE ${tz}))::int AS dow,
            SUM(s.active_duration_ms)                                AS active_ms,
@@ -793,12 +810,14 @@ export async function organizationAnalytics(input: {
   team?: string;
   provider?: string;
   developerIds?: string[];
+  timeZone?: string;
 }): Promise<OrganizationAnalytics> {
   const scope: ScopeFilters = {
     organizationId: input.organizationId,
     team: input.team,
     provider: input.provider,
     developerIds: input.developerIds,
+    timeZone: input.timeZone,
   };
   const prev = previousRange(input.range);
 
@@ -1118,7 +1137,7 @@ export async function fileChangeTrend(
   f: ScopeFilters,
   range: DateRange,
 ): Promise<{ date: string; fileChanges: number }[]> {
-  const tz = orgTimezone();
+  const tz = await scopeTimezone(f);
   const res = await db.execute<{ day: string; file_changes: number }>(sql`
     SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
            COUNT(*)::int AS file_changes

@@ -11,16 +11,32 @@ function resolveApiBase(): string {
 export const API_BASE = resolveApiBase();
 
 const TECHLIO_ORG_HEADER = "x-techlio-org-id";
+const TECHLIO_DISPLAY_TZ_HEADER = "x-techlio-display-timezone";
 
 let activeOrgContextId: string | null = null;
+let activeDisplayTimezone = "Asia/Karachi";
+const displayTzListeners = new Set<() => void>();
 
 /** Set while a platform super admin views a customer organisation workspace. */
 export function setApiOrgContext(orgId: string | null): void {
   activeOrgContextId = orgId;
 }
 
+/** Viewer-selected IANA timezone — sent on API requests for reporting buckets. */
+export function setApiDisplayTimezone(timeZone: string): void {
+  activeDisplayTimezone = timeZone;
+  for (const fn of displayTzListeners) fn();
+}
+
+export function subscribeDisplayTimezone(listener: () => void): () => void {
+  displayTzListeners.add(listener);
+  return () => displayTzListeners.delete(listener);
+}
+
 function authHeaders(token: string | null): Record<string, string> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    [TECHLIO_DISPLAY_TZ_HEADER]: activeDisplayTimezone,
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (activeOrgContextId) headers[TECHLIO_ORG_HEADER] = activeOrgContextId;
   return headers;

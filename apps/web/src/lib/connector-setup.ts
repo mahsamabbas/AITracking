@@ -7,6 +7,7 @@ export const CONNECTOR_ONBOARDING_PATHS = [
   "/setup-connector",
   "/my-connectors",
   "/policy",
+  "/settings",
 ] as const;
 
 export type ConnectorSetupPhase = "loading" | "offline" | "unpaired" | "ready";

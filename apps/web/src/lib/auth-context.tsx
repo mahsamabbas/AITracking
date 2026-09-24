@@ -29,6 +29,7 @@ export interface PortalUser {
   role: Role;
   organizationId: string;
   developerId?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthState {
@@ -39,6 +40,8 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   unlockWithBiometric: () => Promise<void>;
   logout: () => void;
+  applySession: (token: string, user: PortalUser) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
@@ -49,6 +52,8 @@ const AuthContext = createContext<AuthState>({
   login: async () => {},
   unlockWithBiometric: async () => {},
   logout: () => {},
+  applySession: () => {},
+  refreshUser: async () => {},
 });
 
 async function fetchCurrentUser(stored: string): Promise<PortalUser> {
@@ -132,6 +137,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, [router]);
 
+  const applySession = useCallback((nextToken: string, nextUser: PortalUser) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    try {
+      localStorage.setItem(TOKEN_KEY, nextToken);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      stored = null;
+    }
+    if (!stored) return;
+    const nextUser = await fetchCurrentUser(stored);
+    setUser(nextUser);
+  }, []);
+
   useEffect(() => {
     let stored: string | null = null;
     try {
@@ -184,8 +211,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [ready, token, locked, pathname, router, user?.role, user?.developerId]);
 
   const value = useMemo<AuthState>(
-    () => ({ token, user, ready, locked, login, unlockWithBiometric, logout }),
-    [token, user, ready, locked, login, unlockWithBiometric, logout],
+    () => ({ token, user, ready, locked, login, unlockWithBiometric, logout, applySession, refreshUser }),
+    [token, user, ready, locked, login, unlockWithBiometric, logout, applySession, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

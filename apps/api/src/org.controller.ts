@@ -131,7 +131,7 @@ export class OrgController {
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
     return {
       organizationId,
-      ...getOrgPolicy(),
+      ...(await getOrgPolicy(organizationId)),
     };
   }
 }

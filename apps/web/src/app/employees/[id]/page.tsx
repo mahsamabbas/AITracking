@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AiProgressPanel } from "@/components/domain/AiProgressPanel";
-import { AiProgressTimeline } from "@/components/domain/AiProgressTimeline";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatTile } from "@/components/ui/StatTile";
@@ -15,7 +14,6 @@ import {
   EmptyState,
   emptyActivityVariant,
   ErrorState,
-  LoadingBlock,
   NotFoundState,
   StatSkeleton,
 } from "@/components/ui/States";
@@ -31,7 +29,6 @@ import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
 import { EmployeeAiPlanUsage } from "@/components/domain/EmployeeAiPlanUsage";
-import { EventTimeline } from "@/components/domain/EventTimeline";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
@@ -47,7 +44,7 @@ import {
 } from "@/lib/format";
 import { classificationOf, TOOL_CATEGORY_LABEL } from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
-import type { ActivityEventRow, EmployeeAnalytics, LiveStatus } from "@/lib/types";
+import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
   const params = useParams();
@@ -79,21 +76,6 @@ export default function EmployeeDetailPage() {
   const [pickedDay, setPickedDay] = useState<string | null>(null);
   const lastActiveDay = calendar.data?.days.length ? calendar.data.days[calendar.data.days.length - 1].date : null;
   const workDay = pickedDay ?? lastActiveDay ?? new Date().toISOString().slice(0, 10);
-  const timeline = useApi<{
-    timezone: string;
-    hourlyCards: {
-      id: string;
-      hourStart: string;
-      hourLabel: string;
-      version: number;
-      completeness: string;
-      metrics: { eventCount?: number; mergedActiveDurationMs?: number; fileChanges?: number };
-    }[];
-  }>(
-    employeeId && employeeId !== "self"
-      ? `/v1/developers/${employeeId}/timeline?hours=48`
-      : null,
-  );
 
   const d = query.data;
   const t = d?.totals;
@@ -258,17 +240,13 @@ export default function EmployeeDetailPage() {
           <Card className="mb-5">
             <CardHeader
               title="AI activity — last 12 months"
-              subtitle={
-                calendar.data
-                  ? `${formatNumber(calendar.data.totals.activeDays)} active days · ${formatNumber(calendar.data.totals.sessions)} sessions · ${formatDuration(calendar.data.totals.activeMs, { compact: true })} AI active · click a day to see it hour by hour`
-                  : "Each square is one day, shaded by AI agent active time"
-              }
+              subtitle="Each square is one day in the last year — click a day for the workday view below"
             />
-            <CardBody>
+            <CardBody className="pb-6 pt-2">
               {calendar.error ? (
                 <p className="hint">Could not load the activity graph.</p>
               ) : !calendar.data ? (
-                <ChartSkeleton height={130} />
+                <ChartSkeleton height={200} />
               ) : (
                 <ActivityCalendar data={calendar.data} selected={workDay} onSelect={setPickedDay} />
               )}
@@ -351,6 +329,43 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
+          {/* ---------------- Patterns ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card>
+              <CardHeader
+                title="Working-hour pattern"
+                subtitle="When agent activity happens (org timezone)"
+              />
+              <CardBody className="pt-2">
+                <HourPatternChart data={d.hourPattern} emptyVariant={silenceVariant} />
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Activity mix" subtitle="Sessions by observed outcome" />
+              <CardBody>
+                <DonutChart
+                  data={classificationSlices}
+                  centerValue={formatNumber(t.sessions)}
+                  centerLabel="sessions"
+                  emptyVariant={silenceVariant}
+                />
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Day of week" subtitle="Agent active time" />
+              <CardBody>
+                <BarList
+                  items={d.weekdayPattern.map((w) => ({
+                    label: w.label,
+                    value: w.activeMs,
+                    formatted: formatDuration(w.activeMs),
+                    color: "var(--chart-2)",
+                  }))}
+                />
+              </CardBody>
+            </Card>
+          </section>
+
           {/* ---------------- AI progress (primary module) ---------------- */}
           <section className="mt-5" aria-label="AI progress">
             <AiProgressPanel
@@ -358,9 +373,6 @@ export default function EmployeeDetailPage() {
               employeeId={employeeId}
               emptyVariant={silenceVariant}
             />
-          </section>
-          <section className="mt-5">
-            <AiProgressTimeline employeeId={employeeId} />
           </section>
 
           {/* ---------------- Trend + split ---------------- */}
@@ -419,12 +431,6 @@ export default function EmployeeDetailPage() {
             <ProjectsFileChangesCard
               trend={d.fileChangeTrend ?? []}
               workspaces={d.fileChangeWorkspaces ?? []}
-              dailyUsage={d.dailyTrend}
-              totals={{
-                activeMs: t.activeMs,
-                sessions: t.sessions,
-                fileChanges: t.fileChanges,
-              }}
               subtitle={
                 isSelf
                   ? "Your AI active time, workspaces your agent edited, and file changes from your connector. Session time is counted per workspace when that folder had file activity."
@@ -439,68 +445,7 @@ export default function EmployeeDetailPage() {
             <EmployeeAiPlanUsage rows={d.aiSubscriptions ?? []} isSelf={isSelf} />
           </section>
 
-
-          {/* ---------------- Hourly timeline ---------------- */}
-          <section className="mt-5">
-            <Card>
-              <CardHeader
-                title="Hourly timeline"
-                subtitle={
-                  timeline.data?.timezone
-                    ? `Latest version of each hour · ${timeline.data.timezone}`
-                    : "One card per clock hour, linked to its source events"
-                }
-              />
-              {timeline.error ? (
-                <ErrorState
-                  title="Could not load hourly cards"
-                  detail={timeline.error}
-                  onRetry={timeline.reload}
-                />
-              ) : timeline.loading ? (
-                <LoadingBlock rows={4} />
-              ) : (timeline.data?.hourlyCards.length ?? 0) === 0 ? (
-                <EmptyState
-                  compact
-                  title="No hourly summaries yet"
-                  body="Hourly cards appear after the worker finalises a completed hour. The current hour stays open until it closes."
-                />
-              ) : (
-                <div
-                  className={`grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3 ${
-                    timeline.data!.hourlyCards.length > 6 ? "scroll-y pr-1" : ""
-                  }`}
-                >
-                  {timeline.data!.hourlyCards.map((card) => (
-                    <Link
-                      key={card.id}
-                      href={`/hourly/${card.id}`}
-                      className="rounded-xl border border-line bg-card p-3 transition hover:border-brand-300"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-ink-900">{card.hourLabel}</p>
-                        <span
-                          className={
-                            card.completeness === "complete" ? "badge-ok" : "badge-warn"
-                          }
-                        >
-                          {card.completeness}
-                        </span>
-                      </div>
-                      <p className="hint mt-2">
-                        {formatDuration(card.metrics.mergedActiveDurationMs ?? 0)} active ·{" "}
-                        {card.metrics.eventCount ?? 0} events · {card.metrics.fileChanges ?? 0} file
-                        changes
-                      </p>
-                      <p className="hint">v{card.version}</p>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </section>
-
-          {/* ---------------- Sessions + idle + timeline ---------------- */}
+          {/* ---------------- Sessions ---------------- */}
           <section className="mt-5">
             <Card>
               <CardHeader
@@ -513,45 +458,8 @@ export default function EmployeeDetailPage() {
             </Card>
           </section>
 
-          {/* ---------------- Patterns ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card>
-              <CardHeader
-                title="Working-hour pattern"
-                subtitle="When agent activity happens (org timezone)"
-              />
-              <CardBody className="pt-2">
-                <HourPatternChart data={d.hourPattern} emptyVariant={silenceVariant} />
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader title="Activity mix" subtitle="Sessions by observed outcome" />
-              <CardBody>
-                <DonutChart
-                  data={classificationSlices}
-                  centerValue={formatNumber(t.sessions)}
-                  centerLabel="sessions"
-                  emptyVariant={silenceVariant}
-                />
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader title="Day of week" subtitle="Agent active time" />
-              <CardBody>
-                <BarList
-                  items={d.weekdayPattern.map((w) => ({
-                    label: w.label,
-                    value: w.activeMs,
-                    formatted: formatDuration(w.activeMs),
-                    color: "var(--chart-2)",
-                  }))}
-                />
-              </CardBody>
-            </Card>
-          </section>
-
           {/* ---------------- Breakdown rails ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+          <section className="mt-5 grid gap-4 xl:grid-cols-2">
             <Card>
               <CardHeader title="Projects & work items" subtitle="Where sessions were assigned" />
               <CardBody>
@@ -577,27 +485,6 @@ export default function EmployeeDetailPage() {
                     color: "var(--chart-5)",
                   }))}
                 />
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader title="Models used" subtitle="Reported by the provider" />
-              <CardBody>
-                {d.models.length === 0 ? (
-                  <EmptyState
-                    compact
-                    variant="provider-missing"
-                    body="No model names were reported for this period."
-                  />
-                ) : (
-                  <BarList
-                    items={d.models.slice(0, 6).map((m) => ({
-                      label: m.model,
-                      value: m.sessions,
-                      formatted: `${m.sessions} sessions`,
-                      color: "var(--chart-6)",
-                    }))}
-                  />
-                )}
               </CardBody>
             </Card>
           </section>

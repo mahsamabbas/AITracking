@@ -5,6 +5,7 @@ import {
   totalDurationMs,
   type TimeInterval,
 } from "@techlio/aggregation";
+import { timezoneFromEnv } from "./timezone.js";
 import { db } from "./db.js";
 import { activityEvents, agentSessions, projects, workItems } from "./schema.js";
 import {
@@ -300,7 +301,7 @@ function sessionConditions(f: SessionListFilters) {
   }
   if (f.clockHour != null && f.clockHour >= 0 && f.clockHour <= 23) {
     conds.push(
-      sql`EXTRACT(HOUR FROM ${agentSessions.startedAt} AT TIME ZONE ${process.env.ORG_TIMEZONE ?? "UTC"}) = ${f.clockHour}`,
+      sql`EXTRACT(HOUR FROM ${agentSessions.startedAt} AT TIME ZONE ${timezoneFromEnv()}) = ${f.clockHour}`,
     );
   }
   if (f.from) conds.push(gte(agentSessions.startedAt, f.from));

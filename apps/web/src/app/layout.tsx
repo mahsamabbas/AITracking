@@ -3,6 +3,7 @@ import "./globals.css";
 import { ConnectorOnboardingTour } from "@/components/onboarding/ConnectorOnboardingTour";
 import { ConnectorRequiredGate } from "@/components/domain/ConnectorRequiredGate";
 import { AuthProvider } from "@/lib/auth-context";
+import { DisplayTimezoneProvider } from "@/lib/display-timezone";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -38,8 +39,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>
-            <ConnectorRequiredGate>{children}</ConnectorRequiredGate>
-            <ConnectorOnboardingTour />
+            <DisplayTimezoneProvider>
+              <ConnectorRequiredGate>{children}</ConnectorRequiredGate>
+              <ConnectorOnboardingTour />
+            </DisplayTimezoneProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useApi } from "@/lib/use-api";
 import { formatRelative } from "@/lib/format";
+import { useDisplayTimezone } from "@/lib/display-timezone";
 
 /**
  * Persistent "what am I looking at" strip for analytics pages: whose data,
@@ -25,8 +25,7 @@ export function ContextBar({
   refreshing?: boolean;
   onRefresh?: () => void;
 }) {
-  const policy = useApi<{ timezone?: string }>("/v1/org/policy");
-  const tz = policy.data?.timezone ?? "UTC";
+  const { label: tzLabel } = useDisplayTimezone();
   // Re-render every 30s so "updated 2m ago" stays honest without refetching.
   const [, tick] = useState(0);
   useEffect(() => {
@@ -44,7 +43,7 @@ export function ContextBar({
       <span>{rangeLabel}</span>
       <span aria-hidden className="text-ink-400">·</span>
       <span title="Hour and day labels use the organisation timezone. Events are stored in UTC.">
-        Times in {tz}
+        Times in {tzLabel}
       </span>
       <span className="ml-auto flex items-center gap-2">
         {live ? (

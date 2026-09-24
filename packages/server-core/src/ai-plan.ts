@@ -1,10 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { PROVIDER_CAPABILITIES } from "@techlio/event-schema";
-
-function orgTimezone(): string {
-  return process.env.ORG_TIMEZONE ?? "UTC";
-}
+import { timezoneFromEnv } from "./timezone.js";
 
 function pgErrorCode(err: unknown): string | undefined {
   if (err && typeof err === "object" && "code" in err) {
@@ -96,7 +93,7 @@ export async function currentCalendarMonthBounds(): Promise<{
   label: string;
 }> {
   try {
-    const tz = orgTimezone();
+    const tz = timezoneFromEnv();
     const res = await db.execute<{ month_start: Date; month_end: Date; label: string }>(sql`
       SELECT
         (date_trunc('month', timezone(${tz}, now()))) AT TIME ZONE ${tz} AS month_start,

@@ -26,11 +26,11 @@ export interface ActivityCalendarData {
   totals: { sessions: number; activeMs: number; activeDays: number };
 }
 
-const CELL = 11;
-const GAP = 3;
+const CELL = 14;
+const GAP = 4;
 const STEP = CELL + GAP;
-const LEFT = 28; // weekday labels
-const TOP = 16; // month labels
+const LEFT = 34; // weekday labels
+const TOP = 18; // month labels
 const WEEKS = 53;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 // Opacity steps of the brand colour read correctly in light and dark themes.
@@ -101,18 +101,20 @@ export function ActivityCalendar({
   const hoveredTracked = hover ? data.trackedSince != null && hover.day >= data.trackedSince : false;
 
   return (
-    <div className="relative">
-      <div className="overflow-x-auto">
+    <div className="relative w-full">
+      <div className="relative w-full">
         <svg
+          className="block h-auto w-full max-w-none"
           width={width}
           height={height}
           viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="xMinYMin meet"
           role="img"
           aria-label={`AI agent activity per day for the last year: ${data.totals.activeDays} active days, ${data.totals.sessions} sessions.`}
           onMouseLeave={() => setHover(null)}
         >
           {months.map((m) => (
-            <text key={`${m.label}-${m.col}`} x={LEFT + m.col * STEP} y={10} className="fill-ink-400 text-[10px]">
+            <text key={`${m.label}-${m.col}`} x={LEFT + m.col * STEP} y={12} className="fill-ink-400 text-[11px]">
               {m.label}
             </text>
           ))}
@@ -121,7 +123,7 @@ export function ActivityCalendar({
             ["Wed", 3],
             ["Fri", 5],
           ].map(([label, row]) => (
-            <text key={label} x={0} y={TOP + (row as number) * STEP + CELL - 2} className="fill-ink-400 text-[10px]">
+            <text key={label} x={0} y={TOP + (row as number) * STEP + CELL - 2} className="fill-ink-400 text-[11px]">
               {label}
             </text>
           ))}
@@ -154,13 +156,16 @@ export function ActivityCalendar({
             ),
           )}
         </svg>
-      </div>
 
-      {hover ? (
-        <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-line bg-card px-2.5 py-1.5 text-2xs shadow-pop"
-          style={{ left: Math.min(Math.max(hover.x + CELL / 2, 90), width - 90), top: hover.y - 4 }}
-        >
+        {hover ? (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-line bg-card px-2.5 py-1.5 text-2xs shadow-pop"
+            style={{
+              left: `${((hover.x + CELL / 2) / width) * 100}%`,
+              top: `${(hover.y / height) * 100}%`,
+              marginTop: -4,
+            }}
+          >
           <p className="font-semibold text-ink-900">
             {new Date(`${hover.day}T00:00:00Z`).toLocaleDateString(undefined, {
               weekday: "short",
@@ -183,8 +188,9 @@ export function ActivityCalendar({
           )}
         </div>
       ) : null}
+      </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-2xs text-ink-500">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-2xs text-ink-500">
         <span className="flex items-center gap-1.5">
           <svg width={CELL} height={CELL} aria-hidden>
             <rect width={CELL} height={CELL} rx={2} style={{ fill: "transparent", stroke: "var(--chart-muted)" }} />

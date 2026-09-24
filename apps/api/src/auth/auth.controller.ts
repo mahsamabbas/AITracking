@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import {
   authenticatePortalUser,
+  getPortalUserById,
   homePathForRole,
   listDeveloperDevices,
 } from "@techlio/server-core";
@@ -39,14 +40,18 @@ export class AuthController {
         role: user.role,
         organizationId: user.organizationId,
         developerId: user.developerId ?? null,
+        avatarUrl: user.avatarUrl ?? null,
       },
       homePath,
     };
   }
 
   @Get("me")
-  me(@Headers("authorization") auth?: string) {
+  async me(@Headers("authorization") auth?: string) {
     if (!auth?.startsWith("Bearer ")) throw new UnauthorizedException();
-    return { user: verifyUserToken(auth.slice(7)) };
+    const tokenUser = verifyUserToken(auth.slice(7));
+    const user = await getPortalUserById(tokenUser.id);
+    if (!user) throw new UnauthorizedException();
+    return { user };
   }
 }

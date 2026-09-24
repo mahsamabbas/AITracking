@@ -15,6 +15,7 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
   timezone: text("timezone").notNull().default("UTC"),
+  logoUrl: text("logo_url"),
   aiPlanLimits: jsonb("ai_plan_limits"),
   /** "customer" tenants hold monitored people; the "platform" org holds super admins only. */
   kind: text("kind").notNull().default("customer"),
@@ -200,4 +201,5 @@ export const portalUsers = pgTable("portal_users", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull(),
   developerId: uuid("developer_id"),
+  avatarUrl: text("avatar_url"),
 });

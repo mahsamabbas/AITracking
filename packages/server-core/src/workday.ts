@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
-import { orgTimezone } from "./analytics.js";
+import { resolveReportingTimezone } from "./timezone.js";
 
 /**
  * One person's day, hour by hour, from agent events only (heartbeats and
@@ -84,9 +84,10 @@ export async function workday(input: {
   organizationId: string;
   developerId: string;
   date: string; // YYYY-MM-DD in the org timezone
+  timeZone?: string;
 }): Promise<Workday> {
   const { organizationId, developerId, date } = input;
-  const tz = orgTimezone();
+  const tz = await resolveReportingTimezone(organizationId, input.timeZone);
 
   const bounds = await db.execute<{ start: Date; end: Date }>(sql`
     SELECT (${date}::date::timestamp AT TIME ZONE ${tz})                        AS start,

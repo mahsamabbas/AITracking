@@ -7,12 +7,12 @@ import { useConnectorSetupPhase } from "@/lib/connector-local";
 import { developerNeedsLocalConnector } from "@/lib/connector-setup";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
-import { initialsOf } from "@/lib/format";
 import type { Role } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PlatformOrgTabBar } from "@/components/PlatformOrgTabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BiometricSetup } from "@/components/BiometricSetup";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
+import { UserAvatar } from "@/components/UserAvatar";
 
 interface NavItem {
   href: string;
@@ -96,6 +96,13 @@ const NAV: NavItem[] = [
     icon: icon("M5 3h7l3 3v11H5V3ZM12 3v3h3M7.5 10h5M7.5 13h5"),
   },
   {
+    href: "/settings",
+    label: "Settings",
+    roles: ["manager", "administrator", "developer", "auditor", "super_admin"],
+    icon: icon("M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM4 6v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2Z"),
+    match: (p) => p === "/settings" || p.startsWith("/settings/"),
+  },
+  {
     href: "/policy",
     label: "Policy",
     roles: ["manager", "administrator", "auditor", "developer"],
@@ -143,7 +150,7 @@ export function AppShell({
           : item,
     );
     if (onboardingLocked) {
-      const allowed = new Set(["/setup-connector", "/my-connectors", "/policy"]);
+      const allowed = new Set(["/setup-connector", "/my-connectors", "/policy", "/settings"]);
       items = items.filter((item) => allowed.has(item.href));
     } else {
       items = items.filter((item) => item.href !== "/setup-connector");
@@ -242,9 +249,7 @@ export function AppShell({
           </p>
         </div>
         <div className="mt-3 flex items-center gap-2.5 px-1">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-2xs font-semibold text-brand-700">
-            {initialsOf(user.displayName)}
-          </span>
+          <UserAvatar name={user.displayName} src={user.avatarUrl} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-ink-900">{user.displayName}</p>
             <p className="truncate text-2xs text-ink-500">{user.email}</p>
@@ -313,6 +318,7 @@ export function AppShell({
               actions={
                 <>
                   {actions}
+                  <TimezoneSelect compact />
                   <ThemeToggle />
                 </>
               }
@@ -327,7 +333,6 @@ export function AppShell({
         >
           {/* Keyed by route so only the content animates in, never the shell. */}
           <div key={path} className="enter">
-            <BiometricSetup />
             <PlatformOrgTabBar />
             {children}
           </div>

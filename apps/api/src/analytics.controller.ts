@@ -55,6 +55,7 @@ import { PROVIDER_CAPABILITIES } from "@techlio/event-schema";
 import { eq } from "drizzle-orm";
 import { DashboardAuthGuard, requireRoles } from "./auth/guards.js";
 import { orgAccessFromRequest } from "./auth/org-scope.js";
+import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
 
 interface RangeQuery {
   preset?: string;
@@ -104,12 +105,14 @@ export class AnalyticsController {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer"]);
     const { range, preset } = rangeFrom(q);
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const data = await organizationAnalytics({
       organizationId: organizationId,
       range,
       team: q.team || undefined,
       provider: q.provider || undefined,
       developerIds: scopeDeveloperIds(user),
+      timeZone,
     });
     return { ...data, preset, scope: user.role === "developer" ? "self" : "organization" };
   }
@@ -121,6 +124,7 @@ export class AnalyticsController {
   async filters(@Req() req: FastifyRequest) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer", "auditor"]);
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const [teams, projectRows, workItemRows] = await Promise.all([
       listTeams(organizationId),
       db
@@ -136,7 +140,7 @@ export class AnalyticsController {
       teams,
       projects: projectRows,
       workItems: workItemRows,
-      timezone: process.env.ORG_TIMEZONE ?? "UTC",
+      timezone: timeZone,
       providers: Object.values(PROVIDER_CAPABILITIES).map((p) => ({
         id: p.id,
         label: p.label,
@@ -203,6 +207,7 @@ export class AnalyticsController {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     assertCanViewPeople(user);
     const { range, preset } = rangeFrom(q);
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const rows = await listEmployeeDirectory({
       organizationId: organizationId,
       range,
@@ -213,6 +218,7 @@ export class AnalyticsController {
       connectorState: q.connectorState || undefined,
       developerIds: scopeDeveloperIds(user),
       sort: (q.sort as "name" | "activity" | "sessions" | "recent") || "activity",
+      timeZone,
     });
     return {
       employees: rows,
@@ -245,10 +251,11 @@ export class AnalyticsController {
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
 
     const { range, preset } = rangeFrom(q);
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
 
-    const scope = { organizationId: organizationId, developerId: id };
+    const scope = { organizationId: organizationId, developerId: id, timeZone };
     const prev = previousRange(range);
 
     const [
@@ -292,7 +299,7 @@ export class AnalyticsController {
       safeAnalytics("workspaceFileChanges", () => workspaceFileChanges(scope, range), []),
       safeAnalytics("fileChangeTrend", () => fileChangeTrend(scope, range), []),
       employeeAiSubscriptions(organizationId, id),
-      aiProgress({ organizationId: organizationId, developerId: id, range }),
+      aiProgress({ organizationId: organizationId, developerId: id, range, timeZone }),
     ]);
 
     return {
@@ -336,11 +343,12 @@ export class AnalyticsController {
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
 
     const { range, preset } = rangeFrom(q);
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
 
-    const scope = { organizationId: organizationId, developerId: id, provider };
-    const allScope = { organizationId: organizationId, developerId: id };
+    const scope = { organizationId: organizationId, developerId: id, provider, timeZone };
+    const allScope = { organizationId: organizationId, developerId: id, timeZone };
     const prev = previousRange(range);
 
     const [
@@ -414,7 +422,8 @@ export class AnalyticsController {
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
-    return aiProgressTimeline({ organizationId: organizationId, developerId: id, date: day });
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    return aiProgressTimeline({ organizationId: organizationId, developerId: id, date: day, timeZone });
   }
 
   /** One year of daily AI agent activity for the contribution-style graph. */
@@ -423,7 +432,8 @@ export class AnalyticsController {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
-    return activityCalendar({ organizationId: organizationId, developerId: id });
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    return activityCalendar({ organizationId: organizationId, developerId: id, timeZone });
   }
 
   /**
@@ -463,9 +473,10 @@ export class AnalyticsController {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     assertCanViewPeople(user);
     if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: process.env.ORG_TIMEZONE ?? "UTC" }).format(new Date());
+    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
-    return workday({ organizationId: organizationId, developerId: id, date: day });
+    return workday({ organizationId: organizationId, developerId: id, date: day, timeZone });
   }
 
   @Get("employees/:id/sessions")
