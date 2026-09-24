@@ -1,1 +1,1 @@
-export { default } from "../../../policy/page";
+export { default } from "@/app/policy/page";

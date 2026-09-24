@@ -1,1 +1,1 @@
-export { default } from "../../../connectors/page";
+export { default } from "@/app/connectors/page";
