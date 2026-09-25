@@ -53,12 +53,25 @@ function StateChip({ verified, shipped }: { verified: boolean; shipped: boolean 
  * watcher (counts only), in repos the AI agents work in; "verified" means a
  * passing check ran first, "shipped" that the commit reached the remote.
  */
-export function VerifyShipCard({ commits, showPerson = false }: { commits: CommitSummary; showPerson?: boolean }) {
+export function VerifyShipCard({
+  commits,
+  showPerson = false,
+  compact = false,
+}: {
+  commits: CommitSummary;
+  showPerson?: boolean;
+  /** Narrow column next to a chart: shorter copy, list scrolls inside the card. */
+  compact?: boolean;
+}) {
   return (
     <Card>
       <CardHeader
         title="Verify & ship"
-        subtitle="Commits in the repositories the AI agents work in: committed → verified (a passing check ran first) → shipped (pushed)"
+        subtitle={
+          compact
+            ? "Commits in the repos agents work in → shipped (pushed)"
+            : "Commits in the repositories the AI agents work in: committed → verified (a passing check ran first) → shipped (pushed)"
+        }
       />
       <CardBody>
         {commits.commits === 0 ? (
@@ -78,7 +91,7 @@ export function VerifyShipCard({ commits, showPerson = false }: { commits: Commi
               {formatNumber(commits.linesDeleted)} lines across these commits
               {commits.repos.length ? ` · ${commits.repos.map((r) => `${r.name} (${r.commits})`).join(", ")}` : ""}
             </p>
-            <div className="scroll-y-sm mt-4 rounded-lg border border-line">
+            <div className={`mt-4 rounded-lg border border-line ${compact ? "max-h-[220px] overflow-y-auto" : "scroll-y-sm"}`}>
               <ul className="divide-y divide-line">
                 {commits.recent.map((c) => (
                   <li key={c.ref} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2.5">

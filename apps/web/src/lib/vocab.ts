@@ -81,17 +81,6 @@ export const REVIEWING_NO_AI = {
   help: "Inside the interactive span with no model or tool operation running — reading, typing, reviewing.",
 } as const;
 
-export const OBSERVED_TIME_SPLIT = {
-  title: "Where the time went",
-  subtitle:
-    "Verify & ship, writing code, research & planning, and idle — the same split as Work mix, kept as separate labels",
-} as const;
-
-export const AGENT_ACTIVITY_COUNTS = {
-  title: "Agent activity counts",
-  subtitle: "Aggregate counts for the range — per-person breakdown is on Employees",
-} as const;
-
 export const TREND_CHART = {
   idleSeries: "Long quiet gaps",
   idleTooltip: "Long quiet gaps in session",
@@ -158,23 +147,6 @@ export interface ClassificationDonutSlice {
   color: string;
 }
 
-/** Every observed session pattern — includes zero counts so the legend stays complete. */
-export function classificationDonutSlices(
-  rows: { classification: string; sessions: number }[],
-): ClassificationDonutSlice[] {
-  const byId = new Map(rows.map((r) => [r.classification, r.sessions]));
-  return CLASSIFICATION_ORDER.map((id) => {
-    const info = CLASSIFICATION[id];
-    const sessions = byId.get(id) ?? 0;
-    return {
-      name: info.label,
-      value: sessions,
-      formatted: String(sessions),
-      color: CLASSIFICATION_CHART_COLOR[id],
-    };
-  });
-}
-
 export const ACTIVITY_TYPE: Record<string, { label: string; color: string }> = {
   model: { label: "Model calls", color: "var(--chart-1)" },
   tool: { label: "Tool use", color: "var(--chart-2)" },
@@ -227,7 +199,6 @@ export const CHART_COLORS = [
   "var(--chart-4)",
 ];
 
-
 /** Agent time by what it was doing — event time, same rules as the Workday graph. */
 export interface WorkMix {
   verifyMs: number;
@@ -258,9 +229,3 @@ export function workMixSlices(mix?: WorkMix | null): { name: string; value: numb
   ];
 }
 
-export const WORK_MIX_HELP: Record<string, string> = {
-  "Verify & ship": "Agent time running tests, builds, lint, type-checks, or the repo's CI gate.",
-  "Writing code": "Agent time editing or creating files.",
-  "Research & planning": "Agent time reading, searching, and in model calls without writing files.",
-  Idle: "Inside a working period with no agent running — reviewing, typing, or waiting. Gaps over 10 minutes end the period.",
-};

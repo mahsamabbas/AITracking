@@ -35,8 +35,11 @@ export function ChartFrame({
   }
   return (
     <div
-      style={fill ? { minHeight: emptyMin, height: "100%" } : { height }}
-      className="w-full"
+      // Fixed height by default (charts nested in wrappers need a definite
+      // height). `chart-fill` + globals.css let a chart that is the direct child
+      // of a card body grow to fill a stretched card — never below this height.
+      style={fill ? { minHeight: emptyMin, height: "100%" } : ({ height, "--chart-h": `${height}px` } as React.CSSProperties)}
+      className="chart-fill w-full"
     >
       <ResponsiveContainer width="100%" height="100%">
         {children}

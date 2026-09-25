@@ -51,5 +51,5 @@ export function CardBody({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`p-5 ${className}`}>{children}</div>;
+  return <div className={`card-body p-5 ${className}`}>{children}</div>;
 }

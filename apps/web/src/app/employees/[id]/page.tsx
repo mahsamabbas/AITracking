@@ -24,10 +24,8 @@ import { ActivityFeed } from "@/components/domain/ActivityFeed";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
-import { ConnectorBadge } from "@/components/domain/Badges";
 import { EmployeeProfileCard } from "@/components/domain/EmployeeProfileCard";
 import { DeleteEmployeePanel } from "@/components/domain/DeleteEmployeePanel";
-import { DurationSplit } from "@/components/domain/DurationSplit";
 import { SessionTable } from "@/components/domain/SessionTable";
 import { ProjectsFileChangesCard } from "@/components/domain/ProjectsFileChangesCard";
 import { VerifyShipCard } from "@/components/domain/VerifyShipCard";
@@ -42,12 +40,9 @@ import {
   formatDate,
   formatDuration,
   formatNumber,
-  formatRelative,
 } from "@/lib/format";
 import {
-  classificationDonutSlices,
   LONG_QUIET_GAPS,
-  REVIEWING_NO_AI,
   WORK_MIX,
   workMixSlices,
   TOOL_CATEGORY_LABEL,
@@ -99,10 +94,6 @@ export default function EmployeeDetailPage() {
   }, [d?.projects]);
 
 
-  const classificationSlices = useMemo(
-    () => classificationDonutSlices(d?.classifications ?? []),
-    [d?.classifications],
-  );
 
   const crumbs = canViewTeam(user?.role)
     ? [
@@ -296,15 +287,21 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
-          {/* ---------------- Patterns ---------------- */}
+          {/* Layout rule: each row pairs cards of similar height; charts fill their card.
+              "Time split" was removed: it repeated the Work mix from session totals,
+              which disagreed with the event-time figures everywhere else. */}
+          {/* ---------------- Usage trend + work mix ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card>
+            <Card className="xl:col-span-2">
               <CardHeader
-                title="Working-hour pattern"
-                subtitle="When agent activity happens (org timezone)"
+                title="Daily usage trend"
+                subtitle={LONG_QUIET_GAPS.trendSubtitle}
               />
               <CardBody className="pt-2">
-                <HourPatternChart data={d.hourPattern} emptyVariant={silenceVariant} />
+                <TrendChart
+                  data={d.dailyTrend}
+                  emptyVariant={silenceVariant}
+                />
               </CardBody>
             </Card>
             <Card>
@@ -322,7 +319,21 @@ export default function EmployeeDetailPage() {
                   centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
                   centerLabel="working time"
                   emptyVariant={silenceVariant}
+                  height={260}
                 />
+              </CardBody>
+            </Card>
+          </section>
+
+          {/* ---------------- Patterns + Verify & ship ---------------- */}
+          <section className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <Card>
+              <CardHeader
+                title="Working-hour pattern"
+                subtitle="When agent activity happens (org timezone)"
+              />
+              <CardBody className="pt-2">
+                <HourPatternChart data={d.hourPattern} emptyVariant={silenceVariant} />
               </CardBody>
             </Card>
             <Card>
@@ -338,69 +349,7 @@ export default function EmployeeDetailPage() {
                 />
               </CardBody>
             </Card>
-          </section>
-
-          {/* ---------------- AI progress (primary module) ---------------- */}
-          <section className="mt-5" aria-label="AI progress">
-            <AiProgressPanel
-              progress={d.aiProgress}
-              employeeId={employeeId}
-              emptyVariant={silenceVariant}
-            />
-          </section>
-
-          {/* ---------------- Trend + split ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card className="xl:col-span-2">
-              <CardHeader
-                title="Daily usage trend"
-                subtitle={LONG_QUIET_GAPS.trendSubtitle}
-              />
-              <CardBody className="pt-2">
-                <TrendChart
-                  data={d.dailyTrend}
-                  emptyVariant={silenceVariant}
-                />
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader
-                title="Time split"
-                subtitle="Model calls, tool time, reviewing without the agent, and long quiet gaps — kept as separate measures"
-              />
-              <CardBody>
-                <DurationSplit
-                  totalMs={t.elapsedMs}
-                  totalLabel="Elapsed session span"
-                  bands={[
-                    {
-                      label: "Model calls",
-                      ms: t.modelMs,
-                      color: "var(--chart-1)",
-                      help: "Time model requests were executing.",
-                    },
-                    {
-                      label: "Tool & check calls",
-                      ms: Math.max(0, t.activeMs - t.modelMs),
-                      color: "var(--chart-2)",
-                      help: "Tool, test, and build execution time not overlapping a model call.",
-                    },
-                    {
-                      label: REVIEWING_NO_AI.label,
-                      ms: Math.max(0, t.elapsedMs - t.activeMs - t.idleMs),
-                      color: "var(--chart-muted)",
-                      help: REVIEWING_NO_AI.help,
-                    },
-                    {
-                      label: LONG_QUIET_GAPS.label,
-                      ms: t.idleMs,
-                      color: "var(--chart-idle)",
-                      help: LONG_QUIET_GAPS.durationBandHelp,
-                    },
-                  ]}
-                />
-              </CardBody>
-            </Card>
+            {d.commits ? <VerifyShipCard commits={d.commits} compact /> : null}
           </section>
 
           {/* ---------------- Projects & file changes ---------------- */}
@@ -416,12 +365,16 @@ export default function EmployeeDetailPage() {
             />
           </section>
 
-          {/* ---------------- Commit → Verified → Shipped ---------------- */}
-          {d.commits ? (
-            <section className="mt-5">
-              <VerifyShipCard commits={d.commits} />
-            </section>
-          ) : null}
+
+          {/* ---------------- AI progress (primary module) ---------------- */}
+          <section className="mt-5" aria-label="AI progress">
+            <AiProgressPanel
+              progress={d.aiProgress}
+              employeeId={employeeId}
+              emptyVariant={silenceVariant}
+            />
+          </section>
+
 
           {/* ---------------- AI subscription usage ---------------- */}
           <section className="mt-5">
@@ -441,8 +394,8 @@ export default function EmployeeDetailPage() {
             </Card>
           </section>
 
-          {/* ---------------- Breakdown rails ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-2">
+          {/* ---------------- Breakdown rails (lists size to their content) ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
             <Card>
               <CardHeader title="Projects & work items" subtitle="Where sessions were assigned" />
               <CardBody>

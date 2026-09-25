@@ -174,8 +174,26 @@
 
 @layer components {
   /* ---------- surfaces ---------- */
+  /*
+   * Cards in a grid row are stretched to the tallest card. The body grows to
+   * fill that height and charts grow with it; other content is centred — so a
+   * short chart next to a long list never leaves a blank band.
+   */
   .card {
-    @apply rounded-xl border border-line bg-card shadow-card;
+    @apply flex min-w-0 flex-col rounded-xl border border-line bg-card shadow-card;
+  }
+  .card > .card-body {
+    flex: 1 1 auto;
+  }
+  .card-body:has(.chart-fill) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .card-body > .chart-fill {
+    flex: 1 1 auto;
+    height: auto !important;
+    min-height: var(--chart-h, 220px);
   }
   /* Dark cards get a hairline top highlight so surfaces read as layered. */
   html.dark .card {

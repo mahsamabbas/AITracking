@@ -90,3 +90,4 @@ export function initialsOf(name: string): string {
     .join("")
     .toUpperCase();
 }
+

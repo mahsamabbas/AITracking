@@ -213,3 +213,16 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - Mobile: every text-like field (incl. date/time/untyped inputs) is 16px on touch screens → no iOS
   focus zoom; `touch-action: manipulation` (no double-tap zoom, pinch kept); text-size-adjust;
   safe-area insets for header/drawer/body in standalone; Android keyboard resizes content.
+
+## 2026-09-25 dashboard layout pass
+
+- Layout rule: cards are flex columns; a chart that is the direct child of a card body grows to
+  fill a stretched card (`chart-fill`, min height = its height); nested charts keep a fixed height.
+  Rows pair cards of similar height; list rails use `items-start`.
+- Overview order: KPIs → activity strip (model/tool calls, file changes, commits, shipped, tokens or
+  sessions) → usage trend + Work mix → File changes & commits + Verify & ship (compact) → AI tools ·
+  Teams · working hours → Right now → Activity feed → Coverage.
+- Employee order: profile → 12-month calendar → Workday → KPIs → usage trend + Work mix → working
+  hours · day of week · Verify & ship → file changes & commits → AI progress → …
+- Removed duplicates that disagreed with event time: overview "Where the time went" and employee
+  "Time split" (session totals). Dead vocab exports removed.
