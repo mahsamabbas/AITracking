@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { Formik, Form, Field, ErrorMessage, type FormikHelpers } from "formik";
 import { usePlatformOrgOptional } from "@/lib/platform-org";
 import { OrgLink } from "@/components/OrgLink";
 import { AppShell } from "@/components/AppShell";
@@ -11,11 +12,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { PasswordField } from "@/components/ui/PasswordField";
+import { Button } from "@/components/ui/Button";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
 import { ORG_ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/permissions";
 import { providerLabel } from "@/lib/providers";
+import {
+  createUserInitialValues,
+  createUserSchema,
+} from "@/lib/user-form-schema";
+import { FIELD_LIMITS, PASSWORD_REQUIREMENTS_HINT, passwordErrorMessage } from "@/lib/validation";
 import type { Role } from "@/lib/types";
 
 interface OrgUser {
@@ -54,12 +61,6 @@ export default function UsersPage() {
   const { token } = useAuth();
   const platformView = usePlatformOrgOptional();
   const query = useApi<{ users: OrgUser[] }>("/v1/users");
-  const [form, setForm] = useState({
-    displayName: "",
-    email: "",
-    password: "",
-    role: "developer" as Role,
-  });
   const [issueFor, setIssueFor] = useState<OrgUser | null>(null);
   const [issueTool, setIssueTool] = useState("cursor");
   const [issued, setIssued] = useState<IssuedKey | null>(null);
@@ -67,22 +68,26 @@ export default function UsersPage() {
   const [notice, setNotice] = useState<{ tone: "info" | "bad"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
-    setBusy("create");
+  async function onCreate(
+    values: typeof createUserInitialValues,
+    helpers: FormikHelpers<typeof createUserInitialValues>,
+  ) {
     setNotice(null);
     try {
-      const res = await apiPost<{ error?: string; user?: OrgUser }>("/v1/users", token, form);
+      const res = await apiPost<{ error?: string; user?: OrgUser }>("/v1/users", token, values);
       if (res.error === "invalid_role") {
         throw new Error(
           "Platform super admin accounts are not created under Access. From the repo root run: pnpm admin:create --super --email your@email.com --name \"Name\"",
         );
       }
+      if (res.error?.startsWith("password_")) {
+        throw new Error(passwordErrorMessage(res.error));
+      }
       if (res.error) throw new Error(res.error.replace(/_/g, " "));
-      const createdName = form.displayName;
-      const role = form.role;
+      const createdName = values.displayName.trim();
+      const role = values.role;
       const created = res.user;
-      setForm({ displayName: "", email: "", password: "", role: "developer" });
+      helpers.resetForm();
       setNotice({
         tone: "info",
         text:
@@ -101,7 +106,7 @@ export default function UsersPage() {
         text: err instanceof Error ? err.message : "Could not create the user",
       });
     } finally {
-      setBusy(null);
+      helpers.setSubmitting(false);
     }
   }
 
@@ -205,7 +210,7 @@ export default function UsersPage() {
               title={`Assigned key for ${issued.displayName}`}
               subtitle={`${providerLabel(issued.provider)} · token is shown once`}
               action={
-                <button type="button" className="btn-ghost h-8 text-xs" onClick={() => void copyKeys()}>
+                <button type="button" className="btn-ghost h-8 text-xs" onClick={() => void copyKeys()} disabled={copied}>
                   {copied ? "Copied" : "Copy keys"}
                 </button>
               }
@@ -262,14 +267,14 @@ export default function UsersPage() {
                     ))}
                   </select>
                 </label>
-                <button
+                <Button
                   type="button"
-                  className="btn-primary"
-                  disabled={busy === "issue"}
+                  loading={busy === "issue"}
+                  loadingLabel="Issuing…"
                   onClick={() => void issueKey()}
                 >
-                  {busy === "issue" ? "Issuing…" : "Issue key"}
-                </button>
+                  Issue key
+                </Button>
               </div>
             </CardBody>
           </Card>
@@ -284,52 +289,76 @@ export default function UsersPage() {
             subtitle="Developers are monitored; other roles are not. Platform super admins are created with pnpm admin:create --super (not here)."
           />
           <CardBody>
-            <form className="space-y-3" onSubmit={onCreate}>
-              <label className="block">
-                <span className="label mb-1 block">Display name</span>
-                <input
-                  className="field"
-                  value={form.displayName}
-                  onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="label mb-1 block">Email</span>
-                <input
-                  className="field"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="label mb-1 block">Temporary password</span>
-                <PasswordField
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="label mb-1 block">Role</span>
-                <select
-                  className="field"
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-                >
-                  {ORG_ASSIGNABLE_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" className="btn-primary w-full" disabled={busy === "create"}>
-                {busy === "create" ? "Creating…" : "Create user"}
-              </button>
-            </form>
+            <Formik
+              initialValues={createUserInitialValues}
+              validationSchema={createUserSchema}
+              onSubmit={onCreate}
+            >
+              {({ isSubmitting, values, setFieldValue, setFieldTouched }) => (
+                <Form className="space-y-3">
+                  <label className="block">
+                    <span className="label mb-1 block">Display name</span>
+                    <Field
+                      name="displayName"
+                      className="field"
+                      maxLength={FIELD_LIMITS.displayName}
+                      autoComplete="name"
+                    />
+                    <ErrorMessage name="displayName">
+                      {(msg) => <p className="mt-1 text-2xs text-rose-700 dark:text-rose-300">{msg}</p>}
+                    </ErrorMessage>
+                  </label>
+                  <label className="block">
+                    <span className="label mb-1 block">Email</span>
+                    <Field
+                      name="email"
+                      type="email"
+                      className="field"
+                      maxLength={FIELD_LIMITS.email}
+                      autoComplete="email"
+                    />
+                    <ErrorMessage name="email">
+                      {(msg) => <p className="mt-1 text-2xs text-rose-700 dark:text-rose-300">{msg}</p>}
+                    </ErrorMessage>
+                  </label>
+                  <label className="block">
+                    <span className="label mb-1 block">Temporary password</span>
+                    <PasswordField
+                      name="password"
+                      value={values.password}
+                      maxLength={FIELD_LIMITS.password}
+                      autoComplete="new-password"
+                      onChange={(e) => {
+                        void setFieldValue("password", e.target.value);
+                        void setFieldTouched("password", true, false);
+                      }}
+                      onBlur={() => void setFieldTouched("password", true)}
+                      required
+                    />
+                    <p className="hint mt-1">{PASSWORD_REQUIREMENTS_HINT}</p>
+                    <ErrorMessage name="password">
+                      {(msg) => <p className="mt-1 text-2xs text-rose-700 dark:text-rose-300">{msg}</p>}
+                    </ErrorMessage>
+                  </label>
+                  <label className="block">
+                    <span className="label mb-1 block">Role</span>
+                    <Field as="select" name="role" className="field">
+                      {ORG_ASSIGNABLE_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
+                    </Field>
+                    <ErrorMessage name="role">
+                      {(msg) => <p className="mt-1 text-2xs text-rose-700 dark:text-rose-300">{msg}</p>}
+                    </ErrorMessage>
+                  </label>
+                  <Button type="submit" className="w-full" loading={isSubmitting} loadingLabel="Creating…">
+                    Create user
+                  </Button>
+                </Form>
+              )}
+            </Formik>
           </CardBody>
         </Card>
         ) : (

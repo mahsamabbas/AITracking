@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import {
   CONNECTOR_MAC_PKG,
   CONNECTOR_WINDOWS_EXE,
@@ -29,6 +31,7 @@ function StepBadge({ done, n }: { done: boolean; n: number }) {
 export function ConnectorInstallGuide() {
   const { online, refresh } = useConnectorOnline(5_000);
   const { phase } = useConnectorSetupPhase(4_000);
+  const [checking, setChecking] = useState(false);
   const platform = detectConnectorPlatform();
   const macHref = CONNECTOR_MAC_PKG;
   const macLabel = "Download for Mac";
@@ -54,9 +57,19 @@ export function ConnectorInstallGuide() {
             >
               {platform === "windows" ? "Download for Windows" : macLabel}
             </a>
-            <button type="button" className="btn-ghost h-9 whitespace-nowrap text-xs" onClick={() => void refresh()}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 whitespace-nowrap text-xs"
+              loading={checking}
+              loadingLabel="Checking…"
+              onClick={() => {
+                setChecking(true);
+                void refresh().finally(() => setChecking(false));
+              }}
+            >
               Check if running
-            </button>
+            </Button>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-700">
             {platform === "windows"

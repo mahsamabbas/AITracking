@@ -30,3 +30,4 @@ export * from "./org-context.js";
 export * from "./schema-version.js";
 export * from "./timezone.js";
 export * from "./images.js";
+export * from "./password-policy.js";

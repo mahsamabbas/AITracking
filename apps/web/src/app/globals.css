@@ -143,10 +143,19 @@
     @apply bg-brand-100 text-brand-900;
   }
   /* Keyboard focus on controls — not on text fields (outline stacks on .field borders). */
-  *:focus-visible:not(input):not(textarea):not(select) {
+  *:focus-visible:not(input):not(textarea):not(select):not(button) {
     outline: 2px solid rgb(var(--focus-ring));
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  button:focus:not(:focus-visible),
+  .btn:focus:not(:focus-visible) {
+    outline: none;
+  }
+  button:focus-visible,
+  .btn:focus-visible {
+    outline: 2px solid rgb(var(--focus-ring));
+    outline-offset: 2px;
   }
   input:focus,
   input:focus-visible,
@@ -233,7 +242,7 @@
 
   /* ---------- controls ---------- */
   .btn {
-    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-fast outline-none disabled:cursor-not-allowed disabled:opacity-50 active:outline-none;
   }
   /* Primary actions on touch layouts get a 44px target. */
   .btn-touch {
@@ -383,6 +392,12 @@
   .crossfade {
     animation: fade var(--motion-normal) ease-out both;
   }
+  .login-hero-ken-burns {
+    animation: login-hero-ken-burns 22s ease-in-out infinite alternate;
+  }
+  .login-hero-copy-in {
+    animation: login-hero-copy-in 700ms var(--ease-out) both;
+  }
 }
 
 @keyframes enter {
@@ -405,4 +420,22 @@
 @keyframes pulse-online {
   0%, 100% { box-shadow: 0 0 0 0 rgb(var(--state-ok) / 0.45); }
   50% { box-shadow: 0 0 0 4px rgb(var(--state-ok) / 0); }
+}
+@keyframes login-hero-ken-burns {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+  }
+}
+@keyframes login-hero-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

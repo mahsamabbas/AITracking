@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { PasswordField } from "@/components/ui/PasswordField";
+import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { LoadingBlock } from "@/components/ui/States";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
@@ -25,6 +26,12 @@ import { useApi } from "@/lib/use-api";
 import { usePlatformOrgOptional } from "@/lib/platform-org";
 import { ROLE_LABEL } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
+import {
+  FIELD_LIMITS,
+  PASSWORD_REQUIREMENTS_HINT,
+  passwordErrorMessage,
+  validatePortalPassword,
+} from "@/lib/validation";
 import type { FilterMeta } from "@/lib/types";
 import Link from "next/link";
 
@@ -189,7 +196,7 @@ function ProfileTab({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="label mb-1 block">Display name</span>
-            <input className="field" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <input className="field" value={displayName} maxLength={FIELD_LIMITS.displayName} onChange={(e) => setDisplayName(e.target.value)} />
           </label>
           <label className="block">
             <span className="label mb-1 block">Email</span>
@@ -197,6 +204,7 @@ function ProfileTab({
               className="field"
               type="email"
               autoComplete="email"
+              maxLength={FIELD_LIMITS.email}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -211,6 +219,7 @@ function ProfileTab({
                 <input
                   className="field"
                   value={team}
+                  maxLength={FIELD_LIMITS.team}
                   onChange={(e) => setTeam(e.target.value)}
                   placeholder="e.g. Platform"
                   list="profile-team-suggestions"
@@ -227,6 +236,7 @@ function ProfileTab({
                 <input
                   className="field"
                   value={title}
+                  maxLength={FIELD_LIMITS.title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Software engineer"
                   autoComplete="organization-title"
@@ -264,9 +274,9 @@ function ProfileTab({
         </label>
         {error ? <Callout tone="bad" title={error} /> : null}
         {message ? <Callout tone="info" title={message} /> : null}
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void save()}>
-          {busy ? "Saving…" : "Save profile"}
-        </button>
+        <Button type="button" loading={busy} loadingLabel="Saving…" onClick={() => void save()}>
+          Save profile
+        </Button>
       </CardBody>
     </Card>
   );
@@ -302,6 +312,11 @@ function SecurityTab({
       setError("New passwords do not match.");
       return;
     }
+    const policyErr = validatePortalPassword(newPassword);
+    if (policyErr) {
+      setError(passwordErrorMessage(policyErr));
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -312,7 +327,13 @@ function SecurityTab({
       setConfirm("");
       setMessage("Password updated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change password");
+      setError(
+        err instanceof Error && err.message.startsWith("password_")
+          ? passwordErrorMessage(err.message)
+          : err instanceof Error
+            ? err.message.replace(/_/g, " ")
+            : "Could not change password",
+      );
     } finally {
       setBusy(false);
     }
@@ -349,6 +370,7 @@ function SecurityTab({
             <PasswordField
               autoComplete="current-password"
               value={currentPassword}
+              maxLength={FIELD_LIMITS.password}
               onChange={(e) => setCurrentPassword(e.target.value)}
             />
           </label>
@@ -357,20 +379,23 @@ function SecurityTab({
             <PasswordField
               autoComplete="new-password"
               value={newPassword}
+              maxLength={FIELD_LIMITS.password}
               onChange={(e) => setNewPassword(e.target.value)}
             />
+            <p className="hint mt-1">{PASSWORD_REQUIREMENTS_HINT}</p>
           </label>
           <label className="block">
             <span className="label mb-1 block">Confirm new password</span>
             <PasswordField
               autoComplete="new-password"
               value={confirm}
+              maxLength={FIELD_LIMITS.password}
               onChange={(e) => setConfirm(e.target.value)}
             />
           </label>
-          <button type="button" className="btn-primary sm:w-fit" disabled={busy} onClick={() => void changePassword()}>
-            {busy ? "Updating…" : "Update password"}
-          </button>
+          <Button type="button" className="sm:w-fit" loading={busy} loadingLabel="Updating…" onClick={() => void changePassword()}>
+            Update password
+          </Button>
         </CardBody>
       </Card>
 
@@ -388,9 +413,9 @@ function SecurityTab({
             ) : enrolled ? (
               <>
                 <Callout tone="info" title={`${label} is enabled for ${user.email} on this device.`} />
-                <button type="button" className="btn-ghost h-9 text-sm" disabled={bioBusy} onClick={disableBiometric}>
+                <Button type="button" variant="ghost" className="h-9 text-sm" disabled={bioBusy} onClick={disableBiometric}>
                   Turn off {label}
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -398,9 +423,15 @@ function SecurityTab({
                   After you enable {label}, signing out will ask for {label} instead of your password on this device
                   only.
                 </p>
-                <button type="button" className="btn-primary sm:w-fit" disabled={bioBusy} onClick={() => void enableBiometric()}>
-                  {bioBusy ? "Waiting…" : `Enable ${label}`}
-                </button>
+                <Button
+                  type="button"
+                  className="sm:w-fit"
+                  loading={bioBusy}
+                  loadingLabel="Waiting…"
+                  onClick={() => void enableBiometric()}
+                >
+                  {`Enable ${label}`}
+                </Button>
               </>
             )}
           </CardBody>
@@ -515,14 +546,15 @@ function OrganizationTab({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
-            className="btn-primary"
-            disabled={busy || !logoPreview}
+            loading={busy}
+            loadingLabel="Saving…"
+            disabled={!logoPreview}
             onClick={() => void saveLogo(logoPreview)}
           >
-            {busy ? "Saving…" : "Save logo"}
-          </button>
+            Save logo
+          </Button>
           {branding?.logoUrl ? (
             <button type="button" className="btn-ghost h-9" disabled={busy} onClick={() => void saveLogo(null)}>
               Remove logo

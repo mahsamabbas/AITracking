@@ -73,8 +73,11 @@ export class OrgController {
       });
       return { user: created };
     } catch (err) {
-      if (err instanceof Error && err.message === "email_already_used") {
-        return { error: "email_already_used" };
+      if (err instanceof Error) {
+        if (err.message === "email_already_used") return { error: "email_already_used" };
+        if (err.message.startsWith("password_") || err.message === "display_name_too_long" || err.message === "email_too_long" || err.message === "display_name_required") {
+          return { error: err.message };
+        }
       }
       return { error: "could_not_create_user" };
     }

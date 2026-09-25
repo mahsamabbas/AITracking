@@ -4,6 +4,7 @@
  * Filters stick just below the page header while the content scrolls, so the
  * active range and filters stay visible next to the numbers they shape.
  */
+import { FIELD_LIMITS } from "@/lib/validation";
 export function FilterBar({
   children,
   right,
@@ -90,6 +91,7 @@ export function SearchFilter({
         type="search"
         className="field pl-9"
         value={value}
+        maxLength={FIELD_LIMITS.searchQuery}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />

@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth-context";
 import { apiPatch, apiPost } from "@/lib/api";
 import { formatDate, formatNumber, formatRelative } from "@/lib/format";
 import { readLogoFile } from "@/lib/image-upload";
+import { Button } from "@/components/ui/Button";
+import { FIELD_LIMITS } from "@/lib/validation";
 
 interface Organization {
   id: string;
@@ -198,6 +200,7 @@ export default function PlatformPage() {
               <input
                 className="field h-9 w-full min-w-0 sm:w-44 text-xs"
                 placeholder="Search…"
+                maxLength={FIELD_LIMITS.searchQuery}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -329,6 +332,7 @@ export default function PlatformPage() {
                   <input
                     className={input}
                     required
+                    maxLength={FIELD_LIMITS.displayName}
                     value={adminForm.name}
                     onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
                   />
@@ -339,14 +343,15 @@ export default function PlatformPage() {
                     className={input}
                     type="email"
                     required
+                    maxLength={FIELD_LIMITS.email}
                     value={adminForm.email}
                     onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
                   />
                 </label>
                 <div className="flex gap-2">
-                  <button type="submit" className="btn-primary h-9 px-3 text-xs" disabled={busy}>
+                  <Button type="submit" className="h-9 px-3 text-xs" loading={busy} loadingLabel="Adding…">
                     Add administrator
-                  </button>
+                  </Button>
                   <button type="button" className="btn-ghost h-9 text-xs" onClick={() => setAdminFor(null)}>
                     Cancel
                   </button>
@@ -366,6 +371,7 @@ export default function PlatformPage() {
                     className={input}
                     required
                     minLength={2}
+                    maxLength={FIELD_LIMITS.orgName}
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                   />
@@ -374,6 +380,7 @@ export default function PlatformPage() {
                   Timezone (IANA)
                   <input
                     className={input}
+                    maxLength={FIELD_LIMITS.timezone}
                     value={form.timezone}
                     onChange={(e) => setForm({ ...form, timezone: e.target.value })}
                   />
@@ -383,6 +390,7 @@ export default function PlatformPage() {
                   <input
                     className={input}
                     required
+                    maxLength={FIELD_LIMITS.displayName}
                     value={form.adminName}
                     onChange={(e) => setForm({ ...form, adminName: e.target.value })}
                   />
@@ -393,13 +401,14 @@ export default function PlatformPage() {
                     className={input}
                     type="email"
                     required
+                    maxLength={FIELD_LIMITS.email}
                     value={form.adminEmail}
                     onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
                   />
                 </label>
-                <button type="submit" className="btn-primary h-9 w-full text-xs" disabled={busy}>
+                <Button type="submit" className="h-9 w-full text-xs" loading={busy} loadingLabel="Creating…">
                   Create organisation
-                </button>
+                </Button>
               </form>
             )}
           </CardBody>

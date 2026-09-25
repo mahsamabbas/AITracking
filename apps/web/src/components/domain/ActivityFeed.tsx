@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { EventTimeline } from "@/components/domain/EventTimeline";
 import { ListTimeSortButton, sortEventsByTime, type SortDirection } from "@/components/ui/SortControl";
 import { LoadingBlock } from "@/components/ui/States";
+import { Button } from "@/components/ui/Button";
 import { rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
@@ -165,9 +166,9 @@ export function ActivityFeed({
                 Showing {formatNumber(events.length)} of {formatNumber(Math.max(total, events.length))}
               </span>
               {olderCursor ? (
-                <button type="button" className="btn-ghost h-8 text-xs" onClick={() => void loadOlder()} disabled={loadingMore}>
-                  {loadingMore ? "Loading…" : "Load older"}
-                </button>
+                <Button type="button" variant="ghost" className="h-8 text-xs" loading={loadingMore} loadingLabel="Loading…" onClick={() => void loadOlder()}>
+                  Load older
+                </Button>
               ) : (
                 <span>Start of range</span>
               )}

@@ -38,7 +38,7 @@ export const PasswordField = forwardRef<
       />
       <button
         type="button"
-        className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-slate-100 hover:text-ink-700 dark:hover:bg-white/10"
+        className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-400 outline-none transition-colors hover:bg-slate-100 hover:text-ink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--focus-ring))] dark:hover:bg-white/10"
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-controls={inputId}

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Callout } from "@/components/ui/Callout";
 import { PasswordField } from "@/components/ui/PasswordField";
+import { Button } from "@/components/ui/Button";
 import { claimLocalConnector } from "@/components/domain/ConnectThisComputer";
 import { providerLabel } from "@/lib/providers";
+import { FIELD_LIMITS } from "@/lib/validation";
 
 const SETUP: Record<string, string[]> = {
   cursor: [
@@ -76,6 +78,7 @@ export function ActivateConnectorForm({
         <input
           className="field font-mono text-xs"
           value={deviceId}
+          maxLength={FIELD_LIMITS.deviceId}
           onChange={(e) => setDeviceId(e.target.value)}
           placeholder="Assigned by your administrator"
           required
@@ -87,6 +90,7 @@ export function ActivateConnectorForm({
         <PasswordField
           className="font-mono text-xs"
           value={deviceToken}
+          maxLength={FIELD_LIMITS.connectorToken}
           onChange={(e) => setDeviceToken(e.target.value)}
           placeholder="Shown once when the admin issued the key"
           required
@@ -114,13 +118,9 @@ export function ActivateConnectorForm({
           process.
         </span>
       </label>
-      <button
-        type="submit"
-        className="btn-primary w-full"
-        disabled={busy || !token || !consentAccepted}
-      >
-        {busy ? "Activating…" : "Activate on this computer"}
-      </button>
+      <Button type="submit" className="w-full" loading={busy} loadingLabel="Activating…" disabled={!token || !consentAccepted}>
+        Activate on this computer
+      </Button>
       {error ? <Callout tone="bad" title={error} /> : null}
       {ok ? (
         <Callout tone="info" title="This computer is now using your assigned key">

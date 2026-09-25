@@ -6,6 +6,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { BRAND } from "@/lib/brand";
 import { PasswordField } from "@/components/ui/PasswordField";
+import { Button } from "@/components/ui/Button";
+import { LoginHeroCarousel } from "@/components/login/LoginHeroCarousel";
+import { FIELD_LIMITS } from "@/lib/validation";
 import {
   biometricLabel,
   canUsePlatformBiometrics,
@@ -77,7 +80,7 @@ export default function LoginPage() {
   const label = biometricLabel();
 
   return (
-    <div className="grid min-h-[100dvh] lg:grid-cols-2">
+    <div className="grid min-h-[100dvh] max-w-full overflow-x-clip lg:grid-cols-2">
       <div className="relative flex items-center justify-center px-6 py-12">
         <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex items-center gap-2">
           <InstallAppButton />
@@ -103,6 +106,7 @@ export default function LoginPage() {
                 type="email"
                 className="field"
                 value={email}
+                maxLength={FIELD_LIMITS.email}
                 autoComplete="username"
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -112,6 +116,7 @@ export default function LoginPage() {
               <span className="label mb-1.5 block">Password</span>
               <PasswordField
                 value={password}
+                maxLength={FIELD_LIMITS.password}
                 autoComplete="current-password"
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -122,9 +127,9 @@ export default function LoginPage() {
                 {error}
               </p>
             ) : null}
-            <button type="submit" className="btn-primary w-full" disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
-            </button>
+            <Button type="submit" className="w-full" loading={busy} loadingLabel="Signing in…">
+              Sign in
+            </Button>
           </form>
 
           {biometricAvailable || locked ? (
@@ -137,14 +142,16 @@ export default function LoginPage() {
                   </span>
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
-                className="btn-ghost w-full"
-                disabled={busy}
+                variant="ghost"
+                className="w-full"
+                loading={busy}
+                loadingLabel="Waiting…"
                 onClick={() => void biometricUnlock()}
               >
-                {busy ? "Waiting…" : `Unlock with ${label}`}
-              </button>
+                {`Unlock with ${label}`}
+              </Button>
               <p className="hint mt-2">
                 {label} is available on this phone only. Desktop sign-in still uses email and
                 password.
@@ -159,47 +166,38 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {SHOW_DEMO ? (
-      <div className="hidden flex-col justify-center border-line bg-slate-950 px-10 py-12 dark:border-l dark:bg-black/40 lg:flex">
-        <p className="label text-brand-200">Local demo accounts</p>
-        <h2 className="mt-2 text-xl font-semibold text-white">
-          Four portals, one dataset
-        </h2>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
-          Every screen, API, and query is scoped by role. Developers see exactly what is collected
-          about them — no more, no less.
-        </p>
-        <ul className="mt-8 space-y-2">
-          {DEMO.map((d) => (
-            <li key={d.email}>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(d.email);
-                  setPassword(d.password);
-                }}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-brand-400/50 hover:bg-white/10"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-medium text-white">{d.role}</span>
-                  <span className="font-mono text-2xs text-slate-500">{d.email}</span>
-                </div>
-                <p className="mt-0.5 text-2xs text-slate-400">{d.desc}</p>
-              </button>
-            </li>
-          ))}
-        </ul>
+      <div className="hidden min-h-[100dvh] min-w-0 border-l border-line lg:flex">
+        <LoginHeroCarousel
+          footer={
+            SHOW_DEMO ? (
+              <div className="rounded-xl border border-white/10 bg-black/35 p-4 backdrop-blur-sm">
+                <p className="label text-brand-200">Local demo accounts</p>
+                <p className="mt-1 text-2xs text-slate-400">Four portals, one dataset — tap to fill the form.</p>
+                <ul className="scroll-y-sm mt-3 space-y-2 pr-1">
+                  {DEMO.map((d) => (
+                    <li key={d.email}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail(d.email);
+                          setPassword(d.password);
+                        }}
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left transition hover:border-brand-400/50 hover:bg-white/10"
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-sm font-medium text-white">{d.role}</span>
+                          <span className="font-mono text-2xs text-slate-500">{d.email}</span>
+                        </div>
+                        <p className="mt-0.5 text-2xs text-slate-400">{d.desc}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null
+          }
+        />
       </div>
-      ) : (
-        <div className="hidden flex-col justify-center border-line bg-slate-950 px-10 py-12 dark:border-l dark:bg-black/40 lg:flex">
-          <p className="label text-brand-200">{BRAND.name}</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">Agent activity, not timekeeping</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
-            Every screen, API, and query is scoped by role. Developers see exactly what is collected
-            about them — no more, no less. Missing telemetry is never treated as inactivity.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

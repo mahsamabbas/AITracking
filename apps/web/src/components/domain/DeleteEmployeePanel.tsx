@@ -6,6 +6,8 @@ import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { apiDelete } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { Button } from "@/components/ui/Button";
+import { FIELD_LIMITS } from "@/lib/validation";
 
 export function DeleteEmployeePanel({
   employeeId,
@@ -55,15 +57,24 @@ export function DeleteEmployeePanel({
           <input
             className="field"
             value={confirm}
+            maxLength={FIELD_LIMITS.deleteConfirm}
             onChange={(e) => setConfirm(e.target.value)}
             autoComplete="off"
             placeholder={phrase}
           />
         </label>
         {error ? <Callout tone="bad" title={error} /> : null}
-        <button type="button" className="btn-ghost border-rose-300 text-rose-700" disabled={!ready || busy} onClick={() => void onDelete()}>
-          {busy ? "Removing…" : "Delete employee and all data"}
-        </button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="border-rose-300 text-rose-700"
+          loading={busy}
+          loadingLabel="Removing…"
+          disabled={!ready}
+          onClick={() => void onDelete()}
+        >
+          Delete employee and all data
+        </Button>
       </CardBody>
     </Card>
   );

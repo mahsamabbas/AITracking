@@ -6,6 +6,7 @@ import { portalUsers, auditLog, employees } from "./schema.js";
 import { ORG_ASSIGNABLE_ROLES, type OrgAssignableRole, type Role } from "./roles.js";
 import { devAffordancesEnabled } from "./runtime.js";
 import { resolveOrgTimezone, timezoneFromEnv } from "./timezone.js";
+import { validatePortalPassword, PORTAL_FIELD_LIMITS } from "./password-policy.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
 export const DEV_DEVELOPER_ALEX = "550e8400-e29b-41d4-a716-446655440011";
@@ -335,7 +336,8 @@ export async function changePortalPassword(
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  if (newPassword.length < 8) throw new Error("password_too_short");
+  const policyErr = validatePortalPassword(newPassword);
+  if (policyErr) throw new Error(policyErr);
   const rows = await db.select().from(portalUsers).where(eq(portalUsers.id, userId)).limit(1);
   const row = rows[0];
   if (!row) throw new Error("user_not_found");
@@ -376,8 +378,14 @@ export async function createPortalUser(input: {
   if (!ORG_ASSIGNABLE_ROLES.includes(input.role)) {
     throw new Error("invalid_role");
   }
-  const id = randomUUID();
+  const displayName = input.displayName.trim();
+  if (!displayName) throw new Error("display_name_required");
+  if (displayName.length > PORTAL_FIELD_LIMITS.displayName) throw new Error("display_name_too_long");
   const email = input.email.toLowerCase().trim();
+  if (email.length > PORTAL_FIELD_LIMITS.email) throw new Error("email_too_long");
+  const policyErr = validatePortalPassword(input.password);
+  if (policyErr) throw new Error(policyErr);
+  const id = randomUUID();
   const developerId =
     input.role === "developer"
       ? (input.developerId ?? randomUUID())
@@ -387,7 +395,7 @@ export async function createPortalUser(input: {
     organizationId: input.organizationId,
     email,
     passwordHash: hashPassword(input.password),
-    displayName: input.displayName.trim(),
+    displayName: displayName.trim(),
     role: input.role,
     developerId,
   });
@@ -395,7 +403,7 @@ export async function createPortalUser(input: {
     await ensureEmployee({
       id: developerId,
       organizationId: input.organizationId,
-      displayName: input.displayName.trim(),
+      displayName: displayName.trim(),
       email,
     });
   }
@@ -409,7 +417,7 @@ export async function createPortalUser(input: {
   return attachEmployeeDirectory({
     id,
     email,
-    displayName: input.displayName.trim(),
+    displayName: displayName.trim(),
     role: input.role,
     organizationId: input.organizationId,
     developerId,
