@@ -185,7 +185,7 @@
   .card > .card-body {
     flex: 1 1 auto;
   }
-  .card-body:has(.chart-fill) {
+  .card-body:has(> .chart-fill) {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -194,6 +194,9 @@
     flex: 1 1 auto;
     height: auto !important;
     min-height: var(--chart-h, 220px);
+  }
+  .card-body > .chart-sized {
+    flex-shrink: 0;
   }
   /* Dark cards get a hairline top highlight so surfaces read as layered. */
   html.dark .card {
