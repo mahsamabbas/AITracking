@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { isDatabaseReady, schemaStatus } from "@techlio/server-core";
+import { databaseCheck, schemaStatus } from "@techlio/server-core";
 
 @Controller("v1")
 export class HealthController {
@@ -9,11 +9,14 @@ export class HealthController {
    */
   @Get("health")
   async health() {
-    const [db, schema] = await Promise.all([isDatabaseReady(), schemaStatus()]);
+    const [db, schema] = await Promise.all([databaseCheck(), schemaStatus()]);
     return {
-      ok: db && schema.upToDate,
+      ok: db.ok && schema.upToDate,
       service: "techlio-api",
-      database: db,
+      database: db.ok,
+      databaseHost: db.host,
+      databaseSource: db.source,
+      ...(db.error ? { databaseError: db.error } : {}),
       schema,
       time: new Date().toISOString(),
     };

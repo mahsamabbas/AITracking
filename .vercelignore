@@ -21,3 +21,9 @@ apps/web/public/downloads/build
 memory-bank
 docs
 .cursor
+
+# Never upload local secrets. apps/api/.env held the old Neon credentials and
+# was shipped with every deploy; Vercel project env vars are the only source.
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example

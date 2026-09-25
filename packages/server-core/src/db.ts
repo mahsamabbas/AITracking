@@ -39,6 +39,36 @@ export const pool = new pg.Pool(poolOptions());
 
 export const db = drizzle(pool, { schema });
 
+/** Which env var supplied the connection string (never its value). */
+function connectionSource(): string {
+  if (process.env.DATABASE_URL) return "DATABASE_URL";
+  if (process.env.POSTGRES_URL) return "POSTGRES_URL";
+  if (process.env.POSTGRES_PRISMA_URL) return "POSTGRES_PRISMA_URL";
+  return "default";
+}
+
+/**
+ * Health detail for outages: the database host this process connects to and
+ * the last error, without credentials — so "which database, and why not" is
+ * answerable from /v1/health instead of guessed.
+ */
+export async function databaseCheck(): Promise<{ ok: boolean; source: string; host: string; error?: string }> {
+  const cs = (pool.options as { connectionString?: string }).connectionString ?? "";
+  let host = "unknown";
+  try {
+    host = new URL(cs).hostname || `none (falls back to PGHOST=${process.env.PGHOST ?? "unset"})`;
+  } catch {
+    host = "unparseable connection string";
+  }
+  try {
+    await pool.query("SELECT 1 FROM employees LIMIT 1");
+    return { ok: true, source: connectionSource(), host };
+  } catch (err) {
+    const e = err as { code?: string; message?: string };
+    return { ok: false, source: connectionSource(), host, error: `${e.code ?? ""} ${e.message ?? ""}`.trim().slice(0, 160) };
+  }
+}
+
 export async function isDatabaseReady(): Promise<boolean> {
   try {
     await pool.query("SELECT 1 FROM employees LIMIT 1");
