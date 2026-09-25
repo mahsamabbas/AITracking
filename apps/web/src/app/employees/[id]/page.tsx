@@ -461,8 +461,8 @@ export default function EmployeeDetailPage() {
                 />
               ) : (
                 <ul className={`divide-y divide-line ${d.idlePeriods.length > 6 ? "scroll-y-sm" : ""}`}>
-                  {d.idlePeriods.map((g) => (
-                    <li key={g.from} className="flex items-center gap-3 px-5 py-2.5">
+                  {d.idlePeriods.map((g, i) => (
+                    <li key={`${g.from}-${g.to}-${i}`} className="flex items-center gap-3 px-5 py-2.5">
                       <span
                         className={`h-2 w-2 shrink-0 rounded-full ${
                           g.reason === "coverage_gap" ? "bg-conn-warn" : "bg-conn-idle"

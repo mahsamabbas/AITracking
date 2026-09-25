@@ -140,8 +140,8 @@ export function WorkdayPanel({
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-ink-900">Worked with AI</p>
                   <ul className="space-y-1 text-xs text-ink-700">
-                    {d.periods.map((p) => (
-                      <li key={p.start} className="num flex justify-between gap-2">
+                    {d.periods.map((p, i) => (
+                      <li key={`${p.start}-${p.end}-${i}`} className="num flex justify-between gap-2">
                         <span>
                           {clockIn(p.start, d.timezone)} – {clockIn(p.end, d.timezone)}
                         </span>
@@ -156,8 +156,8 @@ export function WorkdayPanel({
                     <p className="hint">None</p>
                   ) : (
                     <ul className="space-y-1 text-xs text-ink-700">
-                      {d.breaks.map((b) => (
-                        <li key={b.start} className="num flex justify-between gap-2">
+                      {d.breaks.map((b, i) => (
+                        <li key={`${b.start}-${b.end}-${i}`} className="num flex justify-between gap-2">
                           <span>
                             {clockIn(b.start, d.timezone)} – {clockIn(b.end, d.timezone)}
                           </span>
@@ -173,8 +173,8 @@ export function WorkdayPanel({
                     <p className="hint">Connector collected all day</p>
                   ) : (
                     <ul className="space-y-1 text-xs text-amber-800 dark:text-amber-200">
-                      {d.coverageGaps.map((g) => (
-                        <li key={g.start} className="num flex justify-between gap-2">
+                      {d.coverageGaps.map((g, i) => (
+                        <li key={`${g.start}-${g.end ?? "open"}-${i}`} className="num flex justify-between gap-2">
                           <span>
                             {clockIn(g.start, d.timezone)} – {g.end ? clockIn(g.end, d.timezone) : "still"}
                           </span>
