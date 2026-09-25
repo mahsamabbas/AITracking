@@ -234,3 +234,8 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - New sections: HighlightsCard (`lib/insights.ts` deriveHighlights — peak hour, busiest day, top tool/model, ship rate, depth, top team/weekday), TopPeopleCard, RepositoriesCard, WeekdayBars, ConnectorHealthCard (connector states + coverage + alerts), RightNowTable extracted. ChartLegend + TREND_LEGEND/CHANGE_TREND_LEGEND in card headers.
 - Donut legend wraps under the chart with share % bars. Mobile: sticky header = menu+title+utilities only; subtitle/actions render via PageIntro at top of content; timezone moves to drawer below `sm`.
 - Removed nonexistent `text-ink-600/800` classes (no such tokens).
+
+## 2026-09-25 commits not tracked — root cause
+- Connector's `git log --numstat` on TechlioTrackingApp took ~12.8s (100+ MB installers in apps/web/public/downloads re-committed 13× in 14 days); git() timeout 8s → null → zero commits, silently. Repo WAS observed; email matched.
+- Fix (git-watch.ts): list commits without diffs, `git show --numstat` only for unseen commits, `-c core.bigFileThreshold=1m`; `warn` option logs git failures once; scan() queues a rerun instead of dropping scanNow during an in-flight scan (race since 87b8eca). Test added for large binaries. Probe: 11/11 of today's commits found.
+- Machine state: ~/.techlio-connector/git-state.json + queue.db.corrupt-* owned by root (a `sudo` dev connector shared the service's folder). Needs `sudo chown -R $USER ~/.techlio-connector`. `pnpm commits:sync` only pokes the running connector, so it needs the rebuilt binary.

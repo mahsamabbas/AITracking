@@ -335,6 +335,7 @@ app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string
 const gitWatch = createGitWatcher({
   stateDir: identityDir(),
   isActive: () => Boolean(identity) && !paused,
+  warn: (message) => note(`⚠ ${message}`),
   emit: (signal) => {
     const event = baseEvent(signal.type as ActivityEvent["event_type"], {
       event_id: signal.eventId,

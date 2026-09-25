@@ -82,4 +82,24 @@ describe("git watcher: Commit → Verified → Shipped", () => {
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ filesChanged: 1, linesAdded: 2, verified: false });
   });
+
+  it("reports commits that include large binary files (installers, executables)", async () => {
+    const bin = join(base, "bin");
+    execFileSync("git", ["init", "-q", bin]);
+    git(bin, "config", "user.email", "dev@example.test");
+    const before = signals.length;
+    for (let i = 0; i < 3; i++) {
+      // 2 MB, above the big-file threshold: counted as a changed file, never diffed.
+      writeFileSync(join(bin, "installer.pkg"), Buffer.alloc(2 * 1024 * 1024, i + 1));
+      writeFileSync(join(bin, "notes.ts"), `v${i}\n`);
+      git(bin, "add", ".");
+      git(bin, "commit", "-q", "-m", `build ${i}`);
+    }
+    await watcher.scanNow(bin);
+    const found = signals.slice(before).filter((s) => s.type === "commit_created");
+    expect(found).toHaveLength(3);
+    expect(found.every((s) => s.filesChanged === 2)).toBe(true);
+    // Oldest first, so the dashboard receives them in order.
+    expect(found.map((s) => s.occurredAt)).toEqual([...found.map((s) => s.occurredAt)].sort());
+  });
 });
