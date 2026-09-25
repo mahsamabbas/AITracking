@@ -64,7 +64,12 @@ const OBSERVE_RESCAN_MS = 15_000;
  */
 const BIG_FILE = "core.bigFileThreshold=1m";
 
-type GitResult = { ok: true; out: string } | { ok: false; error: string };
+/** `out` is "" and `error` says why when `ok` is false (no narrowing needed). */
+interface GitResult {
+  ok: boolean;
+  out: string;
+  error: string;
+}
 
 function runGit(cwd: string, args: string[], timeoutMs = 8_000): Promise<GitResult> {
   return new Promise((resolve) => {
@@ -75,8 +80,12 @@ function runGit(cwd: string, args: string[], timeoutMs = 8_000): Promise<GitResu
       (err, stdout) =>
         resolve(
           err
-            ? { ok: false, error: (err as { killed?: boolean }).killed ? `timed out after ${timeoutMs / 1000}s` : err.message.split("\n")[0] }
-            : { ok: true, out: String(stdout) },
+            ? {
+                ok: false,
+                out: "",
+                error: (err as { killed?: boolean }).killed ? `timed out after ${timeoutMs / 1000}s` : err.message.split("\n")[0],
+              }
+            : { ok: true, out: String(stdout), error: "" },
         ),
     );
   });
@@ -203,7 +212,7 @@ export function createGitWatcher(options: {
     if (listed && !listed.ok) warnOnce(repo.root, `could not list commits: ${listed.error}`);
     let changed = false;
     // git lists newest first; report oldest first so the dashboard reads in order.
-    for (const line of (listed?.ok ? listed.out : "").split("\n").filter(Boolean).reverse()) {
+    for (const line of (listed?.out ?? "").split("\n").filter(Boolean).reverse()) {
       const [rawHash, ct, author] = line.split("\t");
       const hash = rawHash?.trim();
       if (!hash || !ct || author?.trim().toLowerCase() !== email) continue; // pulled commits by others
