@@ -7,7 +7,10 @@ import * as schema from "./schema.js";
  * The runtime never creates tables on boot.
  */
 export function resolveDatabaseConnectionString(): string {
+  // TECHLIO_DATABASE_URL wins: hosting integrations (e.g. Neon on Vercel)
+  // inject their own DATABASE_URL into every deployment and would override ours.
   const fromEnv =
+    process.env.TECHLIO_DATABASE_URL ??
     process.env.DATABASE_URL ??
     process.env.POSTGRES_URL ??
     process.env.POSTGRES_PRISMA_URL;
@@ -41,6 +44,7 @@ export const db = drizzle(pool, { schema });
 
 /** Which env var supplied the connection string (never its value). */
 function connectionSource(): string {
+  if (process.env.TECHLIO_DATABASE_URL) return "TECHLIO_DATABASE_URL";
   if (process.env.DATABASE_URL) return "DATABASE_URL";
   if (process.env.POSTGRES_URL) return "POSTGRES_URL";
   if (process.env.POSTGRES_PRISMA_URL) return "POSTGRES_PRISMA_URL";

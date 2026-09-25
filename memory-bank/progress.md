@@ -239,3 +239,11 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - Connector's `git log --numstat` on TechlioTrackingApp took ~12.8s (100+ MB installers in apps/web/public/downloads re-committed 13× in 14 days); git() timeout 8s → null → zero commits, silently. Repo WAS observed; email matched.
 - Fix (git-watch.ts): list commits without diffs, `git show --numstat` only for unseen commits, `-c core.bigFileThreshold=1m`; `warn` option logs git failures once; scan() queues a rerun instead of dropping scanNow during an in-flight scan (race since 87b8eca). Test added for large binaries. Probe: 11/11 of today's commits found.
 - Machine state: ~/.techlio-connector/git-state.json + queue.db.corrupt-* owned by root (a `sudo` dev connector shared the service's folder). Needs `sudo chown -R $USER ~/.techlio-connector`. `pnpm commits:sync` only pokes the running connector, so it needs the rebuilt binary.
+
+## 2026-09-25 production moved Neon → Supabase
+- Neon free quota (compute/transfer) suspended the DB → every API call 500. Production now on Supabase (Mumbai, ap-south-1, pooler aws-0-ap-south-1.pooler.supabase.com; 6543 runtime, 5432 migrations). Schema migrated fresh (001–014); history NOT copied (Neon locked).
+- Gotcha: the Neon Vercel integration injects its own DATABASE_URL at deploy time and overrides the project var. Fix: `TECHLIO_DATABASE_URL` (checked first in server-core `resolveDatabaseConnectionString`) set in Vercel production. /v1/health now reports databaseHost / databaseSource / databaseError.
+- apps/api/src/db/client.ts reuses server-core `pool` (one pool, same SSL: TLS without cert verification — Supabase CA isn't in Node's store).
+- .vercelignore now excludes apps/api/.env* (the Neon password was uploaded with every deploy).
+- scripts/copy-database.sh: dump/restore + RLS lock-down for Supabase Data API; refuses non-empty targets (needs a data-only merge mode to import Neon history now).
+- Still to do (owner): disconnect Neon integration in Vercel (don't delete the DB), remove PG*/POSTGRES*/NEON* vars, set API function region bom1, rotate Supabase secret key + Neon password, reissue connector keys (devices table is empty).
