@@ -14,6 +14,10 @@ usage() {
 deploy_one() {
   local project="$1"
   cd "$ROOT"
+  if [[ ! -f "$ROOT/.vercelignore" ]]; then
+    echo "ERROR: Missing .vercelignore at repo root (deploy would upload .git and exceed 100 MB file limits)."
+    exit 1
+  fi
   vercel link --project "$project" --yes
   vercel deploy --prod --yes
 }

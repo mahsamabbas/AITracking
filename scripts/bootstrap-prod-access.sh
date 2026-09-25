@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create or reset an administrator against production Postgres (same URL as db:migrate:prod).
+# Bootstrap Access users + connector credential on production Postgres.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -13,12 +13,12 @@ else
   export DATABASE_URL_UNPOOLED
   DATABASE_URL_UNPOOLED="$(node "$ROOT/scripts/migrate.mjs" --production --print-dsn)"
   if [[ -z "$DATABASE_URL_UNPOOLED" ]]; then
-    echo "ERROR: Could not resolve production DATABASE_URL_UNPOOLED. See scripts/migrate-prod.sh"
+    echo "ERROR: Could not resolve production DATABASE_URL_UNPOOLED."
     exit 1
   fi
-  # CLI scripts (admin create, seed) use one session — direct 5432 URL avoids pooler quirks.
   export DATABASE_URL="$DATABASE_URL_UNPOOLED"
 fi
 
 cd "$ROOT"
-exec pnpm admin:create "$@"
+pnpm --filter @techlio/server-core run build
+exec pnpm --filter @techlio/api exec tsx src/scripts/bootstrap-prod-access.ts

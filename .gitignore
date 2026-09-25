@@ -11,6 +11,8 @@ dist
 .vercel
 .env*
 .next-build
+.next-build*
 .next-dev
 .next-pwa
+.turbo
 apps/web/public/downloads/build/

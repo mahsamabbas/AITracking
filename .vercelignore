@@ -1,0 +1,23 @@
+# Keep `vercel deploy` uploads small; Vercel rejects individual files over 100 MB.
+.git
+**/.git/**
+
+node_modules
+**/.turbo
+.turbo
+
+# Local Next output — production build runs on Vercel
+.next-dev
+.next-pwa
+.next-build
+.next-build2
+.next-build3
+**/.next-build*
+
+# Connector pack intermediates (e.g. 130 MB universal binary)
+apps/web/public/downloads/build
+
+# Not needed at runtime on Vercel
+memory-bank
+docs
+.cursor
