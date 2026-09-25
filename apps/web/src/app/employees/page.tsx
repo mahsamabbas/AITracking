@@ -28,7 +28,6 @@ import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
-import { AGENT_WORK_SHARE } from "@/lib/vocab";
 import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import type { EmployeeRow, FilterMeta } from "@/lib/types";
 
@@ -358,8 +357,9 @@ export default function EmployeesPage() {
       </div>
 
       <p className="mt-4 text-2xs leading-relaxed text-ink-400">
-        Percentages describe observed agent activity only. Low AI usage is not evidence of low
-        effort — planning, review, meetings, and manual coding are invisible to this system.
+        Times describe observed agent activity only. Idle is time inside a working period with
+        no agent running. Low AI usage is not evidence of low effort — planning, review,
+        meetings, and manual coding are invisible to this system.
       </p>
     </AppShell>
   );

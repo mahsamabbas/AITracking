@@ -38,10 +38,8 @@ import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import {
   AGENT_ACTIVITY_COUNTS,
-  classificationDonutSlices,
   LONG_QUIET_GAPS,
   OBSERVED_TIME_SPLIT,
-  REVIEWING_NO_AI,
   WORK_MIX,
   WORK_MIX_HELP,
   workMixSlices,
@@ -113,11 +111,6 @@ export default function OverviewPage() {
     [d?.tools],
   );
 
-  const classificationSlices = useMemo(
-    () => classificationDonutSlices(d?.classifications ?? []),
-    [d?.classifications],
-  );
-
   const hasActivity = (t?.sessions ?? 0) > 0;
   const liveConnectors = live.data?.connectors ?? [];
   const emptyVariant = emptyActivityVariant(liveConnectors);
@@ -133,7 +126,7 @@ export default function OverviewPage() {
       subtitle={
         isSelfScope
           ? "Everything collected about you through your connected AI tools."
-          : `How AI coding tools are being used across Techlio · ${rangeLabel(range)}`
+          : `How connected AI coding tools were used in this organisation · ${rangeLabel(range)}`
       }
       actions={
         canViewTeam(user?.role) ? (

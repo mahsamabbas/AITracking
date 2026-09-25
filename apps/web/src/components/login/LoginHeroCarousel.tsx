@@ -16,7 +16,7 @@ const SLIDES: LoginHeroSlide[] = [
     eyebrow: "Operational visibility",
     title: "See what the agent performed",
     body:
-      "Sessions, file changes, and tool use from connected AI coding agents — structured for managers and developers on the same facts.",
+      "Sessions, a day-by-day workday, file changes, and tool use from connected AI coding agents — the same facts for managers and the person they describe.",
   },
   {
     image: "/login/hero-privacy.png",
@@ -30,7 +30,7 @@ const SLIDES: LoginHeroSlide[] = [
     eyebrow: "Delivery signals",
     title: "Verify & ship in context",
     body:
-      "Commits in repos the agents work in, with whether checks ran and changes reached the remote — counts and states, not message bodies.",
+      "Commits in repos the agents work in, with whether checks ran and changes reached the remote — counts and states, never the message, author, or code.",
   },
 ];
 

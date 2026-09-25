@@ -1,4 +1,4 @@
-# Techlio · AI Agent Activity Monitoring
+# Techlio Pulse · AI Agent Activity Monitoring
 
 An employee AI-activity monitoring dashboard. It shows managers how AI coding
 tools — Cursor, Claude Code, Copilot — are actually being used across an
@@ -9,9 +9,11 @@ Organisation → Employees → Employee → AI tool → Sessions → Session det
 ```
 
 It is an **operational visibility** product, not timekeeping. It never accepts
-timesheets, never ranks people, and never treats missing telemetry as proof that
-someone was not working. See [memory-bank/requirements.md](memory-bank/requirements.md)
-(PRD v0.2) — every screen traces back to it.
+timesheets, and never treats missing telemetry as proof that someone was not
+working. Administrators and managers can open a usage ranking of observed AI
+activity; that table is not a performance score. See
+[memory-bank/requirements.md](memory-bank/requirements.md) (PRD v0.2) — every
+screen traces back to it.
 
 ## Quick start
 
@@ -56,6 +58,7 @@ Full steps: [docs/DEPLOY.md](docs/DEPLOY.md).
 | Route | Who | What it answers |
 |-------|-----|-----------------|
 | `/` | Manager, admin, developer | How is the org using AI tools right now and over time? |
+| `/leaderboard` | Manager, admin | Observed AI usage per person — not a performance score |
 | `/employees` | Manager, admin | Who uses what, how much, and whose telemetry is incomplete? |
 | `/employees/[id]` | Manager, admin, self | One person: usage, trends, patterns, tools, projects, idle periods, sessions |
 | `/employees/[id]/tools/[provider]` | Manager, admin, self | That person's use of one AI tool specifically |
@@ -88,9 +91,10 @@ forbids merging them into one headline number:
 describes *observed agent activity*, never a person's effort or worth.
 
 **Verify & ship** (`engineering_output`) needs observed check or ship signals in the session
-(test/build/lint/typecheck, agent tools, local CI gate, or **git commit** via the post-commit hook).
-Git and GitHub do not send events by themselves — the connector must receive `POST /hooks/git-commit`
-after each local commit (see `.husky/post-commit`). The connector must be running at commit time.
+(test/build/lint/typecheck, agent tools, a local CI gate, or a **git commit** the connector
+saw in a repo the agent was working in). The connector reports counts and whether a check
+ran or the commit reached a remote — never the message, author, hash, or code. It has to
+be running to see those commits.
 
 Metrics a provider does not report render as **“Not available from provider”**,
 never as zero. Coverage gaps, pauses, stale connectors, and unassigned sessions

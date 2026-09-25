@@ -42,7 +42,7 @@ export const CLASSIFICATION: Record<
     label: "Verify & ship",
     tone: "ok",
     productive: true,
-    help: "Tests, builds, lint, type-checks, local CI, or a git commit (via connector hook) — not commits GitHub sees unless the hook ran.",
+    help: "Tests, builds, lint, type-checks, local CI, or a commit the connector saw in a repo the agent was working in. Counts and check state only — never the message, author, or code.",
   },
   assisted_editing: {
     label: "Writing code",
@@ -64,18 +64,6 @@ export const CLASSIFICATION: Record<
   },
 };
 
-/** Shared copy for session-mix donuts and related sections. */
-export const SESSION_MIX = {
-  title: "Session mix",
-  subtitle:
-    "Verify & ship, writing code, research & planning, and long quiet gaps — session counts, not hours",
-} as const;
-
-export const AGENT_WORK_SHARE = {
-  label: "Agent work share",
-  help: "Share of agent active time in verify & ship, writing code, or research & planning sessions. Observed telemetry only — not a rating of the person.",
-} as const;
-
 export const LONG_QUIET_GAPS = {
   label: "Long quiet gaps",
   kpiHelp:
@@ -94,16 +82,9 @@ export const REVIEWING_NO_AI = {
 } as const;
 
 export const OBSERVED_TIME_SPLIT = {
-  title: "Observed time split",
-  subtitle: "Separate measures — never one combined number",
-  verifyCodeResearch: {
-    label: "Verify, code & research",
-    help: "Agent active time in verify & ship, writing code, or research & planning sessions.",
-  },
-  otherAgentActivity: {
-    label: "Other agent activity",
-    help: "Agent operations in sessions dominated by long quiet gaps.",
-  },
+  title: "Where the time went",
+  subtitle:
+    "Verify & ship, writing code, research & planning, and idle — the same split as Work mix, kept as separate labels",
 } as const;
 
 export const AGENT_ACTIVITY_COUNTS = {
@@ -260,7 +241,7 @@ export interface WorkMix {
 export const WORK_MIX = {
   title: "Work mix",
   subtitle:
-    "Where the time went — verify & ship, writing code, research & planning, and idle — measured from the same events as the Workday graph",
+    "How working time split across verify & ship, writing code, research & planning, and idle — the same events as the Workday graph",
 } as const;
 
 export function workMixSlices(mix?: WorkMix | null): { name: string; value: number; formatted: string; color: string }[] {

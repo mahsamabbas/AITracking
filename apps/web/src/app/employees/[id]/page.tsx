@@ -45,7 +45,6 @@ import {
   formatRelative,
 } from "@/lib/format";
 import {
-  AGENT_WORK_SHARE,
   classificationDonutSlices,
   LONG_QUIET_GAPS,
   REVIEWING_NO_AI,
@@ -365,7 +364,10 @@ export default function EmployeeDetailPage() {
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Time split" subtitle="Five separate measures (never summed)" />
+              <CardHeader
+                title="Time split"
+                subtitle="Model calls, tool time, reviewing without the agent, and long quiet gaps — kept as separate measures"
+              />
               <CardBody>
                 <DurationSplit
                   totalMs={t.elapsedMs}

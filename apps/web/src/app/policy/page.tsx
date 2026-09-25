@@ -27,6 +27,7 @@ const COLLECTED = [
   "File-change metadata: repository-relative path category, change type, timestamp",
   "Connector health: version, last upload, queue depth, pause state",
   "The project or work item you select for a session",
+  "Commits in repositories the agent worked in: files changed, lines added and removed, whether a check ran, and whether the commit reached a remote",
 ];
 
 const NOT_COLLECTED = [
@@ -34,6 +35,7 @@ const NOT_COLLECTED = [
   "Source code or file contents",
   "Command text and shell output",
   "Keystrokes and screenshots",
+  "Commit messages, author names, and commit hashes",
   "Private messages, browser history, or personal activity",
   "Secrets, tokens, and environment values — redacted locally and rejected at the server",
 ];
@@ -51,8 +53,9 @@ export default function PolicyPage() {
         <Callout tone="info" title="Scope boundary">
           This system observes work performed through connected AI coding agents. It does not
           accept developer-submitted hours, compare activity with timesheets, estimate total human
-          effort, approve billing, or rank people. Low observed AI usage is not evidence of low
-          effort — planning, meetings, review, and manual coding are invisible to it.
+          effort, or approve billing. Administrators and managers can open a ranking of observed
+          AI usage; that table is not a performance score. Low observed AI usage is not evidence
+          of low effort — planning, meetings, review, and manual coding are invisible to it.
         </Callout>
       </div>
 
