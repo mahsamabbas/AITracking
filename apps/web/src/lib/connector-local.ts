@@ -20,7 +20,20 @@ export function setConnectorViewer(developerId: string | null | undefined): void
   viewerDeveloperId = developerId ?? null;
 }
 
-type LocalIdentity = { paired?: boolean; developerId?: string };
+type LocalIdentity = { paired?: boolean; developerId?: string; displayName?: string };
+
+/**
+ * Whose connector this is, from the signed-in person's point of view.
+ * "other": activated for a different account — e.g. a key from before the
+ * database moved, or a previous user of this computer. It can be re-activated
+ * with the viewer's own key, but is never paused, stopped, or unpaired for them.
+ */
+export type ConnectorOwner = "mine" | "unpaired" | "other";
+
+export function connectorOwner(id: LocalIdentity): ConnectorOwner {
+  if (!id.paired) return "unpaired";
+  return !viewerDeveloperId || id.developerId === viewerDeveloperId ? "mine" : "other";
+}
 
 async function probe(base: string): Promise<LocalIdentity | null> {
   try {
@@ -33,9 +46,10 @@ async function probe(base: string): Promise<LocalIdentity | null> {
 
 /** Mine: paired to the signed-in developer, or not yet activated (ready to pair). */
 function isMine(id: LocalIdentity): boolean {
-  if (!id.paired) return true;
-  return !viewerDeveloperId || id.developerId === viewerDeveloperId;
+  return connectorOwner(id) !== "other";
 }
+
+let cachedSetupBase: string | null = null;
 
 /**
  * The base URL of this person's connector on this computer, or null. A
@@ -59,6 +73,32 @@ export async function connectorBase(): Promise<string | null> {
   return cachedBase;
 }
 
+/**
+ * For detection and activation only: this person's connector if there is one,
+ * else any connector on this computer (one activated for another account can
+ * be switched to this person by activating their own admin-issued key).
+ */
+export async function setupConnectorBase(): Promise<string | null> {
+  const own = await connectorBase();
+  if (own) return own;
+  if (cachedSetupBase && (await probe(cachedSetupBase))) return cachedSetupBase;
+  const found = await Promise.all(
+    CONNECTOR_PORTS.map(async (port) => {
+      const base = `http://127.0.0.1:${port}`;
+      return (await probe(base)) ? base : null;
+    }),
+  );
+  cachedSetupBase = found.find(Boolean) ?? null;
+  return cachedSetupBase;
+}
+
+/** Detection / activation fetch: may reach a connector activated for another account. */
+export async function setupConnectorFetch(path: string, init?: RequestInit): Promise<Response> {
+  const base = await setupConnectorBase();
+  if (!base) throw new Error("connector_not_found");
+  return fetch(`${base}${path}`, { cache: "no-store", ...init });
+}
+
 /** Fetch against this person's connector; throws when none is reachable. */
 export async function connectorFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = await connectorBase();
@@ -78,7 +118,7 @@ export function connectorDownloadPath(platform: "mac" | "windows" | "other"): st
 
 export async function fetchConnectorHealth(): Promise<boolean> {
   try {
-    const r = await connectorFetch("/health");
+    const r = await setupConnectorFetch("/health");
     return r.ok;
   } catch {
     return false;

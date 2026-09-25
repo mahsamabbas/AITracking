@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import { CONNECTOR_LOCAL, connectorFetch } from "@/lib/connector-local";
+import { CONNECTOR_LOCAL, connectorFetch, connectorOwner, setupConnectorFetch } from "@/lib/connector-local";
 import { Callout } from "@/components/ui/Callout";
 import { LocalAccessHint } from "@/components/domain/LocalAccessHint";
 
@@ -16,7 +16,9 @@ export async function claimLocalConnector(input: {
   consentAccepted: boolean;
 }): Promise<{ ok: true } | { ok: false; offline: boolean; message: string }> {
   try {
-    const r = await connectorFetch("/claim", {
+    // May replace a key activated for another account (e.g. from before a
+    // database move) — it only succeeds with this person's own issued key.
+    const r = await setupConnectorFetch("/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,17 +64,23 @@ export function ThisComputerStatus() {
     | { kind: "offline" }
     | { kind: "unpaired" }
     | { kind: "paired"; displayName?: string; providers?: string[]; label?: string | null }
+    | { kind: "other"; displayName?: string }
   >({ kind: "loading" });
 
   async function refresh() {
     try {
-      const r = await connectorFetch("/identity");
+      const r = await setupConnectorFetch("/identity");
       const json = (await r.json()) as {
         paired?: boolean;
+        developerId?: string;
         displayName?: string;
         providers?: string[];
         label?: string | null;
       };
+      if (connectorOwner(json) === "other") {
+        setState({ kind: "other", displayName: json.displayName });
+        return;
+      }
       setState(
         json.paired
           ? {
@@ -101,6 +109,16 @@ export function ThisComputerStatus() {
       <Callout tone="warn" title="Connector not detected on this computer">
         Download the connector from this page and install it once, then activate your key.
         <LocalAccessHint />
+      </Callout>
+    );
+  }
+
+  if (state.kind === "other") {
+    return (
+      <Callout tone="warn" title="This computer's connector is activated for a different account">
+        It is running, but its key belongs to {state.displayName ? `“${state.displayName}”` : "another account"} — for
+        example a key issued before your organisation’s data moved. Enter the device ID and token your
+        administrator issued to you below; activating replaces the old key so activity is attributed to you.
       </Callout>
     );
   }

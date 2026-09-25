@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { connectorFetch, setConnectorViewer } from "./connector-local";
+import { connectorOwner, setConnectorViewer, setupConnectorFetch } from "./connector-local";
 
 /** Routes developers may use until the local agent is installed and paired. */
 export const CONNECTOR_ONBOARDING_PATHS = [
@@ -56,12 +56,14 @@ export async function fetchConnectorSetupPhase(): Promise<
 > {
   const attempt = async (): Promise<Exclude<ConnectorSetupPhase, "loading">> => {
     try {
-      const health = await connectorFetch("/health");
+      const health = await setupConnectorFetch("/health");
       if (!health.ok) return "offline";
-      const r = await connectorFetch("/identity");
+      const r = await setupConnectorFetch("/identity");
       if (!r.ok) return "offline";
-      const json = (await r.json()) as { paired?: boolean };
-      return json.paired ? "ready" : "unpaired";
+      const json = (await r.json()) as { paired?: boolean; developerId?: string };
+      // Activated for another account (e.g. a key from before a database move):
+      // installed and running, but this person still has to activate their key.
+      return connectorOwner(json) === "mine" ? "ready" : "unpaired";
     } catch {
       return "offline";
     }
