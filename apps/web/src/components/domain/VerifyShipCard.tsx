@@ -35,8 +35,6 @@ function Stage({
 function StateChip({ verified, shipped }: { verified: boolean; shipped: boolean }) {
   return (
     <span className="flex flex-wrap items-center gap-1 text-2xs">
-      <span className="badge-neutral">Committed</span>
-      <span aria-hidden className="text-ink-400">→</span>
       <span className={verified ? "badge-ok" : "badge-neutral opacity-60"} title={verified ? "A passing check ran in this repo before the commit" : "No passing check was observed before this commit"}>
         {verified ? "Verified" : "Not verified"}
       </span>
@@ -71,8 +69,8 @@ export function VerifyShipCard({
         title="Verify & ship"
         subtitle={
           compact
-            ? "Commits in the repos agents work in → shipped (pushed)"
-            : "Commits in the repositories the AI agents work in: committed → verified (a passing check ran first) → shipped (pushed)"
+            ? "Commits in the repos agents work in → pushed (shipped)"
+            : "Commits in the repositories the AI agents work in: verified (a passing check ran first) → shipped (pushed)"
         }
       />
       <CardBody>
@@ -85,8 +83,8 @@ export function VerifyShipCard({
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Stage label="Committed" value={commits.commits} hint="Commits by the tracked people" color="var(--chart-4)" />
-              <Stage label="Shipped" value={commits.shipped} of={commits.commits} hint="Pushed to the remote" color="var(--chart-2)" />
+              <Stage label="Commits" value={commits.commits} hint="Commits the connector saw in repos agents work in" color="var(--chart-4)" />
+              <Stage label="Shipped" value={commits.shipped} of={commits.commits} hint="Commits pushed to the remote" color="var(--chart-2)" />
             </div>
             <p className="hint mt-3">
               {formatNumber(commits.filesChanged)} files · +{formatNumber(commits.linesAdded)} / −

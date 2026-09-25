@@ -94,6 +94,13 @@ export function connectorOnboardingActive(
   return phase === "offline" || phase === "unpaired";
 }
 
+/** Install stepper on My connectors — only while the local agent is not running yet. */
+export function showConnectorInstallStepper(phase: ConnectorSetupPhase): boolean {
+  if (phase === "offline") return true;
+  if (phase === "loading") return readCachedConnectorPhase() === "offline";
+  return false;
+}
+
 export function useConnectorSetupPhase(pollMs = 5_000) {
   const [phase, setPhase] = useState<ConnectorSetupPhase>(() => initialConnectorSetupPhase());
 

@@ -52,12 +52,12 @@ export function deriveHighlights(d: HighlightInput): Highlight[] {
       tone: "amber",
       label: "Peak hour",
       value: hourLabel(peak.hour),
-      detail: `${pct(peak.activeMs, total)}% of agent active time`,
+      detail: `${pct(peak.activeMs, total)}% of AI active time`,
     });
   }
 
   const day = maxBy(d.dailyTrend, (p) => p.activeMs);
-  if (day && d.dailyTrend.length > 1) {
+  if (day) {
     out.push({
       id: "busiest-day",
       icon: "calendar",
@@ -69,7 +69,7 @@ export function deriveHighlights(d: HighlightInput): Highlight[] {
         month: "short",
         timeZone: "UTC",
       }),
-      detail: `${formatDuration(day.activeMs)} active · ${formatNumber(day.sessions)} sessions`,
+      detail: `${formatDuration(day.activeMs)} AI active · ${formatNumber(day.sessions)} sessions`,
     });
   }
 
@@ -96,8 +96,8 @@ export function deriveHighlights(d: HighlightInput): Highlight[] {
       value: providerLabel(tool.provider),
       detail:
         d.scope === "organization"
-          ? `${pct(tool.activeMs, total)}% of active time · ${tool.employees} ${tool.employees === 1 ? "person" : "people"}`
-          : `${pct(tool.activeMs, total)}% of active time · ${formatNumber(tool.sessions)} sessions`,
+          ? `${pct(tool.activeMs, total)}% of AI active time · ${tool.employees} ${tool.employees === 1 ? "person" : "people"}`
+          : `${pct(tool.activeMs, total)}% of AI active time · ${formatNumber(tool.sessions)} sessions`,
     });
   }
 
@@ -131,20 +131,8 @@ export function deriveHighlights(d: HighlightInput): Highlight[] {
       tone: "slate",
       label: "Most active team",
       value: team.team,
-      detail: `${formatDuration(team.activeMs)} · ${team.employees} ${team.employees === 1 ? "person" : "people"}`,
+      detail: `${formatDuration(team.activeMs)} AI active · ${team.employees} ${team.employees === 1 ? "person" : "people"}`,
     });
-  } else {
-    const weekday = maxBy(d.weekdayPattern, (w) => w.activeMs);
-    if (weekday) {
-      out.push({
-        id: "top-weekday",
-        icon: "calendar",
-        tone: "slate",
-        label: "Busiest weekday",
-        value: weekday.label,
-        detail: `${formatDuration(weekday.activeMs)} across the period`,
-      });
-    }
   }
 
   return out;

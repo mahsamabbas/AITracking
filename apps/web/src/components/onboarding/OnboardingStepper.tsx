@@ -6,8 +6,10 @@ const LABELS = ["Install agent", "Admin key", "Activate key"];
 
 export function OnboardingStepper() {
   const { phase } = useConnectorSetupPhase(4_000);
+  if (phase === "ready") return null;
+
   const current =
-    phase === "ready" ? 4 : phase === "unpaired" ? 3 : phase === "offline" ? 1 : 1;
+    phase === "unpaired" ? 3 : phase === "offline" ? 1 : 1;
 
   return (
     <nav className="mb-5" aria-label="Onboarding progress">

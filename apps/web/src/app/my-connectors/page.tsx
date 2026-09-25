@@ -14,6 +14,7 @@ import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import { ThisComputerStatus } from "@/components/domain/ConnectThisComputer";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
+import { showConnectorInstallStepper, useConnectorSetupPhase } from "@/lib/connector-local";
 import { apiPost } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import { homePathForRole } from "@/lib/permissions";
@@ -27,6 +28,8 @@ export default function MyConnectorsPage() {
   }>(user?.role === "developer" ? "/v1/connectors/mine" : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
+  const showInstallStepper = showConnectorInstallStepper(connectorPhase);
 
   const developerId = user?.developerId;
   const mine = (live.data?.connectors ?? []).filter(
@@ -79,7 +82,7 @@ export default function MyConnectorsPage() {
       ) : null}
 
       <div className="mb-5 space-y-4">
-        <OnboardingStepper />
+        {showInstallStepper ? <OnboardingStepper /> : null}
         <ThisComputerStatus />
         <FirstActivityStatus live={live.data} developerId={developerId} />
       </div>

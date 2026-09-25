@@ -10,7 +10,7 @@ type LivePerson = NonNullable<LiveStatus["people"]>[number];
 export function RightNowTable({ people }: { people: LivePerson[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="tbl">
+      <table className="tbl min-w-[720px] w-full">
         <thead>
           <tr>
             <th>Person</th>
@@ -19,7 +19,7 @@ export function RightNowTable({ people }: { people: LivePerson[] }) {
             <th>Last model</th>
             <th>Last tool</th>
             <th className="text-right">Events this hour</th>
-            <th>Last event</th>
+            <th className="text-right">Last event</th>
           </tr>
         </thead>
         <tbody>
@@ -28,7 +28,7 @@ export function RightNowTable({ people }: { people: LivePerson[] }) {
               <td>
                 <OrgLink
                   href={`/employees/${p.developerId}`}
-                  className="flex items-center gap-2.5 text-sm font-medium text-ink-900 hover:text-brand-600"
+                  className="inline-flex max-w-full items-center gap-2.5 text-sm font-medium text-ink-900 hover:text-brand-600"
                 >
                   <UserAvatar name={p.displayName} src={p.avatarUrl} size="sm" />
                   <span className="truncate">{p.displayName}</span>
@@ -49,8 +49,8 @@ export function RightNowTable({ people }: { people: LivePerson[] }) {
               </td>
               <td className="max-w-[180px] truncate text-sm text-ink-700">{p.lastModel ?? <span className="hint">—</span>}</td>
               <td className="max-w-[160px] truncate text-sm text-ink-700">{p.lastTool ?? <span className="hint">—</span>}</td>
-              <td className="num text-right text-sm text-ink-700">{p.eventsThisHour}</td>
-              <td className="whitespace-nowrap text-sm text-ink-500">{formatRelative(p.lastEventAt)}</td>
+              <td className="num text-right text-sm tabular-nums text-ink-700">{p.eventsThisHour}</td>
+              <td className="whitespace-nowrap text-right text-sm text-ink-500">{formatRelative(p.lastEventAt)}</td>
             </tr>
           ))}
         </tbody>
