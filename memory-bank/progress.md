@@ -226,3 +226,11 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
   hours · day of week · Verify & ship → file changes & commits → AI progress → …
 - Removed duplicates that disagreed with event time: overview "Where the time went" and employee
   "Time split" (session totals). Dead vocab exports removed.
+
+## 2026-09-25 UI revamp pass 2
+- InfoDot tooltips render in a portal (fixed, viewport-clamped, flip above/below, tap/Escape/outside-click) — fixes clipping inside `overflow-hidden` cards.
+- Shared `ui/Icon.tsx` (Icon + IconChip, static tone classes). Every CardHeader takes `icon`/`tone`/`help`; all 56 headers use one.
+- StatTile: icon chip, per-day sparkline (`spark`), delta pill. ActivityStrip extracted (overview + employee).
+- New sections: HighlightsCard (`lib/insights.ts` deriveHighlights — peak hour, busiest day, top tool/model, ship rate, depth, top team/weekday), TopPeopleCard, RepositoriesCard, WeekdayBars, ConnectorHealthCard (connector states + coverage + alerts), RightNowTable extracted. ChartLegend + TREND_LEGEND/CHANGE_TREND_LEGEND in card headers.
+- Donut legend wraps under the chart with share % bars. Mobile: sticky header = menu+title+utilities only; subtitle/actions render via PageIntro at top of content; timezone moves to drawer below `sm`.
+- Removed nonexistent `text-ink-600/800` classes (no such tokens).

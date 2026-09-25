@@ -81,24 +81,27 @@ export function DonutChart({
         ) : null}
       </div>
       {total > 0 || data.some((d) => d.value === 0) ? (
+        // Legend wraps under the donut in narrow cards instead of truncating names.
         <ul
-          className={`min-w-[148px] flex-1 space-y-1.5 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
+          className={`min-w-[210px] flex-1 space-y-2 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
         >
-          {data.map((d, i) => (
-            <li
-              key={d.name}
-              className={`flex items-center gap-2 text-xs ${d.value === 0 ? "opacity-55" : ""}`}
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-[2px]"
-                style={{ background: d.color ?? CHART_COLORS[i % CHART_COLORS.length] }}
-              />
-              <span className="truncate text-ink-700">{d.name}</span>
-              <span className="num ml-auto font-medium text-ink-900">
-                {d.formatted ?? d.value}
-              </span>
-            </li>
-          ))}
+          {data.map((d, i) => {
+            const color = d.color ?? CHART_COLORS[i % CHART_COLORS.length];
+            const share = total > 0 ? Math.round((d.value / total) * 100) : 0;
+            return (
+              <li key={d.name} className={d.value === 0 ? "opacity-55" : ""}>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+                  <span className="min-w-0 flex-1 text-ink-700">{d.name}</span>
+                  <span className="num whitespace-nowrap font-medium text-ink-900">{d.formatted ?? d.value}</span>
+                  <span className="num w-9 shrink-0 text-right text-2xs text-ink-500">{share}%</span>
+                </div>
+                <div className="ml-4 mt-1 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                  <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { IconChip, type IconName, type Tone } from "./Icon";
+import { InfoDot } from "./InfoDot";
 
 export function Card({
   children,
@@ -16,18 +18,31 @@ export function CardHeader({
   action,
   href,
   hrefLabel = "View all",
+  icon,
+  tone = "brand",
+  help,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
   href?: string;
   hrefLabel?: string;
+  icon?: IconName;
+  tone?: Tone;
+  /** Longer explanation behind an (i) next to the title. */
+  help?: string;
 }) {
   return (
     <header className="card-head">
-      <div className="min-w-0">
-        <h3 className="h-section">{title}</h3>
-        {subtitle ? <p className="hint mt-0.5">{subtitle}</p> : null}
+      <div className="flex min-w-0 flex-1 basis-[15rem] items-start gap-3">
+        {icon ? <IconChip name={icon} tone={tone} /> : null}
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h3 className="h-section">{title}</h3>
+            {help ? <InfoDot text={help} label={`About ${title}`} /> : null}
+          </div>
+          {subtitle ? <p className="hint mt-0.5">{subtitle}</p> : null}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}

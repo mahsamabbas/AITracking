@@ -26,7 +26,7 @@ import {
 import { useApi } from "@/lib/use-api";
 import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
-import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
+import { formatDuration, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import type { EmployeeRow, FilterMeta } from "@/lib/types";
@@ -190,7 +190,7 @@ export default function EmployeesPage() {
 
       <div className="mt-5">
         <Card className="card-table">
-          <CardHeader
+          <CardHeader icon="people"
             title="Directory"
             subtitle={`${rows.length} people · open a row for full analytics · totals for the range are on Organisation overview`}
             action={

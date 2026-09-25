@@ -55,7 +55,7 @@ export function PlatformOrgTabBar() {
               className={`whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 active
                   ? "bg-brand-600 text-white shadow-sm"
-                  : "text-ink-600 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
+                  : "text-ink-700 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
               {tab.label}

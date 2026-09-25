@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPatch, apiPost } from "@/lib/api";
-import { formatDate, formatNumber, formatRelative } from "@/lib/format";
+import { formatNumber, formatRelative } from "@/lib/format";
 import { readLogoFile } from "@/lib/image-upload";
 import { Button } from "@/components/ui/Button";
 import { FIELD_LIMITS } from "@/lib/validation";
@@ -193,7 +193,7 @@ export default function PlatformPage() {
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="card-table order-2 lg:order-1 lg:col-span-2">
-          <CardHeader
+          <CardHeader icon="team"
             title="Customer organisations"
             subtitle={`${formatNumber(filtered.length)} shown`}
             action={
@@ -310,7 +310,7 @@ export default function PlatformPage() {
         </Card>
 
         <Card className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start">
-          <CardHeader
+          <CardHeader icon="person"
             title={adminFor ? `Administrator · ${adminFor.name}` : "New organisation"}
             subtitle={
               adminFor

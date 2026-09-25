@@ -99,10 +99,10 @@ export default function ConnectorsPage() {
         <StatSkeleton />
       ) : (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatTile label="Online" value={counts.online} hint="heartbeat within 5 min" accent="teal" />
-          <StatTile label="Stale" value={counts.stale} hint="no heartbeat for 5+ min" accent="amber" />
-          <StatTile label="Paused" value={counts.paused} hint="collection paused by policy" accent="amber" />
-          <StatTile label="Offline" value={counts.offline} hint="never reported" accent="rose" />
+          <StatTile label="Online" icon="live" value={counts.online} hint="heartbeat within 5 min" accent="teal" />
+          <StatTile label="Stale" icon="clock" value={counts.stale} hint="no heartbeat for 5+ min" accent="amber" />
+          <StatTile label="Paused" icon="plug" value={counts.paused} hint="collection paused by policy" accent="amber" />
+          <StatTile label="Offline" icon="shield" value={counts.offline} hint="never reported" accent="rose" />
         </section>
       )}
 
@@ -126,7 +126,7 @@ export default function ConnectorsPage() {
       </div>
 
       <Card className="card-table">
-        <CardHeader
+        <CardHeader icon="plug" tone="teal"
           title="Registered connectors"
           subtitle="One credential per employee, device, and AI tool"
         />
@@ -203,7 +203,7 @@ export default function ConnectorsPage() {
 
       <div className="mt-5">
         <Card>
-          <CardHeader title="Coverage notices" subtitle="Health and data-quality alerts only" />
+          <CardHeader icon="shield" tone="amber" title="Coverage notices" subtitle="Health and data-quality alerts only" />
           <AlertList alerts={query.data?.alerts ?? []} limit={10} />
         </Card>
       </div>

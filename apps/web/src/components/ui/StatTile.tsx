@@ -1,6 +1,23 @@
 import { percentChange } from "@/lib/format";
+import { Sparkline } from "@/components/charts/Sparkline";
 import { InfoDot } from "./InfoDot";
+import { IconChip, type IconName, type Tone } from "./Icon";
 
+type Accent = "brand" | "teal" | "amber" | "rose" | "slate";
+
+const SPARK_COLOR: Record<Accent, string> = {
+  brand: "var(--chart-1)",
+  teal: "var(--chart-2)",
+  amber: "var(--chart-3)",
+  rose: "var(--chart-4)",
+  slate: "var(--chart-axis)",
+};
+
+/**
+ * Headline number. Optional icon, previous-period delta (neutral colour — a
+ * drop in AI usage is not bad news about a person), and a sparkline of the
+ * period so the number reads with its shape.
+ */
 export function StatTile({
   label,
   value,
@@ -10,7 +27,9 @@ export function StatTile({
   current,
   previous,
   invertDelta = false,
-  accent,
+  accent = "brand",
+  icon,
+  spark,
 }: {
   label: string;
   value: string | number;
@@ -21,7 +40,10 @@ export function StatTile({
   previous?: number;
   /** For metrics where "up" is not good news (failures, coverage gaps). */
   invertDelta?: boolean;
-  accent?: "brand" | "teal" | "amber" | "rose" | "slate";
+  accent?: Accent;
+  icon?: IconName;
+  /** Per-day values for the period; drawn only when there are 2+ points. */
+  spark?: number[];
 }) {
   const delta =
     current !== undefined && previous !== undefined
@@ -29,42 +51,32 @@ export function StatTile({
       : undefined;
   void invertDelta; // kept for API compatibility; deltas are always neutral now
 
-  const bar =
-    accent === "teal"
-      ? "bg-teal-500"
-      : accent === "amber"
-        ? "bg-amber-500"
-        : accent === "rose"
-          ? "bg-rose-500"
-          : accent === "slate"
-            ? "bg-slate-400"
-            : "bg-brand-500";
-
   return (
-    <div className="card relative overflow-hidden p-5 transition-shadow duration-fast hover:shadow-pop">
-      <span className={`absolute inset-y-0 left-0 w-[3px] ${bar}`} aria-hidden />
-      <div className="flex items-center gap-1.5">
-        <p className="label">{label}</p>
-        {help ? <InfoDot text={help} /> : null}
+    <div className="card relative p-5 transition-shadow duration-fast hover:shadow-pop">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="label truncate">{label}</p>
+          {help ? <InfoDot text={help} label={`About ${label}`} /> : null}
+        </div>
+        {icon ? <IconChip name={icon} tone={accent as Tone} size="sm" /> : null}
       </div>
-      <p className="mt-2 flex items-baseline gap-1.5">
-        <span className="num text-[26px] font-semibold leading-none tracking-tight text-ink-900">
-          {value}
-        </span>
-        {unit ? <span className="text-sm text-ink-500">{unit}</span> : null}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className="flex min-w-0 items-baseline gap-1.5">
+          <span className="num truncate text-[26px] font-semibold leading-none tracking-tight text-ink-900">
+            {value}
+          </span>
+          {unit ? <span className="text-sm text-ink-500">{unit}</span> : null}
+        </p>
+        {spark && spark.length > 1 ? (
+          <span className="hidden shrink-0 opacity-90 sm:block">
+            <Sparkline points={spark} width={84} height={28} color={SPARK_COLOR[accent]} />
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         {delta !== undefined ? (
-          // Direction is shown with an arrow and a neutral colour. A drop in AI
-          // usage is not bad news about a person, so nothing is painted red.
-          <span className="num inline-flex items-center gap-0.5 text-xs font-medium text-ink-700">
-            {delta == null || delta === 0 ? (
-              <span aria-hidden>→</span>
-            ) : delta > 0 ? (
-              <span aria-hidden>↑</span>
-            ) : (
-              <span aria-hidden>↓</span>
-            )}
+          <span className="num inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-2xs font-semibold text-ink-700 dark:bg-white/10">
+            <span aria-hidden>{delta == null || delta === 0 ? "→" : delta > 0 ? "↑" : "↓"}</span>
             <span className="sr-only">
               {delta == null ? "new this period" : delta > 0 ? "up" : delta < 0 ? "down" : "unchanged"}
             </span>

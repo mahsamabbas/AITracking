@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Callout } from "@/components/ui/Callout";
@@ -161,7 +161,7 @@ function ProfileTab({
 
   return (
     <Card>
-      <CardHeader
+      <CardHeader icon="person"
         title="Profile"
         subtitle="Account, directory details, and photo — shown in the header, employee directory, and profile card"
       />
@@ -363,7 +363,7 @@ function SecurityTab({
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="Password" subtitle="Sign in with email and password on every device" />
+        <CardHeader icon="shield" tone="slate" title="Password" subtitle="Sign in with email and password on every device" />
         <CardBody className="grid gap-4 sm:max-w-md">
           <label className="block">
             <span className="label mb-1 block">Current password</span>
@@ -401,7 +401,7 @@ function SecurityTab({
 
       {isMobileDevice() ? (
         <Card>
-          <CardHeader
+          <CardHeader icon="shield" tone="teal"
             title={label}
             subtitle="Unlock the portal on this phone without typing your password again"
           />
@@ -475,7 +475,7 @@ function OrganizationTab({
   if (userRole === "super_admin" && !platformOrg) {
     return (
       <Card>
-        <CardHeader title="Organisation logo" subtitle="Set a logo for each customer organisation" />
+        <CardHeader icon="spark" tone="violet" title="Organisation logo" subtitle="Set a logo for each customer organisation" />
         <CardBody className="space-y-3">
           <p className="text-sm text-ink-500">
             From the{" "}
@@ -521,7 +521,7 @@ function OrganizationTab({
 
   return (
     <Card>
-      <CardHeader
+      <CardHeader icon="spark" tone="violet"
         title="Organisation logo"
         subtitle={branding ? `Shown in the portal for ${branding.name}` : "Your organisation"}
       />

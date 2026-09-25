@@ -104,3 +104,28 @@ export function durationTicks(maxMs: number): (v: number) => string {
   }
   return (v) => `${Math.round(v / 60_000)}m`;
 }
+
+export interface LegendItem {
+  label: string;
+  color: string;
+  /** "line" for line/area series, "bar" (default) for bars and areas. */
+  shape?: "line" | "bar";
+}
+
+/** Compact series legend, typically placed in a card header's action slot. */
+export function ChartLegend({ items }: { items: LegendItem[] }) {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-700">
+      {items.map((i) => (
+        <li key={i.label} className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className={i.shape === "line" ? "h-0.5 w-3.5 rounded" : "h-2.5 w-2.5 rounded-[3px]"}
+            style={{ background: i.color }}
+          />
+          {i.label}
+        </li>
+      ))}
+    </ul>
+  );
+}

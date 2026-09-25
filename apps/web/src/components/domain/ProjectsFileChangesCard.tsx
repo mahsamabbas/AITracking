@@ -29,6 +29,8 @@ export function ProjectsFileChangesCard({
   return (
     <Card>
       <CardHeader
+        icon="file"
+        tone="violet"
         title="File changes & commits"
         subtitle={
           subtitle ??

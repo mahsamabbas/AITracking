@@ -31,7 +31,7 @@ export function ListTimeSortButton({
   return (
     <button
       type="button"
-      className="btn-ghost ml-auto h-8 shrink-0 gap-1.5 px-2.5 text-xs text-ink-600"
+      className="btn-ghost ml-auto h-8 shrink-0 gap-1.5 px-2.5 text-xs text-ink-700"
       onClick={onToggle}
       aria-label={`Sort by ${label}, ${orderLabel}`}
     >

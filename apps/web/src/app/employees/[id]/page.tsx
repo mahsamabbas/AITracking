@@ -17,7 +17,12 @@ import {
   NotFoundState,
   StatSkeleton,
 } from "@/components/ui/States";
-import { TrendChart } from "@/components/charts/TrendChart";
+import { TREND_LEGEND, TrendChart } from "@/components/charts/TrendChart";
+import { ChartLegend } from "@/components/charts/ChartFrame";
+import { WeekdayBars } from "@/components/charts/WeekdayBars";
+import { ActivityStrip } from "@/components/domain/ActivityStrip";
+import { HighlightsCard } from "@/components/domain/HighlightsCard";
+import { RepositoriesCard } from "@/components/domain/RepositoriesCard";
 import { ActivityCalendar, type ActivityCalendarData } from "@/components/charts/ActivityCalendar";
 import { WorkdayPanel } from "@/components/domain/WorkdayPanel";
 import { ActivityFeed } from "@/components/domain/ActivityFeed";
@@ -48,6 +53,7 @@ import {
   TOOL_CATEGORY_LABEL,
 } from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
+import { deriveHighlights } from "@/lib/insights";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
@@ -197,6 +203,8 @@ export default function EmployeeDetailPage() {
           {/* ---------------- Year of AI activity (contribution graph) ---------------- */}
           <Card className="mb-5">
             <CardHeader
+              icon="calendar"
+              tone="teal"
               title="AI activity — last 12 months"
               subtitle="Each square is one day in the last year — click a day for the workday view below"
             />
@@ -256,6 +264,8 @@ export default function EmployeeDetailPage() {
               value={formatDuration(t.activeMs, { compact: true })}
               hint="merged model + tool time"
               accent="brand"
+              icon="clock"
+              spark={d.dailyTrend.map((p) => p.activeMs)}
               current={t.activeMs}
               previous={d.previousTotals.activeMs}
               help="Agent active time: overlapping model and tool operations merged, so parallel calls are counted once."
@@ -265,6 +275,8 @@ export default function EmployeeDetailPage() {
               value={formatNumber(t.sessions)}
               hint={`avg ${formatDuration(t.avgSessionMs)} active`}
               accent="teal"
+              icon="sessions"
+              spark={d.dailyTrend.map((p) => p.sessions)}
               current={t.sessions}
               previous={d.previousTotals.sessions}
             />
@@ -273,6 +285,7 @@ export default function EmployeeDetailPage() {
               value={formatDuration(d.workMix?.workingMs ?? 0, { compact: true })}
               hint={`${formatDuration(t.activeMs)} agent active · ${formatDuration(t.idleMs)} idle`}
               accent="teal"
+              icon="bolt"
               help="Time between agent events with no gap over 10 minutes — the same measure as the Workday graph."
             />
             <StatTile
@@ -280,55 +293,59 @@ export default function EmployeeDetailPage() {
               value={formatDuration(t.idleMs, { compact: true })}
               hint={`${d.idlePeriods.length} gaps over 10 min`}
               accent="slate"
+              icon="clock"
+              spark={d.dailyTrend.map((p) => p.idleMs)}
               invertDelta
               current={t.idleMs}
               previous={d.previousTotals.idleMs}
               help={LONG_QUIET_GAPS.kpiHelp}
             />
           </section>
+          <ActivityStrip totals={t} commits={d.commits} />
 
           {/* Layout rule: each row pairs cards of similar height; charts fill their card.
               "Time split" was removed: it repeated the Work mix from session totals,
               which disagreed with the event-time figures everywhere else. */}
-          {/* ---------------- Usage trend + work mix ---------------- */}
+          {/* ---------------- Usage trend + highlights ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
               <CardHeader
+                icon="trend"
                 title="Daily usage trend"
                 subtitle={LONG_QUIET_GAPS.trendSubtitle}
+                action={<ChartLegend items={TREND_LEGEND} />}
               />
               <CardBody className="pt-2">
-                <TrendChart
-                  data={d.dailyTrend}
-                  emptyVariant={silenceVariant}
-                />
+                <TrendChart data={d.dailyTrend} emptyVariant={silenceVariant} />
               </CardBody>
             </Card>
-            <Card>
-              <CardHeader
-                title={WORK_MIX.title}
-                subtitle={
-                  d!.commits && "commits" in d!.commits && (d!.commits as { commits: number }).commits > 0
-                    ? `${WORK_MIX.subtitle} · ${(d!.commits as { commits: number }).commits} commits`
-                    : WORK_MIX.subtitle
-                }
-              />
-              <CardBody>
-                <DonutChart
-                  data={workMixSlices(d!.workMix)}
-                  centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
-                  centerLabel="working time"
-                  emptyVariant={silenceVariant}
-                  height={260}
-                />
-              </CardBody>
-            </Card>
+            <HighlightsCard items={deriveHighlights(d)} />
           </section>
 
-          {/* ---------------- Patterns + Verify & ship ---------------- */}
+          {/* ---------------- Work mix + rhythm ---------------- */}
           <section className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <Card>
               <CardHeader
+                icon="pie"
+                tone="teal"
+                title={WORK_MIX.title}
+                subtitle="How working time split across the four kinds of agent work"
+                help={WORK_MIX.subtitle}
+              />
+              <CardBody>
+                <DonutChart
+                  data={workMixSlices(d.workMix)}
+                  centerValue={formatDuration(d.workMix?.workingMs ?? 0, { compact: true })}
+                  centerLabel="working time"
+                  emptyVariant={silenceVariant}
+                  height={220}
+                />
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader
+                icon="sun"
+                tone="amber"
                 title="Working-hour pattern"
                 subtitle="When agent activity happens (org timezone)"
               />
@@ -336,21 +353,23 @@ export default function EmployeeDetailPage() {
                 <HourPatternChart data={d.hourPattern} emptyVariant={silenceVariant} />
               </CardBody>
             </Card>
-            <Card>
-              <CardHeader title="Day of week" subtitle="Agent active time" />
+            <Card className="lg:col-span-2 xl:col-span-1">
+              <CardHeader icon="calendar" tone="sky" title="Day of week" subtitle="Agent active time · busiest day highlighted" />
               <CardBody>
-                <BarList
-                  items={d.weekdayPattern.map((w) => ({
-                    label: w.label,
-                    value: w.activeMs,
-                    formatted: formatDuration(w.activeMs),
-                    color: "var(--chart-2)",
-                  }))}
-                />
+                <WeekdayBars data={d.weekdayPattern} />
               </CardBody>
             </Card>
-            {d.commits ? <VerifyShipCard commits={d.commits} compact /> : null}
           </section>
+
+          {/* ---------------- Verify & ship + repositories ---------------- */}
+          {d.commits ? (
+            <section className="mt-5 grid gap-4 xl:grid-cols-3">
+              <div className={`flex min-w-0 flex-col [&>.card]:flex-1 ${d.commits.repos.length ? "xl:col-span-2" : "xl:col-span-3"}`}>
+                <VerifyShipCard commits={d.commits} />
+              </div>
+              {d.commits.repos.length ? <RepositoriesCard repos={d.commits.repos} /> : null}
+            </section>
+          ) : null}
 
           {/* ---------------- Projects & file changes ---------------- */}
           <section className="mt-5">
@@ -385,6 +404,7 @@ export default function EmployeeDetailPage() {
           <section className="mt-5">
             <Card>
               <CardHeader
+                icon="sessions"
                 title="Recent sessions"
                 subtitle="Most recent first — open one for its full event trail"
                 href={`/employees/${employeeId}/sessions`}
@@ -397,7 +417,7 @@ export default function EmployeeDetailPage() {
           {/* ---------------- Breakdown rails (lists size to their content) ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
             <Card>
-              <CardHeader title="Projects & work items" subtitle="Where sessions were assigned" />
+              <CardHeader icon="target" tone="sky" title="Projects & work items" subtitle="Where sessions were assigned" />
               <CardBody>
                 <BarList
                   items={d.projects.slice(0, 6).map((p) => ({
@@ -411,7 +431,7 @@ export default function EmployeeDetailPage() {
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Tool categories" subtitle="Allowlisted categories only" />
+              <CardHeader icon="tool" tone="violet" title="Tool categories" subtitle="Allowlisted categories only" />
               <CardBody>
                 <BarList
                   items={d.toolCategories.slice(0, 7).map((c) => ({
@@ -428,6 +448,8 @@ export default function EmployeeDetailPage() {
           <section className="mt-5 grid gap-4 xl:grid-cols-2 xl:items-start">
             <Card>
               <CardHeader
+                icon="clock"
+                tone="slate"
                 title={LONG_QUIET_GAPS.listTitle}
                 subtitle={LONG_QUIET_GAPS.listSubtitle}
               />

@@ -124,6 +124,7 @@ export function ActivityFeed({
   return (
     <Card>
       <CardHeader
+        icon="list"
         title={title}
         subtitle={
           first.data

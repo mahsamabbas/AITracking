@@ -6,7 +6,15 @@ import { AppShell } from "@/components/AppShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ActivityFeed } from "@/components/domain/ActivityFeed";
 import { VerifyShipCard } from "@/components/domain/VerifyShipCard";
-import { ChangeTrendChart } from "@/components/charts/ChangeTrendChart";
+import { HighlightsCard } from "@/components/domain/HighlightsCard";
+import { TopPeopleCard } from "@/components/domain/TopPeopleCard";
+import { RepositoriesCard } from "@/components/domain/RepositoriesCard";
+import { ConnectorHealthCard } from "@/components/domain/ConnectorHealthCard";
+import { WeekdayBars } from "@/components/charts/WeekdayBars";
+import { RightNowTable } from "@/components/domain/RightNowTable";
+import { ActivityStrip } from "@/components/domain/ActivityStrip";
+import { CHANGE_TREND_LEGEND, ChangeTrendChart } from "@/components/charts/ChangeTrendChart";
+import { ChartLegend } from "@/components/charts/ChartFrame";
 import { StatTile } from "@/components/ui/StatTile";
 import { Callout } from "@/components/ui/Callout";
 import {
@@ -16,12 +24,11 @@ import {
   ErrorState,
   StatSkeleton,
 } from "@/components/ui/States";
-import { TrendChart } from "@/components/charts/TrendChart";
+import { TREND_LEGEND, TrendChart } from "@/components/charts/TrendChart";
 import { HourPatternChart } from "@/components/charts/HourPatternChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
 import { ConnectorBadge, ProviderBadge } from "@/components/domain/Badges";
-import { UserAvatar } from "@/components/UserAvatar";
 import { FilterBar, SelectFilter } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
 import {
@@ -37,9 +44,11 @@ import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import {
   LONG_QUIET_GAPS,
+  TOOL_CATEGORY_LABEL,
   WORK_MIX,
   workMixSlices,
 } from "@/lib/vocab";
+import { deriveHighlights } from "@/lib/insights";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
 import type {
   FilterMeta,
@@ -106,6 +115,27 @@ export default function OverviewPage() {
       })),
     [d?.tools],
   );
+
+  const toolCategoryItems = useMemo(
+    () =>
+      (d?.toolCategories ?? []).slice(0, 7).map((c) => ({
+        label: TOOL_CATEGORY_LABEL[c.category] ?? c.category,
+        value: c.calls,
+        formatted: formatNumber(c.calls),
+        color: "var(--chart-5)",
+      })),
+    [d?.toolCategories],
+  );
+  const highlights = useMemo(() => (d ? deriveHighlights(d) : []), [d]);
+  const spark = useMemo(
+    () => ({
+      active: (d?.dailyTrend ?? []).map((p) => p.activeMs),
+      sessions: (d?.dailyTrend ?? []).map((p) => p.sessions),
+      people: (d?.dailyTrend ?? []).map((p) => p.employees),
+    }),
+    [d?.dailyTrend],
+  );
+  const teamView = canViewTeam(user?.role);
 
   const hasActivity = (t?.sessions ?? 0) > 0;
   const liveConnectors = live.data?.connectors ?? [];
@@ -249,6 +279,8 @@ export default function OverviewPage() {
               value={formatDuration(t!.activeMs, { compact: true })}
               hint="vs previous period"
               accent="brand"
+              icon="clock"
+              spark={spark.active}
               current={t!.activeMs}
               previous={prev!.activeMs}
               help="Merged model and tool execution time. Overlapping operations are counted once, and this is not the same as a person's working time."
@@ -258,6 +290,8 @@ export default function OverviewPage() {
               value={formatNumber(t!.sessions)}
               hint={`avg ${formatDuration(t!.avgSessionMs)} active`}
               accent="teal"
+              icon="sessions"
+              spark={spark.sessions}
               current={t!.sessions}
               previous={prev!.sessions}
               help="Agent sessions that started in this period."
@@ -275,116 +309,107 @@ export default function OverviewPage() {
                   : `${d!.headcount.connected} have a registered connector`
               }
               accent="slate"
-              help="Employees with at least one observed agent session in this period."
+              icon={isSelfScope ? "model" : "people"}
+              spark={isSelfScope ? undefined : spark.people}
+              help={
+                isSelfScope
+                  ? "AI coding tools that reported activity for you in this period."
+                  : "Employees with at least one observed agent session in this period."
+              }
             />
             <StatTile
               label="Coverage warnings"
               value={formatNumber(coverageIssues + (coverage?.employeesWithoutTelemetry ?? 0))}
               hint="gaps, pauses, silent connectors"
               accent={coverageIssues > 0 ? "amber" : "slate"}
+              icon="shield"
               invertDelta
               help="Telemetry limitations. A coverage gap means the system cannot confirm what happened — it never means the person was idle."
             />
           </section>
 
           {/* ---------------- Activity strip: what the agents did (counts) ---------------- */}
-          <section
-            aria-label="Agent activity counts"
-            className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line shadow-card sm:grid-cols-3 lg:grid-cols-6"
-          >
-            {[
-              { label: "Model calls", value: formatNumber(t!.modelRequests) },
-              { label: "Tool calls", value: formatNumber(t!.toolCalls) },
-              { label: "File changes", value: formatNumber(t!.fileChanges) },
-              { label: "Commits", value: formatNumber(d!.commits?.commits ?? 0) },
-              {
-                label: "Shipped",
-                value: d!.commits?.commits
-                  ? `${formatNumber(d!.commits.shipped)} · ${Math.round((d!.commits.shipped / d!.commits.commits) * 100)}%`
-                  : "0",
-              },
-              // Tokens and checks appear only when an agent reported them.
-              ...(t!.tokenInput != null
-                ? [{ label: "Tokens in / out", value: `${formatNumber(t!.tokenInput)} / ${formatNumber(t!.tokenOutput)}` }]
-                : t!.testsRun + t!.buildsRun > 0
-                  ? [{ label: "Tests · builds", value: `${formatNumber(t!.testsRun)} · ${formatNumber(t!.buildsRun)}` }]
-                  : [{ label: "Sessions", value: formatNumber(t!.sessions) }]),
-            ].map((x) => (
-              <div key={x.label} className="bg-card px-4 py-3">
-                <p className="label">{x.label}</p>
-                <p className="num mt-0.5 truncate text-base font-semibold text-ink-900">{x.value}</p>
-              </div>
-            ))}
-          </section>
+          <ActivityStrip totals={t!} commits={d!.commits} />
 
           {/* Layout rule: each row pairs cards of similar height; charts fill their card. */}
-          {/* ---------------- Usage over time + work mix ---------------- */}
+          {/* ---------------- Usage over time + highlights ---------------- */}
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
               <CardHeader
+                icon="trend"
                 title="AI usage over time"
                 subtitle={LONG_QUIET_GAPS.trendSubtitle}
+                action={<ChartLegend items={TREND_LEGEND} />}
               />
               <CardBody className="pt-2">
                 <TrendChart data={d!.dailyTrend} />
               </CardBody>
             </Card>
+            <HighlightsCard items={highlights} />
+          </section>
 
-            <Card>
+          {/* ---------------- File changes & commits + work mix ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            {d!.changeTrend ? (
+              <Card className="xl:col-span-2">
+                <CardHeader
+                  icon="file"
+                  tone="violet"
+                  title="File changes & commits"
+                  subtitle="Agent file edits and commits per day, from the same tracked events"
+                  action={<ChartLegend items={CHANGE_TREND_LEGEND} />}
+                />
+                <CardBody>
+                  <ChangeTrendChart
+                    data={d!.changeTrend}
+                    aiUsageByDay={d!.dailyTrend.map((p) => ({ date: p.date, activeMs: p.activeMs }))}
+                  />
+                </CardBody>
+              </Card>
+            ) : null}
+            <Card className={d!.changeTrend ? "" : "xl:col-span-3"}>
               <CardHeader
+                icon="pie"
+                tone="teal"
                 title={WORK_MIX.title}
-                subtitle={
-                  d!.commits && "commits" in d!.commits && (d!.commits as { commits: number }).commits > 0
-                    ? `${WORK_MIX.subtitle} · ${(d!.commits as { commits: number }).commits} commits`
-                    : WORK_MIX.subtitle
-                }
+                subtitle="How working time split across the four kinds of agent work"
+                help={WORK_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart
                   data={workMixSlices(d!.workMix)}
                   centerValue={formatDuration(d!.workMix?.workingMs ?? 0, { compact: true })}
                   centerLabel="working time"
-                  height={280}
+                  height={220}
                 />
               </CardBody>
             </Card>
           </section>
 
-          {/* ---------------- File changes & commits + Verify & ship ---------------- */}
-          {d!.changeTrend || d!.commits ? (
+          {/* ---------------- Verify & ship + repositories ---------------- */}
+          {d!.commits ? (
             <section className="mt-5 grid gap-4 xl:grid-cols-3">
-              {d!.changeTrend ? (
-                <Card className="xl:col-span-2">
-                  <CardHeader
-                    title="File changes & commits"
-                    subtitle="Agent file edits and commits per day, from the same tracked events"
-                  />
-                  <CardBody>
-                    <ChangeTrendChart
-                      data={d!.changeTrend}
-                      aiUsageByDay={d!.dailyTrend.map((p) => ({ date: p.date, activeMs: p.activeMs }))}
-                    />
-                  </CardBody>
-                </Card>
-              ) : null}
-              {d!.commits ? (
-                <VerifyShipCard commits={d!.commits} showPerson={!isSelfScope} compact />
-              ) : null}
+              <div className={`flex min-w-0 flex-col [&>.card]:flex-1 ${d!.commits.repos.length ? "xl:col-span-2" : "xl:col-span-3"}`}>
+                <VerifyShipCard commits={d!.commits} showPerson={!isSelfScope} />
+              </div>
+              {d!.commits.repos.length ? <RepositoriesCard repos={d!.commits.repos} /> : null}
             </section>
           ) : null}
 
-          {/* ---------------- Tools, teams, working hours ---------------- */}
-          <section className={`mt-5 grid gap-4 lg:grid-cols-2 ${canViewTeam(user?.role) ? "xl:grid-cols-3" : ""}`}>
+          {/* ---------------- People, tools, teams ---------------- */}
+          <section className={`mt-5 grid gap-4 lg:grid-cols-2 ${teamView ? "xl:grid-cols-3" : ""}`}>
+            {teamView ? (
+              <TopPeopleCard range={range} team={team || undefined} provider={provider || undefined} />
+            ) : null}
             <Card>
-              <CardHeader title="AI tools in use" subtitle="By agent active time" />
+              <CardHeader icon="model" tone="violet" title="AI tools in use" subtitle="By agent active time" />
               <CardBody>
                 <BarList items={toolItems} />
               </CardBody>
             </Card>
-
-            {canViewTeam(user?.role) ? (
+            {teamView ? (
               <Card>
-                <CardHeader title="Teams" subtitle="Agent active time by team" href="/employees" />
+                <CardHeader icon="team" tone="slate" title="Teams" subtitle="Agent active time by team" href="/employees" />
                 <CardBody>
                   <BarList
                     items={d!.teams.map((x) => ({
@@ -397,10 +422,22 @@ export default function OverviewPage() {
                   />
                 </CardBody>
               </Card>
-            ) : null}
+            ) : (
+              <Card>
+                <CardHeader icon="tool" title="What the agents did" subtitle="Tool calls by category" />
+                <CardBody>
+                  <BarList items={toolCategoryItems} />
+                </CardBody>
+              </Card>
+            )}
+          </section>
 
+          {/* ---------------- Rhythm: hours, weekdays, kinds of work ---------------- */}
+          <section className={`mt-5 grid gap-4 lg:grid-cols-2 ${teamView ? "xl:grid-cols-3" : ""}`}>
             <Card>
               <CardHeader
+                icon="sun"
+                tone="amber"
                 title="Working-hour pattern"
                 subtitle="When agent activity happens (org timezone)"
               />
@@ -408,99 +445,46 @@ export default function OverviewPage() {
                 <HourPatternChart data={d!.hourPattern} />
               </CardBody>
             </Card>
+            <Card>
+              <CardHeader icon="calendar" tone="sky" title="Day of week" subtitle="Agent active time · busiest day highlighted" />
+              <CardBody>
+                <WeekdayBars data={d!.weekdayPattern} />
+              </CardBody>
+            </Card>
+            {teamView ? (
+              <Card className="lg:col-span-2 xl:col-span-1">
+                <CardHeader icon="tool" title="What the agents did" subtitle="Tool calls by category" />
+                <CardBody>
+                  <BarList items={toolCategoryItems} />
+                </CardBody>
+              </Card>
+            ) : null}
           </section>
-
-
 
           {/* ---------------- Right now (per-person live strip) ---------------- */}
           {(live.data?.people?.length ?? 0) > 0 ? (
             <section className="mt-5">
               <Card>
                 <CardHeader
+                  icon="live"
+                  tone="teal"
                   title="Right now"
                   subtitle="What each connected agent performed in the last two hours · most recent first"
                 />
-                <div className="overflow-x-auto">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Person</th>
-                        <th>AI tool</th>
-                        <th>State</th>
-                        <th>Last model</th>
-                        <th>Last tool</th>
-                        <th className="text-right">Events this hour</th>
-                        <th>Last event</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {live.data!.people!.map((p) => (
-                        <tr key={p.developerId}>
-                          <td>
-                            <OrgLink
-                              href={`/employees/${p.developerId}`}
-                              className="flex items-center gap-2.5 text-sm font-medium text-ink-900 hover:text-brand-600"
-                            >
-                              <UserAvatar name={p.displayName} src={p.avatarUrl} size="sm" />
-                              <span className="truncate">{p.displayName}</span>
-                            </OrgLink>
-                          </td>
-                          <td>{p.provider ? <ProviderBadge provider={p.provider} size="sm" /> : <span className="hint">—</span>}</td>
-                          <td>
-                            {p.sessionState === "active" ? (
-                              <span className="badge-ok" title="Agent event in the last 10 minutes">
-                                <span className="pulse-online h-1.5 w-1.5 rounded-full bg-conn-ok" aria-hidden />
-                                Agent active
-                              </span>
-                            ) : (
-                              <span className="badge-neutral" title="Last agent event 10–120 minutes ago">
-                                Recent
-                              </span>
-                            )}
-                          </td>
-                          <td className="max-w-[180px] truncate text-sm text-ink-700">{p.lastModel ?? <span className="hint">—</span>}</td>
-                          <td className="max-w-[160px] truncate text-sm text-ink-700">{p.lastTool ?? <span className="hint">—</span>}</td>
-                          <td className="num text-right text-sm text-ink-700">{p.eventsThisHour}</td>
-                          <td className="whitespace-nowrap text-sm text-ink-500">{formatRelative(p.lastEventAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <RightNowTable people={live.data!.people!} />
               </Card>
             </section>
           ) : null}
 
-          {/* ---------------- Activity + coverage (stacked — avoids empty stretch beside tall feed) ---------------- */}
+          {/* ---------------- Activity feed ---------------- */}
           <section className="mt-5">
             <ActivityFeed range={range} provider={provider || undefined} team={team || undefined} showPerson title="Activity feed" />
           </section>
 
-          {canViewTeam(user?.role) && coverage ? (
-            <section className="mt-4" aria-label="Coverage summary">
-              <Card>
-                <CardHeader
-                  title="Coverage summary"
-                  subtitle="Gap and assignment quality for this range · device actions on Connectors"
-                  href="/connectors"
-                  hrefLabel="Connectors"
-                />
-                <div className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
-                  {[
-                    ["Gap events", coverage.gapEvents],
-                    ["Partial sessions", coverage.partialSessions],
-                    ["Unassigned sessions", coverage.unassignedSessions],
-                    ["No telemetry", coverage.employeesWithoutTelemetry],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="bg-card px-4 py-2.5">
-                      <p className="label">{label}</p>
-                      <p className="num mt-0.5 text-sm font-semibold text-ink-900">
-                        {formatNumber(Number(value))}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+          {/* ---------------- Coverage & connector health ---------------- */}
+          {teamView && coverage ? (
+            <section className="mt-5" aria-label="Coverage summary">
+              <ConnectorHealthCard connectors={liveConnectors} coverage={coverage} alerts={live.data?.alerts ?? []} />
             </section>
           ) : null}
         </>

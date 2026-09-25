@@ -8,7 +8,7 @@ import { connectorOnboardingActive, developerNeedsLocalConnector, syncConnectorV
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABEL, ROLE_SCOPE } from "@/lib/permissions";
 import type { Role } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, PageIntro } from "@/components/ui/PageHeader";
 import { PlatformOrgTabBar } from "@/components/PlatformOrgTabBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { InstallAppButton } from "@/components/InstallAppButton";
@@ -206,6 +206,11 @@ export function AppShell({
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-2 px-5 pb-3 sm:hidden">
+        <span className="text-2xs font-medium uppercase tracking-[0.07em] text-ink-500">Timezone</span>
+        <TimezoneSelect compact />
+      </div>
+
       <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3" aria-label="Main">
         {nav.map((item) => {
           const active = isActive(path, item);
@@ -322,11 +327,14 @@ export function AppShell({
                   </svg>
                 </button>
               }
-              actions={
+              actions={actions}
+              utilities={
                 <>
-                  {actions}
                   <InstallAppButton compact />
-                  <TimezoneSelect compact />
+                  {/* Phones: timezone lives in the menu drawer so the title has room. */}
+                  <span className="hidden sm:contents">
+                    <TimezoneSelect compact />
+                  </span>
                   <ThemeToggle />
                 </>
               }
@@ -341,6 +349,7 @@ export function AppShell({
         >
           {/* Keyed by route so only the content animates in, never the shell. */}
           <div key={path} className="enter min-w-0 max-w-full">
+            <PageIntro subtitle={subtitle} breadcrumbs={breadcrumbs} actions={actions} />
             <PlatformOrgTabBar />
             {children}
           </div>

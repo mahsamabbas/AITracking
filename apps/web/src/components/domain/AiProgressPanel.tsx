@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { EmptyState } from "@/components/ui/States";
 import { AXIS, ChartFrame, GRID, TooltipShell } from "@/components/charts/ChartFrame";
@@ -30,7 +29,7 @@ export function AiProgressPanel({
   if (!progress || progress.providers.length === 0) {
     return (
       <Card>
-        <CardHeader title="AI progress" subtitle="What each connected AI tool performed in this range" />
+        <CardHeader icon="model" tone="violet" title="AI progress" subtitle="What each connected AI tool performed in this range" />
         <EmptyState compact variant={emptyVariant} />
       </Card>
     );
@@ -43,6 +42,8 @@ export function AiProgressPanel({
   return (
     <Card>
       <CardHeader
+        icon="model"
+        tone="violet"
         title="AI progress"
         subtitle="What each connected AI tool performed — open a tool for its sessions and details"
         action={

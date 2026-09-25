@@ -51,6 +51,8 @@ export function WorkdayPanel({
   return (
     <Card className="mb-5">
       <CardHeader
+        icon="sun"
+        tone="amber"
         title="Workday"
         subtitle={`${pretty}${d ? ` · times in ${d.timezone}` : ""} · minutes per hour`}
         action={
@@ -100,7 +102,7 @@ export function WorkdayPanel({
               <Stat label="Sessions" value={`${t.sessions} · ${t.modelRequests} calls`} hint={`${t.modelRequests} model calls, ${t.toolCalls} tool calls`} />
             </div>
 
-            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs text-ink-600">
+            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs text-ink-700">
               {WORKDAY_SERIES.map((s) => (
                 <span key={s.key} className="flex items-center gap-1.5" title={s.hint}>
                   <span

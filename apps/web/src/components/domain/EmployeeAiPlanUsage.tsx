@@ -61,6 +61,8 @@ export function EmployeeAiPlanUsage({
   return (
     <Card>
       <CardHeader
+        icon="bolt"
+        tone="amber"
         title="AI subscription usage"
         subtitle={
           isSelf
@@ -116,7 +118,7 @@ export function EmployeeAiPlanUsage({
                 {row.completionsCount != null || row.chatRequestsCount != null ? (
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Completions / chat requests</dt>
-                    <dd className="num text-ink-600">
+                    <dd className="num text-ink-700">
                       {formatTokens(row.completionsCount)} / {formatTokens(row.chatRequestsCount)}
                     </dd>
                   </div>
@@ -124,7 +126,7 @@ export function EmployeeAiPlanUsage({
                 {row.tokenInput != null && row.usageUnit === "tokens" ? (
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Input / output</dt>
-                    <dd className="num text-ink-600">
+                    <dd className="num text-ink-700">
                       {formatTokens(row.tokenInput)} / {formatTokens(row.tokenOutput)}
                     </dd>
                   </div>
@@ -132,7 +134,7 @@ export function EmployeeAiPlanUsage({
                 {row.modelRequests != null && row.usageUnit === "model_requests" ? (
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Observed by connector hooks</dt>
-                    <dd className="num text-ink-600">{formatTokens(row.modelRequests)}</dd>
+                    <dd className="num text-ink-700">{formatTokens(row.modelRequests)}</dd>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">

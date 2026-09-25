@@ -66,7 +66,7 @@ export default function PolicyPage() {
       ) : (
         <>
           <Card className="mb-5">
-            <CardHeader
+            <CardHeader icon="shield"
               title="Current configuration"
               subtitle="Applied to every aggregate on every screen"
               action={
@@ -111,7 +111,7 @@ export default function PolicyPage() {
 
           <div className="grid gap-4 xl:grid-cols-2">
             <Card>
-              <CardHeader title="What is collected" subtitle="Allowlisted metadata only" />
+              <CardHeader icon="list" tone="teal" title="What is collected" subtitle="Allowlisted metadata only" />
               <CardBody>
                 <ul className="space-y-2">
                   {COLLECTED.map((item) => (
@@ -125,7 +125,7 @@ export default function PolicyPage() {
             </Card>
 
             <Card>
-              <CardHeader title="What is never collected" subtitle="Disabled by default and rejected at ingest" />
+              <CardHeader icon="shield" tone="rose" title="What is never collected" subtitle="Disabled by default and rejected at ingest" />
               <CardBody>
                 <ul className="space-y-2">
                   {NOT_COLLECTED.map((item) => (
@@ -141,7 +141,7 @@ export default function PolicyPage() {
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <Card>
-              <CardHeader title="Your rights" subtitle="Available to every monitored person" />
+              <CardHeader icon="person" tone="sky" title="Your rights" subtitle="Available to every monitored person" />
               <CardBody>
                 <ul className="space-y-2.5 text-sm text-ink-700">
                   <li>
@@ -168,7 +168,7 @@ export default function PolicyPage() {
             </Card>
 
             <Card>
-              <CardHeader title="Health notifications" subtitle="Data-quality conditions only" />
+              <CardHeader icon="live" tone="amber" title="Health notifications" subtitle="Data-quality conditions only" />
               <CardBody>
                 <div className="flex flex-wrap gap-1.5">
                   {p.notificationRules.map((r) => (

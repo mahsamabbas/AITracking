@@ -114,3 +114,8 @@ export function TrendChart({
     </ChartFrame>
   );
 }
+
+export const TREND_LEGEND = [
+  { label: "Agent active", color: "var(--chart-1)", shape: "line" as const },
+  { label: TREND_CHART.idleSeries, color: "var(--chart-idle)", shape: "line" as const },
+];

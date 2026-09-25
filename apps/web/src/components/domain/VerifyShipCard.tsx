@@ -66,6 +66,8 @@ export function VerifyShipCard({
   return (
     <Card>
       <CardHeader
+        icon="ship"
+        tone="teal"
         title="Verify & ship"
         subtitle={
           compact

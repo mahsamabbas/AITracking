@@ -209,7 +209,7 @@ export default function SessionDetailPage() {
             {/* ---------------- Left rail ---------------- */}
             <div className="space-y-4">
               <Card>
-                <CardHeader title="Duration breakdown" subtitle="Five measures, kept separate" />
+                <CardHeader icon="clock" title="Duration breakdown" subtitle="Five measures, kept separate" />
                 <CardBody>
                   <DurationSplit
                     totalMs={s.elapsedSpanMs}
@@ -261,7 +261,7 @@ export default function SessionDetailPage() {
               </Card>
 
               <Card>
-                <CardHeader title="Tool categories" subtitle="Calls in this session" />
+                <CardHeader icon="tool" tone="violet" title="Tool categories" subtitle="Calls in this session" />
                 <CardBody>
                   <BarList
                     items={Object.entries(s.toolCategories ?? {})
@@ -279,7 +279,7 @@ export default function SessionDetailPage() {
 
               {s.modelsUsed?.length ? (
                 <Card>
-                  <CardHeader title="Models" subtitle="Reported by the provider" />
+                  <CardHeader icon="model" tone="violet" title="Models" subtitle="Reported by the provider" />
                   <CardBody>
                     <div className="flex flex-wrap gap-1.5">
                       {s.modelsUsed.map((m) => (

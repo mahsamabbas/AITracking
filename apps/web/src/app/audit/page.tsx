@@ -52,7 +52,7 @@ export default function AuditPage() {
       </FilterBar>
 
       <Card className="card-table">
-        <CardHeader
+        <CardHeader icon="list" tone="slate"
           title="Events"
           subtitle={`${entries.length} entries · newest first`}
         />

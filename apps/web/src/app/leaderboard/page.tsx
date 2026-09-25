@@ -161,7 +161,7 @@ export default function LeaderboardPage() {
 
       <div className="mt-5">
         <Card className="card-table">
-          <CardHeader
+          <CardHeader icon="trophy" tone="amber"
             title="AI usage ranking"
             subtitle={
               query.data

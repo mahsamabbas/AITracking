@@ -143,3 +143,9 @@ export function ChangeTrendChart({
     </ChartFrame>
   );
 }
+
+export const CHANGE_TREND_LEGEND = [
+  { label: "File changes", color: "var(--chart-2)" },
+  { label: "Commits", color: "var(--chart-4)" },
+  { label: "AI active time", color: "var(--chart-1)", shape: "line" as const },
+];

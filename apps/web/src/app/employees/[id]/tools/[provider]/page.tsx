@@ -159,6 +159,8 @@ export default function EmployeeToolPage() {
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
             <StatTile
               label={`${meta.label} active time`}
+              icon="clock"
+              spark={d.dailyTrend.map((p) => p.activeMs)}
               value={formatDuration(t.activeMs, { compact: true })}
               hint={`${share}% of this employee's AI time`}
               accent="brand"
@@ -167,6 +169,8 @@ export default function EmployeeToolPage() {
             />
             <StatTile
               label="Sessions"
+              icon="sessions"
+              spark={d.dailyTrend.map((p) => p.sessions)}
               value={formatNumber(t.sessions)}
               hint={`avg ${formatDuration(t.avgSessionMs)} active`}
               accent="teal"
@@ -175,6 +179,7 @@ export default function EmployeeToolPage() {
             />
             <StatTile
               label="Model requests"
+              icon="model"
               value={modelRequestsAvailable ? formatNumber(t.modelRequests) : "Not available"}
               hint={
                 t.tokenInput == null
@@ -192,6 +197,7 @@ export default function EmployeeToolPage() {
             />
             <StatTile
               label="Files & checks"
+              icon="file"
               value={formatNumber(t.fileChanges)}
               unit="file changes"
               hint={`${t.testsRun} tests · ${t.buildsRun} builds`}
@@ -204,6 +210,7 @@ export default function EmployeeToolPage() {
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card className="xl:col-span-2">
               <CardHeader
+                icon="trend"
                 title={`${meta.label} usage over time`}
                 subtitle="Agent active time per day with this tool"
               />
@@ -213,8 +220,11 @@ export default function EmployeeToolPage() {
             </Card>
             <Card>
               <CardHeader
+                icon="pie"
+                tone="teal"
                 title={WORK_MIX.title}
-                subtitle={WORK_MIX.subtitle}
+                subtitle="How working time split across the four kinds of agent work"
+                help={WORK_MIX.subtitle}
               />
               <CardBody>
                 <DonutChart
@@ -228,13 +238,13 @@ export default function EmployeeToolPage() {
 
           <section className="mt-5 grid gap-4 xl:grid-cols-3">
             <Card>
-              <CardHeader title="Working-hour pattern" subtitle={`When ${meta.label} is used`} />
+              <CardHeader icon="sun" tone="amber" title="Working-hour pattern" subtitle={`When ${meta.label} is used`} />
               <CardBody className="pt-2">
                 <HourPatternChart data={d.hourPattern} />
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Models" subtitle="Reported by this provider" />
+              <CardHeader icon="model" tone="violet" title="Models" subtitle="Reported by this provider" />
               <CardBody>
                 {d.models.length === 0 ? (
                   <EmptyState compact variant="provider-missing" />
@@ -251,7 +261,7 @@ export default function EmployeeToolPage() {
               </CardBody>
             </Card>
             <Card>
-              <CardHeader title="Tool categories" subtitle="Allowlisted categories only" />
+              <CardHeader icon="tool" tone="violet" title="Tool categories" subtitle="Allowlisted categories only" />
               <CardBody>
                 {d.toolCategories.length === 0 ? (
                   <EmptyState compact variant="provider-missing" />
@@ -272,6 +282,7 @@ export default function EmployeeToolPage() {
           <section className="mt-5">
             <Card>
               <CardHeader
+                icon="sessions"
                 title={`${meta.label} sessions`}
                 subtitle="Click a session to inspect its full event trail"
                 href={`/employees/${id}/sessions${qs({ provider })}`}

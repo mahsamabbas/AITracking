@@ -206,7 +206,7 @@ export default function UsersPage() {
       {issued ? (
         <div className="mb-5">
           <Card>
-            <CardHeader
+            <CardHeader icon="plug" tone="teal"
               title={`Assigned key for ${issued.displayName}`}
               subtitle={`${providerLabel(issued.provider)} · token is shown once`}
               action={
@@ -242,7 +242,7 @@ export default function UsersPage() {
       {issueFor?.developerId ? (
         <div className="mb-5">
           <Card>
-            <CardHeader
+            <CardHeader icon="plug" tone="teal"
               title={`Issue connector key for ${issueFor.displayName}`}
               subtitle="Choose the AI tool this credential is for"
               action={
@@ -284,7 +284,7 @@ export default function UsersPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         {!platformView ? (
         <Card>
-          <CardHeader
+          <CardHeader icon="person"
             title="Add a user"
             subtitle="Developers are monitored; other roles are not. Platform super admins are created with pnpm admin:create --super (not here)."
           />
@@ -363,7 +363,7 @@ export default function UsersPage() {
         </Card>
         ) : (
           <Card>
-            <CardHeader
+            <CardHeader icon="team" tone="slate"
               title="Platform view"
               subtitle="Account changes are made by each organisation's administrators. You can review members here."
             />
@@ -371,7 +371,7 @@ export default function UsersPage() {
         )}
 
         <Card className="card-table xl:col-span-2">
-          <CardHeader
+          <CardHeader icon="people"
             title="Members"
             subtitle={`${users.length} in this organisation · ${developers.length} monitored`}
             href="/connectors"

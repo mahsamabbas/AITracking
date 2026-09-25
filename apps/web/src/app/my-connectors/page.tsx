@@ -87,7 +87,7 @@ export default function MyConnectorsPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <div data-onboarding="onboard-activate-form">
         <Card>
-          <CardHeader
+          <CardHeader icon="plug" tone="teal"
             title="Activate assigned key"
             subtitle="Paste the device ID and token from your administrator"
           />
@@ -108,7 +108,7 @@ export default function MyConnectorsPage() {
         </div>
 
         <Card className="card-table xl:col-span-2">
-          <CardHeader
+          <CardHeader icon="plug"
             title="Keys assigned to you"
             subtitle={
               assignedKeys.length

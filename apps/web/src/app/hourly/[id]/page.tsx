@@ -96,7 +96,7 @@ export default function HourlyDetailPage() {
           ) : null}
 
           <Card className="mb-5">
-            <CardHeader
+            <CardHeader icon="target"
               title="Deterministic metrics"
               subtitle="Reproducible from the source events below"
               action={
@@ -165,7 +165,7 @@ export default function HourlyDetailPage() {
 
           {d.versions.length > 1 ? (
             <Card className="mb-5">
-              <CardHeader
+              <CardHeader icon="clock" tone="slate"
                 title="Recalculation history"
                 subtitle="Late events create a new version; earlier snapshots are retained"
               />
@@ -186,7 +186,7 @@ export default function HourlyDetailPage() {
           ) : null}
 
           <Card>
-            <CardHeader
+            <CardHeader icon="list"
               title="Source events"
               subtitle={`${d.sourceEvents.length} events in this clock hour`}
               action={

@@ -210,18 +210,21 @@ function SessionsInner() {
         <section className="grid gap-3 sm:grid-cols-3" aria-label="Page summary">
           <StatTile
             label="Sessions matched"
+            icon="sessions"
             value={formatNumber(query.data?.total ?? 0)}
             hint={`showing ${rows.length} on this page`}
             accent="brand"
           />
           <StatTile
             label="Agent active (all matched)"
+            icon="clock"
             value={matched ? formatDuration(matched.activeMs, { compact: true }) : "—"}
             hint="merged model + tool time"
             accent="teal"
           />
           <StatTile
             label="Output (all matched)"
+            icon="file"
             value={matched ? formatNumber(matched.fileChanges) : "—"}
             unit="file changes"
             hint={matched ? `${formatNumber(matched.testsRun)} tests run` : undefined}
@@ -232,7 +235,7 @@ function SessionsInner() {
 
       <div className="mt-5">
         <Card>
-          <CardHeader
+          <CardHeader icon="sessions"
             title="Sessions"
             subtitle="Start and end time, duration, activity, project context, and outcome"
           />

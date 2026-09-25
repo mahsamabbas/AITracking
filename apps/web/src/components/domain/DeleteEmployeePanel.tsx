@@ -46,7 +46,7 @@ export function DeleteEmployeePanel({
         subtitle="Permanently deletes this person, their portal login, connectors, and all AI usage data for your organisation"
       />
       <CardBody className="space-y-4">
-        <p className="text-sm text-ink-600">
+        <p className="text-sm text-ink-700">
           This removes activity events, agent sessions, hourly summaries, registered devices, provider
           identity mappings, and any portal account linked to this employee. It cannot be undone.
         </p>

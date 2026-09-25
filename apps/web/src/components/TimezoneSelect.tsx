@@ -1,7 +1,7 @@
 "use client";
 
 import { useDisplayTimezone } from "@/lib/display-timezone";
-import { DEFAULT_TIMEZONE, timezoneLabel } from "@/lib/timezone-options";
+import { DEFAULT_TIMEZONE } from "@/lib/timezone-options";
 import { useEffect, useId, useRef, useState } from "react";
 
 function compactLabel(timezone: string, full: string): string {
@@ -80,7 +80,7 @@ export function TimezoneSelect({ compact }: { compact?: boolean }) {
                   role="option"
                   aria-selected={selected}
                   className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition hover:bg-brand-50/80 dark:hover:bg-white/5 ${
-                    selected ? "bg-brand-50/60 font-medium text-brand-800 dark:bg-white/5 dark:text-brand-200" : "text-ink-800"
+                    selected ? "bg-brand-50/60 font-medium text-brand-800 dark:bg-white/5 dark:text-brand-200" : "text-ink-900"
                   }`}
                   onClick={() => {
                     setTimezone(o.id);
