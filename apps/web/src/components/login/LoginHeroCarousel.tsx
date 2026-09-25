@@ -92,7 +92,7 @@ export function LoginHeroCarousel({
           key={index}
           className={`max-w-lg ${reduceMotion ? "" : "login-hero-copy-in"}`}
         >
-          <p className="label text-brand-200">{slide.eyebrow}</p>
+          <p className="label text-indigo-200">{slide.eyebrow}</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{slide.title}</h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-300">{slide.body}</p>
           <p className="mt-4 text-2xs font-medium uppercase tracking-wider text-slate-500">{BRAND.name}</p>

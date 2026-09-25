@@ -39,7 +39,7 @@ export function TimezoneSelect({ compact }: { compact?: boolean }) {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className="field inline-flex h-9 min-w-[5.5rem] max-w-[11rem] items-center justify-between gap-2 truncate px-2.5 text-left text-xs font-medium text-ink-900 sm:max-w-[12.5rem] sm:text-sm"
+        className="inline-flex h-8 min-w-[4.5rem] max-w-[8.5rem] items-center justify-between gap-1.5 truncate rounded-lg px-2 text-left text-xs font-medium text-ink-700 transition hover:bg-slate-100 hover:text-ink-900 sm:max-w-[10rem] sm:text-sm dark:hover:bg-white/10"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listId}
@@ -80,7 +80,7 @@ export function TimezoneSelect({ compact }: { compact?: boolean }) {
                   role="option"
                   aria-selected={selected}
                   className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition hover:bg-brand-50/80 dark:hover:bg-white/5 ${
-                    selected ? "bg-brand-50/60 font-medium text-brand-800 dark:bg-white/5 dark:text-brand-200" : "text-ink-900"
+                    selected ? "bg-brand-50/60 font-medium text-brand-800 dark:bg-brand-100 dark:text-brand-900" : "text-ink-900"
                   }`}
                   onClick={() => {
                     setTimezone(o.id);
@@ -89,7 +89,7 @@ export function TimezoneSelect({ compact }: { compact?: boolean }) {
                 >
                   <span>{o.label}</span>
                   {selected ? (
-                    <span className="text-xs text-brand-600 dark:text-brand-300" aria-hidden>
+                    <span className="text-xs text-brand-600" aria-hidden>
                       ✓
                     </span>
                   ) : null}

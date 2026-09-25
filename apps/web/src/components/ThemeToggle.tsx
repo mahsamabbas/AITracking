@@ -17,7 +17,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return (
     <button
       type="button"
-      className={`btn-ghost h-9 w-9 shrink-0 px-0 ${className}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-600 transition hover:bg-slate-100 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/10 dark:hover:text-ink-50 ${className}`}
       onClick={cyclePreference}
       aria-label={hint}
       title={hint}

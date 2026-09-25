@@ -47,7 +47,7 @@ export function OnboardingStepper() {
       </ol>
       <button
         type="button"
-        className="btn-ghost mt-2 h-8 text-xs text-brand-700 dark:text-brand-300"
+        className="btn-ghost mt-2 h-8 text-xs text-brand-700"
         onClick={() => window.dispatchEvent(new CustomEvent("techlio:start-tour"))}
       >
         Show guided tour

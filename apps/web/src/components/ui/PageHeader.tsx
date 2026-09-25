@@ -24,15 +24,28 @@ export function PageHeader({
   leading?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 lg:items-start">
+    <div className="flex items-center gap-3 sm:gap-4">
       {leading}
       <div className="min-w-0 flex-1">
         <div className="hidden lg:block">{breadcrumbs}</div>
-        <h1 className="h-page truncate">{title}</h1>
-        {subtitle ? <p className="muted mt-0.5 hidden lg:block">{subtitle}</p> : null}
+        <h1 className="h-page truncate leading-tight">{title}</h1>
+        {subtitle ? (
+          <p className="mt-1 hidden max-w-2xl truncate text-sm leading-snug text-ink-500 lg:block">{subtitle}</p>
+        ) : null}
       </div>
-      {actions ? <div className="hidden shrink-0 flex-wrap items-center gap-2 lg:flex">{actions}</div> : null}
-      {utilities ? <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">{utilities}</div> : null}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {actions ? (
+          <div className="hidden items-center gap-2 lg:flex">{actions}</div>
+        ) : null}
+        {actions && utilities ? (
+          <span className="hidden h-8 w-px shrink-0 bg-line lg:block" aria-hidden />
+        ) : null}
+        {utilities ? (
+          <div className="flex items-center gap-1 rounded-xl border border-line bg-raised/80 p-1 shadow-sm dark:bg-white/[0.04]">
+            {utilities}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -49,9 +62,9 @@ export function PageIntro({
 }) {
   if (!subtitle && !actions && !breadcrumbs) return null;
   return (
-    <div className="mb-4 space-y-3 lg:hidden">
+    <div className="mb-5 space-y-3 lg:hidden">
       {breadcrumbs}
-      {subtitle ? <p className="muted">{subtitle}</p> : null}
+      {subtitle ? <p className="text-sm leading-snug text-ink-500">{subtitle}</p> : null}
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );

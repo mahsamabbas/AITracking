@@ -171,7 +171,7 @@ export default function LoginPage() {
           footer={
             SHOW_DEMO ? (
               <div className="rounded-xl border border-white/10 bg-black/35 p-4 backdrop-blur-sm">
-                <p className="label text-brand-200">Local demo accounts</p>
+                <p className="label text-indigo-200">Local demo accounts</p>
                 <p className="mt-1 text-2xs text-slate-400">Four portals, one dataset — tap to fill the form.</p>
                 <ul className="scroll-y-sm mt-3 space-y-2 pr-1">
                   {DEMO.map((d) => (

@@ -232,7 +232,7 @@ export function AppShell({
                   : ""
               } ${
                 active
-                  ? "bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-200"
+                  ? "bg-brand-50 text-brand-700 dark:bg-brand-100 dark:text-brand-900"
                   : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
@@ -308,9 +308,9 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header
           ref={headerRef}
-          className="sticky top-0 z-30 border-b border-line bg-card/85 pt-[env(safe-area-inset-top)] backdrop-blur"
+          className="sticky top-0 z-30 border-b border-line bg-card pt-[env(safe-area-inset-top)] shadow-[0_1px_0_0_rgb(var(--color-line))]"
         >
-          <div className={`mx-auto w-full ${maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
+          <div className={`mx-auto w-full ${maxWidth} px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8`}>
             <PageHeader
               title={title ?? "Overview"}
               subtitle={subtitle}

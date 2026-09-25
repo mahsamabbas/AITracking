@@ -33,7 +33,7 @@ export function EmployeeProfileCard({
         subtitle="Directory details and portal photo (from the linked sign-in account)"
         action={
           isSelf ? (
-            <Link href="/settings" className="btn-ghost h-8 text-xs text-brand-700 dark:text-brand-300">
+            <Link href="/settings" className="btn-ghost h-8 text-xs text-brand-700">
               Edit profile →
             </Link>
           ) : null
