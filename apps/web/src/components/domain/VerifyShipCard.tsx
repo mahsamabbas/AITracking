@@ -90,6 +90,9 @@ export function VerifyShipCard({
               {formatNumber(commits.filesChanged)} files · +{formatNumber(commits.linesAdded)} / −
               {formatNumber(commits.linesDeleted)} lines across these commits
               {commits.repos.length ? ` · ${commits.repos.map((r) => `${r.name} (${r.commits})`).join(", ")}` : ""}
+              . Times are when git recorded the commit (not when the dashboard loaded). New commits usually
+              appear within a minute in repos the agent has worked in, or right away if your post-commit hook
+              reached the connector.
             </p>
             <div className={`mt-4 rounded-lg border border-line ${compact ? "max-h-[220px] overflow-y-auto" : "scroll-y-sm"}`}>
               <ul className="divide-y divide-line">

@@ -51,7 +51,8 @@ const VERIFY_WINDOW_MS = 30 * 60_000;
 /** A newly seen repo reports this much of the git user's history (then live). */
 const BACKFILL_MS = 14 * 86_400_000;
 const TRACK_PUSH_FOR_MS = 14 * 86_400_000;
-const SCAN_EVERY_MS = 60_000;
+const SCAN_EVERY_MS = 30_000;
+const OBSERVE_RESCAN_MS = 15_000;
 
 function git(cwd: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
@@ -216,10 +217,12 @@ export function createGitWatcher(options: {
   }
 
   return {
-    /** An agent worked in `cwd`: watch that repo; rescan soon (the agent may have committed). */
+    /** An agent worked in `cwd`: watch that repo; scan now and again soon (user may commit right after). */
     async observe(cwd: string | undefined): Promise<void> {
       const repo = await repoFor(cwd);
-      if (repo) scheduleScan(repo, 10_000);
+      if (!repo) return;
+      void scan(repo);
+      scheduleScan(repo, OBSERVE_RESCAN_MS);
     },
     /** A passing check ran in `cwd` (CI gate / pre-commit, agent test or build). */
     async markCheck(cwd: string | undefined): Promise<void> {
