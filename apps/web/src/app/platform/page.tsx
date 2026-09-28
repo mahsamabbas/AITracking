@@ -32,7 +32,7 @@ export default function PlatformPage() {
   const query = useApi<{ organizations: Organization[] }>(allowed ? "/v1/platform/organizations" : null);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ name: "", timezone: "Asia/Karachi", adminName: "", adminEmail: "" });
-  const [adminFor, setAdminFor] = useState<Organization | null>(null);
+  const [adminFor, setAdminFor] = useState<PlatformOrganization | null>(null);
   const [adminForm, setAdminForm] = useState({ name: "", email: "" });
   const [issued, setIssued] = useState<Issued | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export default function PlatformPage() {
       setAdminForm({ name: "", email: "" });
     });
 
-  const toggle = (org: Organization) =>
+  const toggle = (org: PlatformOrganization) =>
     run(async () => {
       if (
         !org.disabled &&
@@ -115,7 +115,7 @@ export default function PlatformPage() {
       await apiPatch(`/v1/platform/organizations/${org.id}`, token, { disabled: !org.disabled });
     });
 
-  const uploadOrgLogo = (org: Organization, file: File) =>
+  const uploadOrgLogo = (org: PlatformOrganization, file: File) =>
     run(async () => {
       const logoUrl = await readLogoFile(file);
       await apiPatch(`/v1/platform/organizations/${org.id}`, token, { logoUrl });
