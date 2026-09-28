@@ -32,12 +32,6 @@ local dev mode** (`pnpm dev` sets `TECHLIO_DEV_MODE=1`); a hosted API refuses
 them and migration 008 disables them in any existing database. Production
 starts with `pnpm admin:create` — see `docs/DEPLOY.md`.
 
-| Portal | Email | Password | Lands on |
-|--------|-------|----------|----------|
-| Manager | `manager@techlio.local` | `manager123` | Organisation overview |
-| Administrator | `admin@techlio.local` | `admin123` | Organisation overview + access & connectors |
-| Developer | `developer@techlio.local` | `developer123` | Their own analytics only |
-| Auditor | `auditor@techlio.local` | `auditor123` | Audit history, no individual timelines |
 
 Optional: `pnpm dev:worker` (hourly finalisation, late-event recalculation,
 retention, Tier B provider pulls — needs Redis).
