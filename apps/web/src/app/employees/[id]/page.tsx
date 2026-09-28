@@ -305,26 +305,7 @@ export default function EmployeeDetailPage() {
           </section>
           <ActivityStrip totals={t} commits={d.commits} />
 
-          {/* Layout rule: each row pairs cards of similar height; charts fill their card.
-              "Time split" was removed: it repeated the Work mix from session totals,
-              which disagreed with the event-time figures everywhere else. */}
-          {/* ---------------- Usage trend + highlights ---------------- */}
-          <section className="mt-5 grid gap-4 xl:grid-cols-3">
-            <Card className="xl:col-span-2">
-              <CardHeader
-                icon="trend"
-                title="Daily usage trend"
-                subtitle={LONG_QUIET_GAPS.trendSubtitle}
-                action={<ChartLegend items={TREND_LEGEND} />}
-              />
-              <CardBody className="pt-2">
-                <TrendChart data={d.dailyTrend} emptyVariant={silenceVariant} />
-              </CardBody>
-            </Card>
-            <HighlightsCard items={deriveHighlights(d)} />
-          </section>
-
-          {/* ---------------- Work mix + rhythm ---------------- */}
+          {/* ---------------- Work mix + rhythm (before daily trend) ---------------- */}
           <section className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <Card>
               <CardHeader
@@ -361,6 +342,25 @@ export default function EmployeeDetailPage() {
                 <WeekdayBars data={d.weekdayPattern} />
               </CardBody>
             </Card>
+          </section>
+
+          {/* Layout rule: each row pairs cards of similar height; charts fill their card.
+              "Time split" was removed: it repeated the Work mix from session totals,
+              which disagreed with the event-time figures everywhere else. */}
+          {/* ---------------- Usage trend + highlights ---------------- */}
+          <section className="mt-5 grid gap-4 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader
+                icon="trend"
+                title="Daily usage trend"
+                subtitle={LONG_QUIET_GAPS.trendSubtitle}
+                action={<ChartLegend items={TREND_LEGEND} />}
+              />
+              <CardBody className="pt-2">
+                <TrendChart data={d.dailyTrend} emptyVariant={silenceVariant} />
+              </CardBody>
+            </Card>
+            <HighlightsCard items={deriveHighlights(d)} />
           </section>
 
           {/* ---------------- Verify & ship + repositories ---------------- */}
