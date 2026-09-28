@@ -15,7 +15,7 @@ export function MetricGrid({ metrics, columns = 4 }: { metrics: Metric[]; column
         ? "sm:grid-cols-3 lg:grid-cols-5"
         : "sm:grid-cols-2 lg:grid-cols-4";
   return (
-    <dl className={`grid gap-px overflow-hidden rounded-lg bg-line ${cols}`}>
+    <dl className={`grid grid-cols-1 gap-px overflow-hidden rounded-lg bg-line ${cols}`}>
       {/* A metric the provider does not send is left out, never shown as a placeholder. */}
       {metrics.filter((m) => !m.unavailable).map((m) => (
         <div key={m.label} className="bg-card px-4 py-3">

@@ -214,7 +214,7 @@
 
   /* ---------- type ---------- */
   .h-page {
-    @apply text-[22px] font-semibold tracking-[-0.01em] text-ink-900;
+    @apply text-xl font-semibold tracking-[-0.01em] text-ink-900 sm:text-[22px];
   }
   .h-section {
     @apply text-sm font-semibold tracking-tight text-ink-900;
@@ -333,7 +333,7 @@
     }
   }
   .seg {
-    @apply inline-flex rounded-lg border border-line bg-card p-0.5;
+    @apply inline-flex max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-line bg-card p-0.5;
   }
   .seg-item {
     @apply rounded-[6px] px-2.5 py-1 text-xs font-medium text-ink-500 transition hover:text-ink-900;
@@ -454,6 +454,9 @@
   }
   .card-table {
     @apply flex min-h-0 flex-col overflow-hidden;
+  }
+  .card-table > .table-scroll {
+    @apply max-sm:-mx-5 max-sm:px-5;
   }
   /* Sticky headers must be opaque or scrolled rows show through them. */
   .table-scroll .tbl thead th {

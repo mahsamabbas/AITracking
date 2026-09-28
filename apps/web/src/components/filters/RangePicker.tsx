@@ -24,8 +24,8 @@ export function RangePicker({
   onChange: (v: RangeValue) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="seg" role="group" aria-label="Date range">
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="seg max-w-full overflow-x-auto overscroll-x-contain" role="group" aria-label="Date range">
         {RANGE_PRESETS.map((p) => (
           <button
             key={p.id}
@@ -38,11 +38,11 @@ export function RangePicker({
           </button>
         ))}
       </div>
-      <label className="flex items-center gap-1.5 text-xs text-ink-500">
+      <label className="flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs text-ink-500 sm:w-auto">
         <span className="sr-only">Custom start date</span>
         <input
           type="date"
-          className="field h-9 w-[140px] text-xs"
+          className="field h-9 min-w-0 flex-1 text-xs sm:w-[140px] sm:flex-none"
           value={value.from ?? ""}
           onChange={(e) =>
             onChange({ preset: "custom", from: e.target.value, to: value.to })
@@ -52,7 +52,7 @@ export function RangePicker({
         <span className="sr-only">Custom end date</span>
         <input
           type="date"
-          className="field h-9 w-[140px] text-xs"
+          className="field h-9 min-w-0 flex-1 text-xs sm:w-[140px] sm:flex-none"
           value={value.to ?? ""}
           onChange={(e) =>
             onChange({ preset: "custom", from: value.from, to: e.target.value })

@@ -355,7 +355,7 @@ export function AppShell({
           </div>
         </main>
 
-        <footer className="border-t border-line px-4 py-4 sm:px-6 lg:px-8">
+        <footer className="border-t border-line px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
           <p className="mx-auto max-w-[1440px] text-2xs leading-relaxed text-ink-400">
             Techlio observes work performed through connected AI coding agents. It is not a
             timekeeping, payroll, or performance-rating system, and missing telemetry is never

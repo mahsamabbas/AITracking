@@ -79,6 +79,22 @@ function clip(intervals: Interval[], from: number, to: number): number {
   return total;
 }
 
+/** Agent file events in a window — unique paths (repeat saves on one file count once). */
+export function distinctFileChanges(
+  files: { at: number; path: string | null }[],
+  from: number,
+  to: number,
+): number {
+  const paths = new Set<string>();
+  let withoutPath = 0;
+  for (const f of files) {
+    if (f.at < from || f.at >= to) continue;
+    if (f.path) paths.add(f.path);
+    else withoutPath++;
+  }
+  return paths.size + withoutPath;
+}
+
 /** Minimum active slice when the provider reports completion without duration_ms. */
 const MIN_ACTIVE_MS = 60_000;
 
@@ -211,7 +227,7 @@ export async function workday(input: {
       editingMs,
       // Research & planning = agent active time not attributed to writes, checks, or verify tools.
       explorationMs: Math.max(0, activeMs - editingMs),
-      fileChanges: files.filter((f) => f.at >= from && f.at < to).length,
+      fileChanges: distinctFileChanges(files, from, to),
       modelRequests: models.filter((t) => t >= from && t < to).length,
       toolCalls: tools.filter((t) => t >= from && t < to).length,
     });
@@ -223,6 +239,9 @@ export async function workday(input: {
   for (let i = 1; i < working.length; i++) {
     breaks.push({ start: iso(working[i - 1].end), end: iso(working[i].start), ms: working[i].start - working[i - 1].end });
   }
+
+  const filesTouched = new Set(files.map((f) => f.path).filter(Boolean)).size;
+  const anonymousFileEvents = files.filter((f) => !f.path).length;
 
   return {
     date,
@@ -245,8 +264,8 @@ export async function workday(input: {
       idleMs: sum("idleMs"),
       explorationMs: sum("explorationMs"),
       editingMs: sum("editingMs"),
-      fileChanges: files.length,
-      filesTouched: new Set(files.map((f) => f.path).filter(Boolean)).size,
+      fileChanges: filesTouched + anonymousFileEvents,
+      filesTouched,
       modelRequests: models.length,
       toolCalls: tools.length,
       sessions: sessions.size,

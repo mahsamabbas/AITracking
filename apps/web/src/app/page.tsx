@@ -50,6 +50,7 @@ import {
 } from "@/lib/vocab";
 import { deriveHighlights } from "@/lib/insights";
 import { canExportActivity, canViewTeam } from "@/lib/permissions";
+import { analyticsPollMs, LIVE_POLL_MS } from "@/lib/live-poll";
 import type {
   FilterMeta,
   LiveStatus,
@@ -97,8 +98,9 @@ export default function OverviewPage() {
 
   const analytics = useApi<OrganizationAnalytics>(
     `/v1/analytics/organization${qs(params)}`,
+    { pollMs: analyticsPollMs(range) },
   );
-  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=8", { pollMs: 30_000 });
+  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=8", { pollMs: LIVE_POLL_MS });
   const meta = useApi<FilterMeta>("/v1/meta/filters");
 
   const d = analytics.data;

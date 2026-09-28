@@ -54,6 +54,7 @@ import {
 } from "@/lib/vocab";
 import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import { deriveHighlights } from "@/lib/insights";
+import { analyticsPollMs, LIVE_POLL_MS } from "@/lib/live-poll";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
 
 export default function EmployeeDetailPage() {
@@ -76,8 +77,9 @@ export default function EmployeeDetailPage() {
     employeeId && employeeId !== "self"
       ? `/v1/employees/${employeeId}${qs(rangeParams(range))}`
       : null,
+    { pollMs: analyticsPollMs(range) },
   );
-  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=20", { pollMs: 45_000 });
+  const live = useApi<LiveStatus>("/v1/dashboard/live?limit=20", { pollMs: LIVE_POLL_MS });
   // Always the last year, independent of the range filter (like a git contribution graph).
   const calendar = useApi<ActivityCalendarData>(
     employeeId && employeeId !== "self" ? `/v1/employees/${employeeId}/activity-calendar` : null,

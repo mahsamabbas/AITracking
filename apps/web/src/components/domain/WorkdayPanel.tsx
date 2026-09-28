@@ -97,7 +97,11 @@ export function WorkdayPanel({
               <Stat
                 label="Files changed"
                 value={formatNumber(t.fileChanges)}
-                hint={t.filesTouched ? `${t.filesTouched} distinct files` : "File edits reported by the agents"}
+                hint={
+                  t.filesTouched > 0
+                    ? `${t.filesTouched} unique files the agents edited (repeat saves on the same file count once)`
+                    : "File edits reported by the agents"
+                }
               />
               <Stat label="Sessions" value={`${t.sessions} · ${t.modelRequests} calls`} hint={`${t.modelRequests} model calls, ${t.toolCalls} tool calls`} />
             </div>

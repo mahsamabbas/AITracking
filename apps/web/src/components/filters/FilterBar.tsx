@@ -26,7 +26,11 @@ export function FilterBar({
       }`}
     >
       {children}
-      {right ? <div className="ml-auto flex items-center gap-2">{right}</div> : null}
+      {right ? (
+        <div className="flex w-full basis-full items-center gap-2 sm:ml-auto sm:w-auto sm:basis-auto">
+          {right}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -37,7 +41,7 @@ export function SelectFilter({
   onChange,
   options,
   allLabel = "All",
-  width = "w-[150px]",
+  width = "w-full min-w-0 sm:w-[150px]",
 }: {
   label: string;
   value: string;
@@ -72,7 +76,7 @@ export function SearchFilter({
   value,
   onChange,
   placeholder = "Search",
-  width = "w-[240px]",
+  width = "w-full min-w-0 sm:w-[240px]",
 }: {
   value: string;
   onChange: (v: string) => void;

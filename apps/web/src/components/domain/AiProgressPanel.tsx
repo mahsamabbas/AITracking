@@ -126,7 +126,7 @@ function ProviderProgressCard({ p, employeeId }: { p: ProviderProgress; employee
 
       </div>
 
-      <dl className="mt-4 grid grid-cols-3 gap-x-3 gap-y-3">
+      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3">
         <Stat label="Sessions" value={formatNumber(p.sessions)} />
         <Stat
           label="Agent active"

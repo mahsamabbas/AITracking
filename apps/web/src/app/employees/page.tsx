@@ -170,7 +170,7 @@ export default function EmployeesPage() {
           width="w-[170px]"
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
-        <div className="seg" role="radiogroup" aria-label="Connector state">
+        <div className="seg max-w-full overflow-x-auto overscroll-x-contain" role="radiogroup" aria-label="Connector state">
           {[{ value: "", label: "All" }, ...CONNECTOR_STATES].map((o) => (
             <button
               key={o.value || "all"}

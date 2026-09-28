@@ -25,24 +25,24 @@ export function PlatformOrgTabBar() {
 
   return (
     <div className="mb-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200/80 bg-gradient-to-r from-brand-50/90 to-slate-50 px-4 py-3 dark:border-brand-900/50 dark:from-brand-950/40 dark:to-slate-950/40">
-        <span className="inline-flex h-7 items-center rounded-md bg-brand-600 px-2 text-2xs font-semibold uppercase tracking-wide text-white">
+      <div className="flex flex-col gap-3 rounded-xl border border-brand-200/80 bg-gradient-to-r from-brand-50/90 to-slate-50 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 dark:border-brand-900/50 dark:from-brand-950/40 dark:to-slate-950/40">
+        <span className="inline-flex h-7 w-fit items-center rounded-md bg-brand-600 px-2 text-2xs font-semibold uppercase tracking-wide text-white">
           Platform
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink-900">
             {ctx.orgName ?? "Organisation workspace"}
           </p>
-          <p className="text-2xs text-ink-500">
+          <p className="hidden text-2xs text-ink-500 sm:block">
             Inspecting this tenant as platform operator — same dashboards org admins see (read-only).
           </p>
         </div>
-        <Link href="/platform" className="btn-ghost h-8 shrink-0 text-xs">
+        <Link href="/platform" className="btn-ghost h-8 w-full shrink-0 justify-center text-xs sm:w-auto">
           ← All organisations
         </Link>
       </div>
       <nav
-        className="flex gap-1 overflow-x-auto rounded-lg border border-line bg-card p-1"
+        className="-mx-1 flex gap-1 overflow-x-auto overscroll-x-contain rounded-lg border border-line bg-card p-1"
         aria-label="Organisation workspace"
       >
         {TABS.map((tab) => {

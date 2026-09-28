@@ -62,7 +62,7 @@ export function StatTile({
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="flex min-w-0 items-baseline gap-1.5">
-          <span className="num truncate text-[26px] font-semibold leading-none tracking-tight text-ink-900">
+          <span className="num truncate text-[22px] font-semibold leading-none tracking-tight text-ink-900 sm:text-[26px]">
             {value}
           </span>
           {unit ? <span className="text-sm text-ink-500">{unit}</span> : null}

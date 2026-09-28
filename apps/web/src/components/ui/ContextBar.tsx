@@ -35,17 +35,23 @@ export function ContextBar({
 
   return (
     <div
-      className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-line bg-card/60 px-3 py-2 text-xs text-ink-500"
+      className="mb-4 flex flex-col gap-2 rounded-lg border border-line bg-card/60 px-3 py-2 text-xs text-ink-500 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
       aria-label="Data context"
     >
-      <span className="font-medium text-ink-900">{subject}</span>
-      <span aria-hidden className="text-ink-400">·</span>
-      <span>{rangeLabel}</span>
-      <span aria-hidden className="text-ink-400">·</span>
-      <span title="Hour and day labels use the organisation timezone. Events are stored in UTC.">
-        Times in {tzLabel}
-      </span>
-      <span className="ml-auto flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium text-ink-900">{subject}</span>
+        <span aria-hidden className="hidden text-ink-400 sm:inline">
+          ·
+        </span>
+        <span>{rangeLabel}</span>
+        <span aria-hidden className="hidden text-ink-400 sm:inline">
+          ·
+        </span>
+        <span title="Hour and day labels use the organisation timezone. Events are stored in UTC.">
+          Times in {tzLabel}
+        </span>
+      </div>
+      <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
         {live ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 px-2 py-0.5 font-medium text-teal-800 dark:bg-teal-950 dark:text-teal-200">
             <span className="pulse-online h-1.5 w-1.5 rounded-full bg-conn-ok" aria-hidden />

@@ -44,7 +44,7 @@ export function CardHeader({
           {subtitle ? <p className="hint mt-0.5">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
         {action}
         {href ? (
           <Link

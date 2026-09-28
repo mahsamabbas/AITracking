@@ -9,6 +9,7 @@ import { rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+import { analyticsPollMs } from "@/lib/live-poll";
 import type { EmployeeRow } from "@/lib/types";
 
 /**
@@ -28,6 +29,7 @@ export function TopPeopleCard({
 }) {
   const query = useApi<{ employees: EmployeeRow[] }>(
     `/v1/employees${qs({ ...rangeParams(range), team, provider, sort: "activity" })}`,
+    { pollMs: analyticsPollMs(range) },
   );
   const rows = (query.data?.employees ?? [])
     .filter((e) => e.activeMs > 0)

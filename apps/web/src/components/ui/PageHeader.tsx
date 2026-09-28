@@ -24,16 +24,16 @@ export function PageHeader({
   leading?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 sm:gap-4">
+    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
       {leading}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[12rem]">
         <div className="hidden lg:block">{breadcrumbs}</div>
-        <h1 className="h-page truncate leading-tight">{title}</h1>
+        <h1 className="h-page line-clamp-2 leading-tight sm:line-clamp-1">{title}</h1>
         {subtitle ? (
           <p className="mt-1 hidden max-w-2xl truncate text-sm leading-snug text-ink-500 lg:block">{subtitle}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
         {actions ? (
           <div className="hidden items-center gap-2 lg:flex">{actions}</div>
         ) : null}
@@ -41,7 +41,7 @@ export function PageHeader({
           <span className="hidden h-8 w-px shrink-0 bg-line lg:block" aria-hidden />
         ) : null}
         {utilities ? (
-          <div className="flex items-center gap-1 rounded-xl border border-line bg-raised/80 p-1 shadow-sm dark:bg-white/[0.04]">
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-1 rounded-xl border border-line bg-raised/80 p-1 shadow-sm dark:bg-white/[0.04]">
             {utilities}
           </div>
         ) : null}

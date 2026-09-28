@@ -81,7 +81,7 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-[100dvh] max-w-full overflow-x-clip lg:grid-cols-2">
-      <div className="relative flex items-center justify-center px-6 py-12">
+      <div className="relative flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12">
         <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex items-center gap-2">
           <InstallAppButton />
           <ThemeToggle />

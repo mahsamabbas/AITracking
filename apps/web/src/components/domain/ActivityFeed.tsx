@@ -11,6 +11,7 @@ import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiGet, qs } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
+import { rangeIncludesNow, analyticsPollMs } from "@/lib/live-poll";
 import type { ActivityEventRow } from "@/lib/types";
 
 interface FeedPage {
@@ -21,13 +22,6 @@ interface FeedPage {
 }
 
 const PAGE = 50;
-
-/** Ranges that include "now" keep polling for new events. */
-function includesNow(range: RangeValue): boolean {
-  if (range.preset === "yesterday") return false;
-  if (range.preset === "custom") return !range.to || range.to >= new Date().toISOString().slice(0, 10);
-  return true;
-}
 
 function dayKey(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -60,8 +54,8 @@ export function ActivityFeed({
     [range, developerId, provider, team],
   );
   const path = `/v1/activity${qs({ ...base, limit: PAGE })}`;
-  const live = includesNow(range);
-  const first = useApi<FeedPage>(path, { pollMs: live ? 30_000 : undefined });
+  const live = rangeIncludesNow(range);
+  const first = useApi<FeedPage>(path, { pollMs: analyticsPollMs(range) });
 
   // Everything loaded for this filter, merged by event id so live polling and
   // "Load older" never duplicate or skip events.
