@@ -1,33 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { PlatformOrgList, type PlatformOrganization } from "@/components/platform/PlatformOrgList";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Callout } from "@/components/ui/Callout";
-import { TableScroll } from "@/components/ui/TableScroll";
+import { IconChip } from "@/components/ui/Icon";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/ui/States";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPatch, apiPost } from "@/lib/api";
-import { formatNumber, formatRelative } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { readLogoFile } from "@/lib/image-upload";
 import { Button } from "@/components/ui/Button";
 import { FIELD_LIMITS } from "@/lib/validation";
 
-interface Organization {
-  id: string;
-  name: string;
-  timezone: string;
-  logoUrl: string | null;
-  createdAt: string;
-  disabled: boolean;
-  administrators: number;
-  users: number;
-  employees: number;
-  connectors: number;
-  lastActivityAt: string | null;
-}
+type Organization = PlatformOrganization & { createdAt: string };
 
 interface Issued {
   organization: string;
@@ -175,35 +163,52 @@ export default function PlatformPage() {
       ) : null}
 
       <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Organisations", value: formatNumber(totals.orgs) },
-          { label: "Active tenants", value: formatNumber(totals.active) },
-          { label: "Monitored people", value: formatNumber(totals.people) },
-          { label: "Live connectors", value: formatNumber(totals.connectors) },
-        ].map((tile) => (
+        {(
+          [
+            { label: "Organisations", value: formatNumber(totals.orgs), icon: "team" as const, tone: "brand" as const },
+            { label: "Active tenants", value: formatNumber(totals.active), icon: "live" as const, tone: "teal" as const },
+            { label: "Monitored people", value: formatNumber(totals.people), icon: "people" as const, tone: "violet" as const },
+            { label: "Live connectors", value: formatNumber(totals.connectors), icon: "plug" as const, tone: "sky" as const },
+          ] as const
+        ).map((tile) => (
           <div
             key={tile.label}
-            className="rounded-xl border border-line bg-card px-4 py-3 shadow-sm"
+            className="flex items-start gap-3 rounded-xl border border-line bg-card px-4 py-3.5 shadow-sm"
           >
-            <p className="label">{tile.label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-ink-900">{tile.value}</p>
+            <IconChip name={tile.icon} tone={tile.tone} size="sm" />
+            <div className="min-w-0">
+              <p className="label">{tile.label}</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-ink-900">{tile.value}</p>
+            </div>
           </div>
         ))}
       </section>
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="card-table order-2 lg:order-1 lg:col-span-2">
+        <Card className="order-2 lg:order-1 lg:col-span-2">
           <CardHeader icon="team"
             title="Customer organisations"
             subtitle={`${formatNumber(filtered.length)} shown`}
             action={
-              <input
-                className="field h-9 w-full min-w-0 sm:w-44 text-xs"
-                placeholder="Search…"
-                maxLength={FIELD_LIMITS.searchQuery}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <div className="relative w-full min-w-0 sm:w-52">
+                <span
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+                  aria-hidden
+                >
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="7" cy="7" r="4.5" />
+                    <path d="m10.5 10.5 3 3" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <input
+                  type="search"
+                  className="field h-9 w-full pl-9 text-xs"
+                  placeholder="Search organisations…"
+                  maxLength={FIELD_LIMITS.searchQuery}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             }
           />
           {query.error ? (
@@ -213,99 +218,16 @@ export default function PlatformPage() {
           ) : filtered.length === 0 ? (
             <EmptyState compact title="No organisations yet" body="Create the first tenant on the right." />
           ) : (
-            <TableScroll className="overflow-x-auto">
-              <table className="tbl min-w-[640px] w-full">
-                <thead>
-                  <tr>
-                    <th>Organisation</th>
-                    <th className="text-right">People</th>
-                    <th className="text-right">Connectors</th>
-                    <th>Last activity</th>
-                    <th>Status</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((o) => (
-                    <tr key={o.id}>
-                      <td className="min-w-[140px] max-w-[220px]">
-                        <div className="flex min-w-0 items-center gap-2">
-                          {o.logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={o.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain ring-1 ring-line" />
-                          ) : (
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-2xs text-ink-400 dark:bg-white/5">
-                              —
-                            </span>
-                          )}
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-ink-900">{o.name}</p>
-                            <p className="hint truncate">
-                              {o.timezone} · {formatNumber(o.users)} accounts · {formatNumber(o.administrators)} admins
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="num whitespace-nowrap text-right">{o.employees}</td>
-                      <td className="num whitespace-nowrap text-right">{o.connectors}</td>
-                      <td className="whitespace-nowrap text-sm text-ink-500">
-                        {o.lastActivityAt ? formatRelative(o.lastActivityAt) : "—"}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {o.disabled ? (
-                          <span className="badge-bad">Disabled</span>
-                        ) : (
-                          <span className="badge-ok">Active</span>
-                        )}
-                      </td>
-                      <td className="max-w-[min(100%,20rem)] text-right align-top">
-                        <div className="flex flex-wrap items-center justify-end gap-1 py-0.5">
-                        <Link
-                          href={`/platform/${o.id}/overview`}
-                          className="btn-primary h-8 shrink-0 px-2.5 text-2xs sm:px-3 sm:text-xs"
-                        >
-                          Open workspace
-                        </Link>
-                        <button
-                          type="button"
-                          className="btn-ghost h-8 shrink-0 px-2 text-2xs sm:text-xs"
-                          disabled={busy || o.disabled}
-                          onClick={() => {
-                            setAdminFor(o);
-                            setAdminForm({ name: "", email: "" });
-                          }}
-                        >
-                          Add admin
-                        </button>
-                        <label className="btn-ghost h-8 shrink-0 cursor-pointer px-2 text-2xs sm:text-xs">
-                          Logo
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            disabled={busy}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) void uploadOrgLogo(o, file);
-                              e.target.value = "";
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="btn-ghost h-8 shrink-0 px-2 text-2xs sm:text-xs"
-                          disabled={busy}
-                          onClick={() => void toggle(o)}
-                        >
-                          {o.disabled ? "Enable" : "Disable"}
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableScroll>
+            <PlatformOrgList
+              organizations={filtered}
+              busy={busy}
+              onAddAdmin={(o) => {
+                setAdminFor(o);
+                setAdminForm({ name: "", email: "" });
+              }}
+              onToggle={(o) => void toggle(o)}
+              onUploadLogo={(o, file) => void uploadOrgLogo(o, file)}
+            />
           )}
         </Card>
 
