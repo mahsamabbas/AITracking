@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUPABASE_ENV="$ROOT/apps/api/.env.supabase.local"
 PROD_ENV="$ROOT/apps/api/.env.production.local"
+API_ENV="$ROOT/apps/api/.env"
 BACKUP="$ROOT/apps/api/.env.production.local.neon-backup"
 
 read_var() {
@@ -32,9 +33,10 @@ if [[ -f "$PROD_ENV" && ! -f "$BACKUP" ]]; then
   echo "Backed up Neon URLs → apps/api/.env.production.local.neon-backup"
 fi
 
-# Preserve JWT_SECRET and other vars; replace only DB URLs.
+# Preserve JWT_SECRET and other vars; drop Neon/Vercel Postgres template keys.
 touch "$PROD_ENV"
-grep -v -E '^(DATABASE_URL|DATABASE_URL_UNPOOLED|POSTGRES_URL)=' "$PROD_ENV" > "${PROD_ENV}.tmp" 2>/dev/null || true
+grep -v -E '^(DATABASE_URL|DATABASE_URL_UNPOOLED|POSTGRES_|PGHOST|PGUSER|PGDATABASE|PGPASSWORD|NEON_)' "$PROD_ENV" \
+  > "${PROD_ENV}.tmp" 2>/dev/null || true
 {
   cat "${PROD_ENV}.tmp" 2>/dev/null || true
   echo "DATABASE_URL=$POOLED"
@@ -43,7 +45,17 @@ grep -v -E '^(DATABASE_URL|DATABASE_URL_UNPOOLED|POSTGRES_URL)=' "$PROD_ENV" > "
 rm -f "${PROD_ENV}.tmp"
 chmod 600 "$PROD_ENV" 2>/dev/null || true
 
-echo "==> apps/api/.env.production.local now points at Supabase (pooler 6543 + session 5432)."
+ORG_TZ="$(read_var "$API_ENV" ORG_TIMEZONE 2>/dev/null || true)"
+ORG_TZ="${ORG_TZ:-Asia/Karachi}"
+{
+  echo "# Supabase — synced by scripts/switch-production-to-supabase.sh"
+  echo "ORG_TIMEZONE=$ORG_TZ"
+  echo "DATABASE_URL=$POOLED"
+  echo "DATABASE_URL_UNPOOLED=$SESSION"
+} > "$API_ENV"
+chmod 600 "$API_ENV" 2>/dev/null || true
+
+echo "==> apps/api/.env.production.local and apps/api/.env now point at Supabase (6543 + 5432)."
 echo "==> Running migrations on the new database…"
 node "$ROOT/scripts/migrate.mjs" --production
 

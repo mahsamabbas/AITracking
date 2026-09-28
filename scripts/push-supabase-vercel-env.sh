@@ -37,6 +37,8 @@ echo "==> Updating Vercel production DATABASE_URL (6543 pooler)"
 upsert_env DATABASE_URL "$POOLED"
 echo "==> Updating Vercel production DATABASE_URL_UNPOOLED (5432 session)"
 upsert_env DATABASE_URL_UNPOOLED "$SESSION"
+echo "==> Updating TECHLIO_DATABASE_URL (wins over integration-injected DATABASE_URL)"
+upsert_env TECHLIO_DATABASE_URL "$POOLED"
 
 # Neon integration often sets POSTGRES_* — remove so they do not override runtime.
 for key in POSTGRES_URL POSTGRES_URL_NON_POOLING POSTGRES_PRISMA_URL POSTGRES_URL_NO_SSL; do
