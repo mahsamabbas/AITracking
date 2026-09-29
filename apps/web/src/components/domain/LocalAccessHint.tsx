@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
+  CONNECTOR_LINUX_SCRIPT,
   CONNECTOR_MAC_PKG,
   CONNECTOR_WINDOWS_EXE,
   detectConnectorPlatform,
@@ -90,7 +91,7 @@ export function LocalAccessHint({ onReachable }: { onReachable?: () => void }) {
       </>,
       <>
         <a
-          href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : CONNECTOR_MAC_PKG}
+          href={platform === "windows" ? CONNECTOR_WINDOWS_EXE : platform === "linux" ? CONNECTOR_LINUX_SCRIPT : CONNECTOR_MAC_PKG}
           download
           className="btn-primary inline-flex h-8 items-center px-3 text-xs"
         >
@@ -107,7 +108,9 @@ export function LocalAccessHint({ onReachable }: { onReachable?: () => void }) {
           ? "Open the installer you downloaded and finish it. Afterwards the Techlio icon appears in the menu bar at the top of your screen."
           : platform === "windows"
             ? "Run the downloaded installer. Afterwards Techlio Connector appears in Task Manager → Background processes."
-            : "Install the connector from this page."}{" "}
+            : platform === "linux"
+              ? "Run the install command from this page in a terminal. Check it with: systemctl --user status techlio-connector"
+              : "Install the connector from this page."}{" "}
         If the connector is already running there, a privacy extension may be blocking this page: allow this site in it
         (Brave: turn Shields off for this site).
       </>,

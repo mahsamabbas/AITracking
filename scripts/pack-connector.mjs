@@ -8,6 +8,9 @@
  *             user who signs in. No app in /Applications, no Dock icon.
  *   Windows — techlio-connector-win-x64.exe: GUI-subsystem build (no console).
  *             Opening it once registers a hidden logon task and exits.
+ *   Linux   — techlio-connector-linux-{x64,arm64}.tar.gz, installed with
+ *             install-connector-linux.sh as a systemd user service (XDG
+ *             autostart where systemd is not available). No sudo needed.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -92,6 +95,37 @@ for (const [target, name] of targets) {
   if (compiled.status !== 0) {
     console.error(`Failed to build ${name}`);
     process.exit(compiled.status ?? 1);
+  }
+}
+
+// Linux (x64 and arm64): shipped as .tar.gz. The raw binaries are ~95 MB each;
+// compressed they download faster and stay well under git's file-size limit.
+// install-connector-linux.sh picks the right one, verifies it, and runs it.
+for (const [target, arch] of [
+  ["bun-linux-x64", "x64"],
+  ["bun-linux-arm64", "arm64"],
+]) {
+  const stage = join(out, `linux-${arch}`);
+  mkdirSync(stage, { recursive: true });
+  const exe = join(stage, "techlio-connector");
+  const compiled = spawnSync("bun", ["build", "--compile", `--target=${target}`, `--outfile=${exe}`, bundle], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  if (compiled.status !== 0) {
+    console.error(`Failed to build the Linux ${arch} connector`);
+    process.exit(compiled.status ?? 1);
+  }
+  chmodSync(exe, 0o755);
+  // COPYFILE_DISABLE / --no-xattrs: no macOS metadata entries that GNU tar warns about.
+  const packed = spawnSync(
+    "tar",
+    ["--no-xattrs", "-czf", join(downloads, `techlio-connector-linux-${arch}.tar.gz`), "-C", stage, "techlio-connector"],
+    { stdio: "inherit", env: { ...process.env, COPYFILE_DISABLE: "1" } },
+  );
+  if (packed.status !== 0) {
+    console.error(`Failed to package the Linux ${arch} connector`);
+    process.exit(packed.status ?? 1);
   }
 }
 
@@ -414,7 +448,7 @@ if (extBuild.status === 0) {
 
 // Published checksums let IT and the installer verify what was downloaded.
 const sums = readdirSync(downloads)
-  .filter((f) => /\.(pkg|exe|vsix|zip)$|^techlio-connector/.test(f) && !f.endsWith(".txt"))
+  .filter((f) => /\.(pkg|exe|vsix|zip|tar\.gz)$|^techlio-connector/.test(f) && !f.endsWith(".txt"))
   .filter((f) => statSync(join(downloads, f)).isFile())
   .map((f) => `${createHash("sha256").update(readFileSync(join(downloads, f))).digest("hex")}  ${f}`);
 writeFileSync(join(downloads, "SHA256SUMS.txt"), `${sums.join("\n")}\n`);

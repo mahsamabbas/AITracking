@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import {
   EventTypes,
+  isKnownProvider,
   providerCapability,
   providerFromHostApp,
   type ActivityEvent,
@@ -485,8 +486,8 @@ app.get("/health", async () => {
     capabilities: {
       hourly: caps?.hourly ?? false,
       otlp: hostProvider === "claude_code",
-      hooks: hostProvider === "claude_code" || hostProvider === "cursor",
-      companion: hostProvider === "cursor" || hostProvider === "vscode",
+      hooks: hostProvider !== "vscode",
+      companion: hostProvider === "cursor" || hostProvider === "vscode" || hostProvider === "windsurf",
       missing: caps?.missing ?? [],
       emptyState: caps?.emptyState ?? "",
     },
@@ -877,9 +878,9 @@ function routeAgentEvent(event: ActivityEvent): boolean {
 
 function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
-  const provider = payload.provider === "cursor" || payload.provider === "claude_code" || payload.provider === "vscode" || payload.provider === "antigravity"
-    ? payload.provider
-    : fallbackProvider;
+  // Any tool in the provider catalogue (Claude Code, Cursor, Antigravity,
+  // Windsurf, Copilot, Gemini CLI, Codex CLI, Devin CLI, …).
+  const provider = isKnownProvider(payload.provider) ? payload.provider : fallbackProvider;
   const sessionId = asSessionId(payload.session_id ?? payload.conversation_id);
   if (payload.hook_event_name === "model_request_started" || payload.hook_event_name === "UserPromptSubmit" || payload.hook_event_name === "beforeSubmitPrompt" || payload.hook_event_name === "PreInvocation") {
     rememberStart("model", provider, sessionId, undefined);
@@ -1125,6 +1126,11 @@ void (async () => {
       if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");
       if (hooks.cursor) console.log("Cursor agent hooks are installed. Cursor reloads them automatically.");
       if (hooks.antigravity) console.log("Antigravity hooks are installed (~/.gemini/config/hooks.json).");
+      if (hooks.windsurf) console.log("Windsurf (Devin Desktop) Cascade hooks are installed (~/.codeium/windsurf/hooks.json).");
+      if (hooks.copilot) console.log("GitHub Copilot agent hooks are installed (~/.copilot/hooks) for Copilot CLI and VS Code agent mode.");
+      if (hooks.gemini) console.log("Gemini CLI hooks are installed (~/.gemini/settings.json).");
+      if (hooks.codex) console.log("Codex CLI hooks are installed (~/.codex/hooks.json). Run /hooks in Codex once to trust them.");
+      if (hooks.claude) console.log("Devin CLI reads the Claude Code hooks, so Devin CLI sessions are reported too.");
       if (claudeOtelConfigured()) console.log("Claude Code telemetry is routed here for token totals (prompts stay redacted).");
       console.log("The Claude website chat is not Claude Code, so that chat stays off this log until it runs in Claude Code.");
     })

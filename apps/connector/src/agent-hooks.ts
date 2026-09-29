@@ -1,7 +1,8 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { normalizeHookPayload } from "./hook-payload.js";
 import { userPort } from "./port.js";
 
 const SCRIPT_NAME = "report-hook.mjs";
@@ -56,58 +57,35 @@ function installDir(): string {
   return join(homedir(), ".techlio", "connector");
 }
 
-const HOOK_SOURCE = `#!/usr/bin/env node
+/**
+ * Standalone hook script for unpackaged (node) installs. Its normaliser is the
+ * same function the packaged binary runs, written out verbatim, so every
+ * install mode reports identical, allowlisted fields.
+ */
+function hookSource(): string {
+  return `#!/usr/bin/env node
+// Written by the Techlio connector. Forwards allowlisted hook fields only.
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-// Each OS user has their own connector port (recorded by the connector).
-function connectorPort() {
-  try { const p = Number(readFileSync(join(homedir(), ".techlio-connector", "port"), "utf8").trim()); if (p > 0) return p; } catch {}
-  return 9477;
-}
-const fallback = process.argv[2] || "claude_code";
-function detectProvider() {
-  if (fallback === "antigravity") return "antigravity"; // only Antigravity reads ~/.gemini hooks
-  if (process.env.CURSOR_AGENT || process.env.CURSOR_CONVERSATION_ID || process.env.CURSOR_TRACE_ID || process.env.CURSOR_REQUEST_ID) return "cursor";
-  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT) return "claude_code";
-  return fallback;
-}
+const normalizeHookPayload = ${normalizeHookPayload.toString()};
+let port = 9477;
+try { const p = Number(readFileSync(join(homedir(), ".techlio-connector", "port"), "utf8").trim()); if (p > 0) port = p; } catch {}
 const chunks = [];
 process.stdin.on("data", (chunk) => chunks.push(chunk));
 process.stdin.on("end", () => {
   let raw = {};
   try { raw = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { raw = {}; }
-  const roots = Array.isArray(raw.workspace_roots) ? raw.workspace_roots : Array.isArray(raw.workspacePaths) ? raw.workspacePaths : [];
-  // Antigravity: only toolCall.name is read; toolCall.args (commands, file
-  // content) never leaves this process.
-  const toolCall = raw.toolCall && typeof raw.toolCall === "object" ? raw.toolCall : {};
-  // Claude Code nests the edited file under tool_input. Only the path of a
-  // file an agent wrote is read — never tool_input content, commands, or diffs.
-  const toolInput = raw.tool_input && typeof raw.tool_input === "object" ? raw.tool_input : {};
-  const editedPath = ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(raw.tool_name)
-    ? toolInput.file_path || toolInput.notebook_path
-    : undefined;
-  const cwd = typeof raw.cwd === "string" ? raw.cwd : typeof roots[0] === "string" ? roots[0] : undefined;
-  const body = {
-    provider: detectProvider(),
-    // Antigravity does not name the event on stdin; the installer passes it as argv[3].
-    hook_event_name: raw.hook_event_name || process.argv[3],
-    session_id: raw.session_id || raw.conversation_id ||
-      raw.conversationId || raw.generation_id || process.env.CURSOR_CONVERSATION_ID,
-    tool_name: raw.tool_name || raw.tool || toolCall.name,
-    tool_use_id: raw.tool_use_id || raw.toolUseId || toolCall.id,
-    cwd,
-    file_path: typeof raw.file_path === "string" ? raw.file_path : typeof editedPath === "string" ? editedPath : undefined,
-    model: raw.model || raw.model_name || raw.modelName,
-    status: raw.status || (typeof raw.error === "string" && raw.error ? "failed" : undefined),
-  };
-  fetch("http://127.0.0.1:" + connectorPort() + "/hooks/agent", {
+  const body = normalizeHookPayload(raw, process.argv[2], process.argv[3], process.env);
+  if (!body) { process.stdout.write("{}\\n"); return; }
+  fetch("http://127.0.0.1:" + port + "/hooks/agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }).catch(() => undefined).finally(() => process.stdout.write("{}\\n"));
 });
 `;
+}
 
 /** A packaged bun/pkg executable runs itself with --hook; dev uses node + script. */
 function isPackaged(): boolean {
@@ -116,25 +94,26 @@ function isPackaged(): boolean {
   return !exec.includes("node") && !exec.includes("tsx");
 }
 
-function bundledScript(): string | undefined {
-  try {
-    return join(dirname(fileURLToPath(import.meta.url)), "../hook/report-hook.mjs");
-  } catch {
-    return undefined;
-  }
-}
+type HookProvider = "claude_code" | "cursor" | "antigravity" | "windsurf" | "github_copilot" | "gemini" | "codex";
 
-function commandFor(
-  scriptPath: string,
-  provider: "claude_code" | "cursor" | "antigravity",
-  eventName?: string,
-): string {
+function commandFor(scriptPath: string, provider: HookProvider, eventName?: string): string {
   const suffix = eventName ? ` ${eventName}` : "";
   if (isPackaged()) {
     return `"${process.execPath}" --hook ${provider}${suffix}`;
   }
   const node = process.execPath.includes("node") ? process.execPath : "node";
   return `"${node}" "${scriptPath}" ${provider}${suffix}`;
+}
+
+/** The same command for tools that run hooks through PowerShell on Windows. */
+function powershellFor(scriptPath: string, provider: HookProvider, eventName?: string): string {
+  return `& ${commandFor(scriptPath, provider, eventName)}`;
+}
+
+/** True when a CLI is on PATH (a hook file is only written for tools that are installed). */
+function onPath(cmd: string): boolean {
+  const probe = spawnSync(platform() === "win32" ? "where" : "which", [cmd], { stdio: "ignore" });
+  return probe.status === 0;
 }
 
 /**
@@ -147,7 +126,7 @@ function isTechlioHook(entry: unknown): boolean {
   return (
     text.includes(SCRIPT_NAME) ||
     text.includes("techlio-connector") ||
-    /--hook (claude_code|cursor|antigravity)\b/.test(text)
+    /--hook (claude_code|cursor|antigravity|windsurf|github_copilot|gemini|codex)\b/.test(text)
   );
 }
 
@@ -178,9 +157,7 @@ function installScript(): string {
   const dir = installDir();
   mkdirSync(dir, { recursive: true });
   const dest = join(dir, SCRIPT_NAME);
-  const source = bundledScript();
-  if (source && existsSync(source)) copyFileSync(source, dest);
-  else writeFileSync(dest, HOOK_SOURCE);
+  writeFileSync(dest, hookSource());
   chmodSync(dest, 0o755);
   return dest;
 }
@@ -273,35 +250,181 @@ function installCursor(scriptPath: string): void {
   writeJson(path, settings);
 }
 
-/** Point Claude Code, Cursor, and Antigravity at the local connector. Existing settings are kept. */
-export function ensureAgentHooks(): { claude: boolean; cursor: boolean; antigravity: boolean } {
+/** Windsurf / Devin Desktop Cascade hooks (docs.devin.ai/desktop/cascade/hooks). */
+const WINDSURF_EVENTS = [
+  "pre_user_prompt",
+  "post_cascade_response",
+  "pre_read_code",
+  "post_read_code",
+  "pre_write_code",
+  "post_write_code",
+  "pre_run_command",
+  "post_run_command",
+  "pre_mcp_tool_use",
+  "post_mcp_tool_use",
+] as const;
+
+function windsurfHooksPath(): string {
+  return join(homedir(), ".codeium", "windsurf", "hooks.json");
+}
+
+/** Installs only when Windsurf is present (~/.codeium/windsurf exists). */
+function installWindsurf(scriptPath: string): boolean {
+  if (!existsSync(join(homedir(), ".codeium", "windsurf"))) return false;
+  const path = windsurfHooksPath();
+  const settings = readJson(path);
+  const hooks = (settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {}) as Record<string, unknown>;
+  const entry = {
+    command: commandFor(scriptPath, "windsurf"),
+    powershell: powershellFor(scriptPath, "windsurf"),
+    show_output: false,
+  };
+  for (const eventName of WINDSURF_EVENTS) {
+    const existing = Array.isArray(hooks[eventName]) ? (hooks[eventName] as unknown[]) : [];
+    hooks[eventName] = [...existing.filter((e) => !isTechlioHook(e)), entry];
+  }
+  settings.hooks = hooks;
+  writeJson(path, settings);
+  return true;
+}
+
+/**
+ * GitHub Copilot agent hooks. Copilot CLI and VS Code agent mode both load
+ * ~/.copilot/hooks/*.json; the PascalCase event names are the format both read.
+ * The event is passed as an argument because Copilot CLI does not name it on stdin.
+ */
+const COPILOT_EVENTS = [
+  "SessionStart",
+  "SessionEnd",
+  "UserPromptSubmit",
+  "PreToolUse",
+  "PostToolUse",
+  "PostToolUseFailure",
+  "Stop",
+] as const;
+
+function copilotHooksPath(): string {
+  return join(homedir(), ".copilot", "hooks", "techlio-connector.json");
+}
+
+function installCopilot(scriptPath: string): boolean {
+  const path = copilotHooksPath();
+  mkdirSync(dirname(path), { recursive: true });
+  const hooks: Record<string, unknown> = {};
+  for (const eventName of COPILOT_EVENTS) {
+    hooks[eventName] = [
+      {
+        type: "command",
+        command: commandFor(scriptPath, "github_copilot", eventName),
+        powershell: powershellFor(scriptPath, "github_copilot", eventName),
+        timeout: 10,
+        timeoutSec: 10,
+      },
+    ];
+  }
+  // Our own file: rewritten whole on every start, removed on uninstall.
+  writeJson(path, { version: 1, hooks });
+  return true;
+}
+
+/** Gemini CLI hooks live in ~/.gemini/settings.json (Antigravity uses ~/.gemini/config/hooks.json). */
+const GEMINI_TOOL_EVENTS = ["BeforeTool", "AfterTool"] as const;
+const GEMINI_PLAIN_EVENTS = ["SessionStart", "SessionEnd", "BeforeModel", "AfterModel"] as const;
+
+function geminiSettingsPath(): string {
+  return join(homedir(), ".gemini", "settings.json");
+}
+
+function installGemini(scriptPath: string): boolean {
+  if (!existsSync(geminiSettingsPath()) && !onPath("gemini")) return false;
+  const path = geminiSettingsPath();
+  mkdirSync(dirname(path), { recursive: true });
+  const settings = readJson(path);
+  const hooks = (settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {}) as Record<string, unknown>;
+  const hook = { type: "command", name: "techlio-connector", command: commandFor(scriptPath, "gemini"), timeout: 5000 };
+  for (const eventName of [...GEMINI_TOOL_EVENTS, ...GEMINI_PLAIN_EVENTS]) {
+    const existing = Array.isArray(hooks[eventName]) ? (hooks[eventName] as unknown[]) : [];
+    const group = (GEMINI_TOOL_EVENTS as readonly string[]).includes(eventName)
+      ? { matcher: ".*", hooks: [hook] }
+      : { hooks: [hook] };
+    hooks[eventName] = [...existing.filter((e) => !isTechlioHook(e)), group];
+  }
+  settings.hooks = hooks;
+  writeJson(path, settings);
+  return true;
+}
+
+/** Codex CLI hooks (~/.codex/hooks.json). Codex asks the user to trust a new hook once via /hooks. */
+const CODEX_EVENTS = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"] as const;
+
+function codexHooksPath(): string {
+  return join(homedir(), ".codex", "hooks.json");
+}
+
+function installCodex(scriptPath: string): boolean {
+  if (!existsSync(join(homedir(), ".codex")) && !onPath("codex")) return false;
+  const path = codexHooksPath();
+  mkdirSync(dirname(path), { recursive: true });
+  const settings = readJson(path);
+  const hooks = (settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {}) as Record<string, unknown>;
+  const command = commandFor(scriptPath, "codex");
+  for (const eventName of CODEX_EVENTS) {
+    const existing = Array.isArray(hooks[eventName]) ? (hooks[eventName] as unknown[]) : [];
+    const group = eventName.includes("ToolUse")
+      ? { matcher: ".*", hooks: [{ type: "command", command }] }
+      : { hooks: [{ type: "command", command }] };
+    hooks[eventName] = [...existing.filter((e) => !isTechlioHook(e)), group];
+  }
+  settings.hooks = hooks;
+  writeJson(path, settings);
+  return true;
+}
+
+export interface AgentHookStatus {
+  claude: boolean;
+  cursor: boolean;
+  antigravity: boolean;
+  windsurf: boolean;
+  copilot: boolean;
+  gemini: boolean;
+  codex: boolean;
+}
+
+/**
+ * Points every supported AI agent on this computer at the local connector:
+ * Claude Code (also read by Devin CLI), Cursor, Antigravity, Windsurf,
+ * GitHub Copilot, Gemini CLI and Codex CLI. The user's own settings are kept;
+ * a tool whose config cannot be read is skipped, never overwritten.
+ */
+export function ensureAgentHooks(): AgentHookStatus {
   const scriptPath = isPackaged() ? process.execPath : installScript();
-  let claude = false;
-  let cursor = false;
-  try {
-    installClaude(scriptPath);
-    claude = true;
-  } catch {
-    claude = false;
-  }
-  try {
-    installCursor(scriptPath);
-    cursor = true;
-  } catch {
-    cursor = false;
-  }
-  let antigravity = false;
-  try {
-    antigravity = installAntigravity(scriptPath);
-  } catch {
-    antigravity = false;
-  }
-  return { claude, cursor, antigravity };
+  const attempt = (install: () => boolean | void): boolean => {
+    try {
+      return install() !== false;
+    } catch {
+      return false;
+    }
+  };
+  return {
+    claude: attempt(() => installClaude(scriptPath)),
+    cursor: attempt(() => installCursor(scriptPath)),
+    antigravity: attempt(() => installAntigravity(scriptPath)),
+    windsurf: attempt(() => installWindsurf(scriptPath)),
+    copilot: attempt(() => installCopilot(scriptPath)),
+    gemini: attempt(() => installGemini(scriptPath)),
+    codex: attempt(() => installCodex(scriptPath)),
+  };
 }
 
 /** Remove every hook this connector installed; user hooks are kept. */
 export function removeAgentHooks(): void {
-  for (const path of [join(homedir(), ".claude", "settings.json"), join(homedir(), ".cursor", "hooks.json")]) {
+  for (const path of [
+    join(homedir(), ".claude", "settings.json"),
+    join(homedir(), ".cursor", "hooks.json"),
+    windsurfHooksPath(),
+    geminiSettingsPath(),
+    codexHooksPath(),
+  ]) {
     if (!existsSync(path)) continue;
     let settings: Record<string, unknown>;
     try {
@@ -324,6 +447,11 @@ export function removeAgentHooks(): void {
       settings.env = env;
     }
     writeJson(path, settings);
+  }
+  try {
+    if (existsSync(copilotHooksPath())) unlinkSync(copilotHooksPath());
+  } catch {
+    /* already gone */
   }
   const ag = antigravityHooksPath();
   if (existsSync(ag)) {

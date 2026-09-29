@@ -5,7 +5,7 @@ model, analytics API, drill-down UI, role isolation, and realistic connected
 data. **Not** production Definition of Done: legal approval, a real provider
 pilot, production hardening, and the §19 live integration tests remain.
 
-**Gap list:** [pending.md](pending.md)
+**Gap list:** [backlog.md](backlog.md)
 
 ## Delivered in the monitoring refactor
 
@@ -257,3 +257,42 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
   - Vercel Cron 30 21 * * * → GET /v1/maintenance/retention (Bearer CRON_SECRET). `pnpm db:retention[:prod]`. Settings → Data & archive (CSV/JSON download, admins/auditors).
 - Verified on a 199k-event copy: 1,343/1,343 chart metrics identical after archiving 387 days; events table 473 MB → 20 MB; archive 6.9 MB (~41 B/event).
 - 016 = Supabase Data API lock-down (RLS on all tables, revoke anon/authenticated) — flagged for owner review.
+
+## 2026-09-29 connector detection, deployment to techlio1, full audit
+- Connector detection/permission UX: `LocalAccessHint` names the real cause (permission prompt,
+  denied, wrong site, not running); a server heartbeat keeps the dashboard unlocked.
+- Deployed on Vercel team `techlio1` (`ai-tracking` API, `ai-tracking-bhgg` web), env pushed,
+  domains `techlio-pulse.vercel.app` / `techlio-pulse-api.vercel.app`; removed from mahsam's Vercel.
+  (Note: the Supabase project in use is Tokyo `ap-northeast-1`, not Mumbai as logged on 2026-09-25.)
+- Full audit (commit `b7d9159`): today's sessions no longer 0, commits uncapped, idle gaps counted,
+  team time from the engine, fabricated zeros removed, connector polling storm fixed (~4,300 local
+  requests/min → coalesced poller), dashboard pause survives heartbeats (017), leak fixes (pg pool,
+  worker, connector, sw.js, ingest), super-admin drill-down links, AI Progress from the engine,
+  directory tool filter, exports honour team/tool, timezone display fixes, sessions link keeps the
+  range, dead code/deps/scripts removed, ~500 build files untracked.
+- `498cc29`: Install agent tab + steps show when no connector answers on this computer.
+
+## 2026-09-30 UI revamp, Appearance settings, documentation
+- Visual refresh (tokens, cards, glass header/sidebar, stat tiles, pill tabs); charts fill stretched
+  cards; `ChartFrame.minWidth` sideways scroll below 1024 px; `.grid > *` min-width fix (session page
+  overflow); Workday stat tiles; profile card redesign; two-up stat tiles on phones.
+- Settings → Appearance: theme, 5 accents (light + dark palettes), compact density, reduce motion,
+  display timezone, 12/24 h clock, default date range, live updates on/off.
+- Audit: no overflow at 390/768 px on every admin + developer page (headless Chrome).
+- `docs/Techlio-Pulse-Project-Documentation.pdf` (36 pages, 8 Mermaid diagrams).
+
+## 2026-09-30 more AI tools + Linux connector
+- Provider catalogue: `windsurf`, `devin` added; `codex`, `gemini`, `github_copilot` upgraded to
+  Tier A hook integrations. Filter + key-issuing dropdowns list all 9 tools (catalogue-driven).
+- Connector hooks: Windsurf/Devin Desktop Cascade hooks, GitHub Copilot `~/.copilot/hooks`
+  (CLI + VS Code agent mode), Gemini CLI `~/.gemini/settings.json`, Codex CLI `~/.codex/hooks.json`;
+  Devin CLI detected via `prompt_id` on the Claude hooks. `normalizeHookPayload` replaces three
+  duplicated normalisers (`hook/report-hook.mjs` removed; the standalone script is generated).
+  Tool categories learn `view`, `create`, `exec`. Companion installs into Windsurf/Antigravity
+  and maps their names (unknown editors → `vscode`, was `cursor`).
+- Linux: bun `linux-x64`/`linux-arm64` → `.tar.gz` (36 MB each), `install-connector-linux.sh`
+  (arch detect, SHA-256 verify, per-user), systemd user unit with XDG autostart fallback,
+  zenity/notify-send dialogs, setup page OS switcher with copyable command. Verified in Ubuntu 24.04.
+- Tests: connector 24 (hook normaliser per tool, privacy, installers in a temp HOME, generated
+  script end-to-end); event-schema 6; turbo 15/15.
+- Memory bank restructured into folders (this layout).

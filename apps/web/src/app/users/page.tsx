@@ -17,7 +17,7 @@ import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { apiPost } from "@/lib/api";
 import { ORG_ASSIGNABLE_ROLES, ROLE_LABEL } from "@/lib/permissions";
-import { providerLabel } from "@/lib/providers";
+import { ASSIGNABLE_AI_TOOLS, providerLabel } from "@/lib/providers";
 import {
   createUserInitialValues,
   createUserSchema,
@@ -43,11 +43,7 @@ const ROLE_TONE: Record<Role, "info" | "ok" | "neutral" | "warn"> = {
   super_admin: "warn",
 };
 
-const ASSIGNABLE_TOOLS = [
-  { id: "cursor", label: "Cursor companion (file and task signals)" },
-  { id: "claude_code", label: "Claude Code" },
-  { id: "vscode", label: "VS Code companion" },
-] as const;
+const ASSIGNABLE_TOOLS = ASSIGNABLE_AI_TOOLS.map((id) => ({ id, label: providerLabel(id) }));
 
 interface IssuedKey {
   displayName: string;

@@ -26,7 +26,15 @@ const META: Record<string, ProviderMeta> = {
     ink: "#92400e",
     note: "Observed through Claude Code hooks: agent turns, tool calls, file edits. Token totals need OpenTelemetry, not yet ingested.",
   },
-  codex: { id: "codex", label: "Codex", color: "#0d9488", soft: "#f0fdfa", ink: "#115e59" },
+  codex: {
+    id: "codex",
+    label: "Codex CLI",
+    shortLabel: "Codex",
+    color: "#0d9488",
+    soft: "#f0fdfa",
+    ink: "#115e59",
+    note: "Observed through Codex CLI hooks: sessions, agent turns, tool calls. Trust the hook once with /hooks in Codex. No token totals.",
+  },
   gemini: {
     id: "gemini",
     label: "Gemini CLI",
@@ -34,6 +42,7 @@ const META: Record<string, ProviderMeta> = {
     color: "#0ea5e9",
     soft: "#f0f9ff",
     ink: "#075985",
+    note: "Observed through Gemini CLI hooks: sessions, model calls with per-call timing, tool calls. No token totals.",
   },
   github_copilot: {
     id: "github_copilot",
@@ -42,7 +51,7 @@ const META: Record<string, ProviderMeta> = {
     color: "#64748b",
     soft: "#f8fafc",
     ink: "#334155",
-    note: "Tier B: GitHub reports aggregate per day, so session-level metrics are unavailable.",
+    note: "Observed through Copilot agent hooks (Copilot CLI and VS Code agent mode): sessions, agent turns, tool calls. Inline completions are not agent activity.",
   },
   antigravity: {
     id: "antigravity",
@@ -51,6 +60,23 @@ const META: Record<string, ProviderMeta> = {
     soft: "#f0fdf4",
     ink: "#166534",
     note: "Observed through Antigravity hooks: model invocations with per-call timing, tool calls. No token totals.",
+  },
+  windsurf: {
+    id: "windsurf",
+    label: "Windsurf",
+    color: "#0891b2",
+    soft: "#ecfeff",
+    ink: "#155e75",
+    note: "Observed through Windsurf (Devin Desktop) Cascade hooks: agent turns, file reads and writes, commands, MCP tools. No token totals.",
+  },
+  devin: {
+    id: "devin",
+    label: "Devin CLI",
+    shortLabel: "Devin",
+    color: "#334155",
+    soft: "#f1f5f9",
+    ink: "#1e293b",
+    note: "Observed through Devin CLI hooks: sessions, agent turns, tool calls. Devin cloud sessions run on Devin's machines and are not observed.",
   },
   vscode: {
     id: "vscode",
@@ -62,6 +88,23 @@ const META: Record<string, ProviderMeta> = {
     note: "Companion extension: file and task-context signals only.",
   },
 };
+
+/**
+ * AI tools an administrator can issue a connector key for, most common first.
+ * The connector observes every supported tool on the computer either way; the
+ * key's tool is the label its reports carry until another tool is seen.
+ */
+export const ASSIGNABLE_AI_TOOLS = [
+  "claude_code",
+  "cursor",
+  "github_copilot",
+  "windsurf",
+  "antigravity",
+  "gemini",
+  "codex",
+  "devin",
+  "vscode",
+] as const;
 
 const FALLBACK: ProviderMeta = {
   id: "unknown",

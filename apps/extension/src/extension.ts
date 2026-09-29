@@ -26,10 +26,12 @@ const EDIT_THROTTLE_MS = 30_000;
 const SESSION_PULSE_MS = 120_000;
 
 function hostProvider(): string {
+  // Mirrors providerFromHostApp in @techlio/event-schema.
   const name = vscode.env.appName.toLowerCase();
   if (name.includes("cursor")) return "cursor";
-  if (name.includes("visual studio code")) return "vscode";
-  return "cursor";
+  if (name.includes("windsurf") || name.includes("devin")) return "windsurf";
+  if (name.includes("antigravity")) return "antigravity";
+  return "vscode";
 }
 
 function workspaceName(uri?: vscode.Uri): string {

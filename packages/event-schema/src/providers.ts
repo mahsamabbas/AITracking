@@ -7,6 +7,8 @@ export const Providers = {
   github_copilot: "github_copilot",
   vscode: "vscode",
   antigravity: "antigravity",
+  windsurf: "windsurf",
+  devin: "devin",
 } as const;
 
 /** Every provider id the API accepts on registration, heartbeats, and events. */
@@ -49,21 +51,25 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
   },
   codex: {
     id: "codex",
-    label: "Codex",
+    label: "Codex CLI",
     tier: "A",
-    hourly: false,
-    missing: ["session_boundaries", "model_request", "tool_calls", "token_totals", "hourly_summary"],
-    emptyState: "Codex telemetry is not connected in this release.",
-    note: "Planned Tier A adapter; the connector currently rejects OTLP rather than discarding it.",
+    hourly: true,
+    // Codex hooks bracket each turn and tool call; no token totals on stdin.
+    missing: ["token_totals", "model_call_timing"],
+    emptyState: "Codex hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Codex CLI hooks (~/.codex/hooks.json): sessions, agent turns (prompt → stop), and tool calls. Codex asks you to trust a new hook once with /hooks before it runs.",
   },
   gemini: {
     id: "gemini",
     label: "Gemini CLI",
     tier: "A",
-    hourly: false,
-    missing: ["session_boundaries", "model_request", "tool_calls", "token_totals", "hourly_summary"],
-    emptyState: "Gemini telemetry is not connected in this release.",
-    note: "Planned Tier A adapter; no Gemini event adapter is enabled.",
+    hourly: true,
+    // BeforeModel / AfterModel wrap every model call, so per-call timing is real.
+    missing: ["token_totals"],
+    emptyState: "Gemini CLI hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Gemini CLI hooks (~/.gemini/settings.json): sessions, model calls with per-call timing, tool calls, and model names.",
   },
   cursor: {
     id: "cursor",
@@ -79,17 +85,13 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
   github_copilot: {
     id: "github_copilot",
     label: "GitHub Copilot",
-    tier: "B",
-    hourly: false,
-    missing: [
-      "session_boundaries",
-      "model_request",
-      "tool_calls",
-      "hourly_summary",
-    ],
+    tier: "A",
+    hourly: true,
+    missing: ["token_totals", "model_call_timing"],
     emptyState:
-      "Provider does not expose this metric. Copilot organization reports are daily-only.",
-    note: "Tier B: GitHub reports aggregate per day, so hourly and session metrics are unavailable.",
+      "Copilot agent hooks do not report token totals. Inline completions are not agent activity and are not observed.",
+    note:
+      "Observed through GitHub Copilot agent hooks (~/.copilot/hooks), used by Copilot CLI and VS Code agent mode: sessions, agent turns, and tool calls. Organisation daily reports add request counts when a GitHub token is configured.",
   },
   antigravity: {
     id: "antigravity",
@@ -103,6 +105,27 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
       "Antigravity hooks do not report token totals. They are unavailable, not zero.",
     note:
       "Observed through Antigravity hooks (~/.gemini/config/hooks.json): model invocations with per-call timing, tool calls, and model names. No token totals.",
+  },
+  windsurf: {
+    id: "windsurf",
+    label: "Windsurf",
+    tier: "A",
+    hourly: true,
+    // Cascade hooks wrap each tool action; the turn runs from prompt to response.
+    missing: ["token_totals", "model_call_timing"],
+    emptyState: "Windsurf Cascade hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Windsurf (Devin Desktop) Cascade hooks (~/.codeium/windsurf/hooks.json): agent turns (prompt → response), file reads and writes, commands, MCP tool calls, and model names.",
+  },
+  devin: {
+    id: "devin",
+    label: "Devin CLI",
+    tier: "A",
+    hourly: true,
+    missing: ["token_totals", "model_call_timing"],
+    emptyState: "Devin CLI hooks do not report token totals. They are unavailable, not zero.",
+    note:
+      "Observed through Devin CLI lifecycle hooks: sessions, agent turns, and tool calls. Devin cloud sessions run on Devin's own machines and are not observed by the connector.",
   },
   vscode: {
     id: "vscode",
@@ -130,8 +153,9 @@ export function providerCapability(id: string | undefined): ProviderCapability |
 export function providerFromHostApp(appName: string | undefined): ProviderId {
   const n = (appName ?? "").toLowerCase();
   if (n.includes("cursor")) return "cursor";
-  if (n.includes("visual studio code") || n === "vscode") return "vscode";
-  if (n.includes("claude")) return "claude_code";
+  if (n.includes("windsurf") || n.includes("devin")) return "windsurf";
   if (n.includes("antigravity")) return "antigravity";
-  return "cursor";
+  if (n.includes("claude")) return "claude_code";
+  // VS Code and other VS Code–based editors report as the VS Code companion.
+  return "vscode";
 }

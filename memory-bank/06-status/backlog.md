@@ -1,7 +1,7 @@
 # Pending work vs PRD v0.2
 
-Source: [requirements.md](requirements.md) · Audit: [docs/PRODUCTION_TRUTH_AUDIT.md](../docs/PRODUCTION_TRUTH_AUDIT.md)
-Last reviewed: 2026-09-24.
+Source: [../05-requirements/prd-v0.2.md](../05-requirements/prd-v0.2.md) · Audit: [docs/PRODUCTION_TRUTH_AUDIT.md](../../docs/PRODUCTION_TRUTH_AUDIT.md)
+Last reviewed: 2026-09-30.
 
 Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 (needs an external decision, purchase, or evidence). Nothing is "partial".
@@ -19,10 +19,10 @@ Every item is **Done**, **Open** (engineering, can be built), or **Blocked**
 | §19 live integration tests (offline queue, heartbeat stop, pause, late event, invalid signature, replay, provider-missing UI) in CI | **Open** | `ai-progress.live.test.ts` and `tier-b.live.test.ts` cover connector → API → dashboard for Claude/Cursor/Antigravity and Tier B (`LIVE_STACK=1`); not yet in CI, and offline/replay/signature cases remain |
 | Production database behind deployed code (2026-09-23) | **Done** | Verified 2026-09-24: migrations 001–012 applied in production |
 | Remove seeded demo people from production | **Blocked — owner action** | Dry run done 2026-09-24 (12 `@techlio.local` + `random@techlio.com`). Run `node scripts/purge-demo-data.mjs --production --keep talha,bilal,rizwan,hassan --confirm` |
-| Apply migrations 013–014 in production + create the platform super admin | **Blocked — owner action** | `pnpm db:migrate:prod` (paste the Neon URL when asked), then `pnpm admin:create --super --email <platform email>`. Deploy the API after the migration, then reinstall connectors (commit watcher, agent-only file changes) |
-| UI consistency sweep of every page (spacing, typography, states, responsive) | **Open** | Not done page-by-page in the 2026-09-24 pass; data/analytics integrity and Verify & ship were prioritised |
-| Custom date range sent as UTC midnight from the web (`rangeParams`) | **Open** | Presets are timezone-correct; custom from/to should be resolved in the org timezone server-side |
-| Rotate the Neon database password | **Blocked — owner action** | Shared in a chat session 2026-09-24; rotate in Neon, update Vercel env |
+| Apply migrations 013–014 in production + create the platform super admin | **Done (migrations)** — 17/17 applied on Supabase 2026-09-29; super admin still an owner action | `pnpm db:migrate:prod` (paste the Neon URL when asked), then `pnpm admin:create --super --email <platform email>`. Deploy the API after the migration, then reinstall connectors (commit watcher, agent-only file changes) |
+| UI consistency sweep of every page (spacing, typography, states, responsive) | **Done 2026-09-30 — not yet deployed** | Not done page-by-page in the 2026-09-24 pass; data/analytics integrity and Verify & ship were prioritised |
+| Custom date range sent as UTC midnight from the web (`rangeParams`) | **Done 2026-09-29** — calendar dates resolved in the reporting timezone | Presets are timezone-correct; custom from/to should be resolved in the org timezone server-side |
+| Rotate the Supabase DB password + secret key | **Blocked — owner action** | Shared in chat 2026-09-29 (Neon is no longer used). Steps in [../04-operations/security.md](../04-operations/security.md) |
 | Real administrator in production | **Blocked — owner action** | Only `admin@techlio.local` exists; `pnpm admin:create --email …` then disable the demo admin |
 | TLS + managed encryption at rest for Postgres, Redis, backups, exports (SEC-003) | **Blocked — infrastructure** | Neon/Vercel provide TLS + at-rest encryption; needs written confirmation and a backup-encryption decision |
 | SSO/OIDC (FR-001) | **Open** | ~3–5 d; password login remains, now scrypt-hashed |
@@ -50,15 +50,15 @@ purge script (`scripts/purge-demo-data.mjs`).
 | Cursor Tier B rows freeze at first pull of the day (id = hash(day,user), insert-or-ignore) | High | Upsert Tier B rows or only ingest closed days |
 | Sessionization reloads the whole session per event (≈8 queries) | High (scale) | Recompute once per session per batch |
 | Claude Code run inside Cursor's terminal labelled Cursor | Medium | Decide by payload shape (`transcript_path`) not env vars |
-| Org timezone vs UTC day keys; "today" computed in UTC (`range.ts`) | Medium | Use `organizations.timezone` everywhere |
-| Concurrent sessions summed can exceed wall-clock time | Medium | Merge intervals per person for totals |
+| ~~Org timezone vs UTC day keys; "today" computed in UTC (`range.ts`)~~ **Done 2026-09-29** | Medium | Use `organizations.timezone` everywhere |
+| ~~Concurrent sessions summed can exceed wall-clock time~~ **Done** (event-time engine merges per person) | Medium | Merge intervals per person for totals |
 | Late-event recalc race / missing snapshot never recalculated | Medium | Unique `(org,dev,hour,version)`, debounce |
 | AiProgressPanel shows 0 for providers whose catalog lists the metric missing | Medium | Show "Not available from provider" |
-| `listRecentEvents` sorts on unindexed `received_at`; no `(org, occurred_at)` index | Medium (scale) | Add indexes via migration 013 |
+| ~~No `(org, occurred_at)` index~~ **Done** (013) | Medium (scale) | Add indexes via migration 013 |
 | Windows in-place upgrade silently keeps the old exe (file locked) | Medium | Stop task → copy → start; report failure |
 | Queue has no size cap and rewrites the file on each enqueue | Low | Cap + append-only |
-| CSV export silently truncated at 5000 events | Low | Say so in the file |
-| Project name lookup lacks org filter in session detail | Low | Add `organization_id` predicate |
+| ~~CSV export silently truncated at 5000 events~~ **Done 2026-09-29** (file says so) | Low | Say so in the file |
+| ~~Project name lookup lacks org filter in session detail~~ **Done** | Low | Add `organization_id` predicate |
 
 ## P1 — MVP product behaviour
 
@@ -84,7 +84,7 @@ purge script (`scripts/purge-demo-data.mjs`).
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Connector as a real per-user service (macOS LaunchAgent, Windows task w/ restart, Linux systemd) | **Done in code** | macOS `.pkg` → `/Library/LaunchAgents`, no app/Dock icon; verified per-user install, crash restart, hook delivery on macOS (2026-09-23). Windows exe is GUI-subsystem (no console), hidden task + Run-key fallback + Settings → Apps entry — needs a run on a clean Windows machine, and the signed `.pkg` |
+| Connector as a real per-user service (macOS LaunchAgent, Windows task w/ restart, Linux systemd) | **Done** — Linux installer added and verified in Ubuntu 24.04 (2026-09-30) | macOS `.pkg` → `/Library/LaunchAgents`, no app/Dock icon; verified per-user install, crash restart, hook delivery on macOS (2026-09-23). Windows exe is GUI-subsystem (no console), hidden task + Run-key fallback + Settings → Apps entry — needs a run on a clean Windows machine, and the signed `.pkg` |
 | Windows SCM service (LocalSystem) instead of per-user logon task | **Open — decision** | Would need a per-user helper for hooks/DPAPI; only if IT requires a service visible in services.msc |
 | OS credential store for connector secrets | **Done** | Keychain / DPAPI / Secret Service, 0600 fallback |
 | Connector tray / menu-bar health UI | **Done in code** | macOS Swift menu-bar app; Windows PowerShell/WinForms tray (`--tray`, own logon task). Both: pause/resume, stop/start with confirmation, dashboard, log. Windows tray untested on a real Windows machine |
@@ -98,7 +98,23 @@ purge script (`scripts/purge-demo-data.mjs`).
 | WCAG 2.1 AA automated checks + review (NFR-007) | **Open** | |
 | IaC, environment separation, DR drills (NFR-008) | **Open** | Runbook exists; drills not executed |
 | Remaining ADRs (identity, privacy, storage, sessionization, hourly, live updates) | **Open** | |
-| Codex / Gemini adapters | **Deferred** | Only after Claude Code passes the pilot |
+| Codex / Gemini adapters | **Done 2026-09-30 (not deployed)** | Hook integrations; plus Windsurf, GitHub Copilot hooks, Devin CLI — see [../02-connector/ai-tool-integrations.md](../02-connector/ai-tool-integrations.md) |
+
+## Added 2026-09-30
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Commit + deploy the UI revamp, new AI-tool hooks, Linux connector | **Open — owner go-ahead** | Everyone reinstalls the connector afterwards |
+| Restrict CORS to dashboard origins | **Open** | `app.enableCors()` is open today |
+| Login rate limiting / lockout | **Open** | None today |
+| Move installers out of git (LFS or release assets) | **Open** | Windows exe ~96 MB, close to GitHub's 100 MB limit |
+| Deploy the worker (Redis) for Tier B pulls (Cursor, Copilot) | **Open — decision** | Would also host a Devin cloud API puller (`api.devin.ai/v1/sessions`) |
+| Cline and Kiro integrations | **Deferred** | Their hook formats were mid-migration on 2026-09-30 |
+| Overview "Right now" panel ignores team filter | **Open** | |
+| Web tests (Playwright) incl. super-admin drill-down; migrate `next lint` → ESLint CLI; Next.js upgrade | **Open** | |
+| Staging environment with its own DB | **Open** | Previews share prod, migrations only on production |
+| Confirm first production retention run + DB size alert | **Open** | Due 2026-09-30 21:30 UTC |
+| SSE/WebSocket for live panels | **Deferred** | 30 s polling is adequate today |
 
 ---
 

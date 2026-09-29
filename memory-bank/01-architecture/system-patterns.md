@@ -35,3 +35,25 @@
     own developer; Tier B only from `provider_pull` devices; events are validated
     one by one.
 
+15. **One time source.** Every displayed time goes through the event-time engine
+    (`activityTimeline` / `withEventTime`). See [analytics-engine.md](analytics-engine.md).
+16. **The provider catalogue is the single list of AI tools.**
+    `packages/event-schema/src/providers.ts` drives key validation, the filter dropdowns
+    (`/v1/meta/filters`), connector capability reports, and (via `ASSIGNABLE_AI_TOOLS` +
+    colours in `apps/web/src/lib/providers.ts`) the key-issuing dropdown. Adding a tool = add it
+    there first, then its hook installer in the connector.
+17. **Hook payloads are normalised inside the hook process.** `normalizeHookPayload`
+    (`apps/connector/src/hook-payload.ts`) keeps names, ids, workspace folder and the path of a
+    written file only — never prompts, arguments, diffs, commands or responses. It is
+    self-contained because its source is written verbatim as the standalone `report-hook.mjs`;
+    a test enforces that.
+18. **Never overwrite a user's tool config.** Hook installers read → merge → atomic write, replace
+    only their own entries (`isTechlioHook`), skip unreadable files, and remove only their own
+    entries on uninstall.
+19. **Dashboard pause wins, local pause stays.** `paused = GREATEST(local, remote)`; the dashboard
+    can never lift a pause the developer set.
+20. **Install UI follows this computer.** A recent server heartbeat keeps the dashboard unlocked,
+    but the Install agent tab/steps depend only on a local connector answer.
+21. **Polling, not sockets, with limits.** `useApi` polls only while the tab is visible and the
+    range includes today; one coalesced poller for the local connector; the *Live updates*
+    preference can turn polling off.

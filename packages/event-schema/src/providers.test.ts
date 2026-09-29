@@ -15,20 +15,22 @@ describe("providerFromHostApp", () => {
     expect(providerFromHostApp("Visual Studio Code")).toBe("vscode");
   });
 
-  it("does not claim unavailable adapters provide hourly telemetry", () => {
-    expect(providerCapability("codex")?.hourly).toBe(false);
-    expect(providerCapability("gemini")?.hourly).toBe(false);
+  it("maps Windsurf / Devin Desktop and unknown VS Code forks", () => {
+    expect(providerFromHostApp("Windsurf")).toBe("windsurf");
+    expect(providerFromHostApp("Devin Desktop")).toBe("windsurf");
+    expect(providerFromHostApp("Some VS Code fork")).toBe("vscode");
+  });
+
+  it("lists every hook-based agent as Tier A with hourly telemetry", () => {
+    for (const id of ["codex", "gemini", "github_copilot", "windsurf", "devin"]) {
+      expect(providerCapability(id)).toMatchObject({ tier: "A", hourly: true });
+    }
   });
 
   it("never claims token totals from hook-only providers", () => {
-    // Claude Code and Cursor hooks carry no token counts; the connector's OTLP
-    // routes reject telemetry, so tokens must read as unavailable, not zero.
-    expect(providerCapability("claude_code")?.missing).toContain("token_totals");
-    expect(providerCapability("cursor")?.missing).toContain("token_totals");
-  });
-
-  it("marks daily-report providers as Tier B without session metrics", () => {
-    expect(providerCapability("github_copilot")).toMatchObject({ tier: "B", hourly: false });
-    expect(providerCapability("github_copilot")?.missing).toContain("session_boundaries");
+    // Agent hooks carry no token counts, so tokens must read as unavailable, not zero.
+    for (const id of ["claude_code", "cursor", "codex", "gemini", "github_copilot", "windsurf", "devin"]) {
+      expect(providerCapability(id)?.missing).toContain("token_totals");
+    }
   });
 });

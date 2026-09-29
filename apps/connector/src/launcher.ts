@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname } from "node:path";
+import { normalizeHookPayload } from "./hook-payload.js";
 
 /**
  * Downloadable connector: start the agent immediately, then keep it running
@@ -7,31 +8,13 @@ import { dirname } from "node:path";
  *
  * Two extra modes let the same executable act as the IDE hook runner, so the
  * download works even when Node.js is not installed:
- *   <exe> --hook [fallbackProvider]   read a hook payload on stdin and report it
+ *   <exe> --hook <provider> [event]    read a hook payload on stdin and report it
  *   <exe> --service                    run in the background without re-installing
  *   <exe> --status                     print local connector health
  *   <exe> --uninstall [--purge]        remove the service and hooks (and credentials with --purge)
  */
-function detectProvider(fallback: string): string {
-  // Only Antigravity reads ~/.gemini/config/hooks.json, so its explicit
-  // argument is trusted even when launched from a Claude Code terminal.
-  if (fallback === "antigravity") return "antigravity";
-  // Cursor markers win first — Cursor also runs Claude-format hooks, and real
-  // Claude Code never sets CURSOR_* — so Cursor work is never seen as Claude.
-  if (
-    process.env.CURSOR_AGENT ||
-    process.env.CURSOR_CONVERSATION_ID ||
-    process.env.CURSOR_TRACE_ID ||
-    process.env.CURSOR_REQUEST_ID
-  ) {
-    return "cursor";
-  }
-  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT) return "claude_code";
-  return fallback;
-}
-
 async function runHook(): Promise<void> {
-  const fallback = process.argv[process.argv.indexOf("--hook") + 1] || "claude_code";
+  const at = process.argv.indexOf("--hook");
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
   let raw: Record<string, unknown> = {};
@@ -40,59 +23,20 @@ async function runHook(): Promise<void> {
   } catch {
     raw = {};
   }
-  const roots = Array.isArray(raw.workspace_roots)
-    ? (raw.workspace_roots as unknown[])
-    : Array.isArray(raw.workspacePaths)
-      ? (raw.workspacePaths as unknown[])
-      : [];
-  // Antigravity: only toolCall.name is read; toolCall.args never leaves here.
-  const toolCall =
-    raw.toolCall && typeof raw.toolCall === "object" ? (raw.toolCall as Record<string, unknown>) : {};
-  // Claude Code nests the edited file under tool_input. Only the path of a
-  // file an agent wrote is read — never tool_input content, commands, or diffs.
-  const toolInput =
-    raw.tool_input && typeof raw.tool_input === "object" ? (raw.tool_input as Record<string, unknown>) : {};
-  const editedPath = ["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(raw.tool_name as string)
-    ? toolInput.file_path ?? toolInput.notebook_path
-    : undefined;
-  // Antigravity does not name the event on stdin; the installer passes it after the provider.
-  const argEvent = process.argv[process.argv.indexOf("--hook") + 2];
-  const cwd =
-    typeof raw.cwd === "string"
-      ? raw.cwd
-      : typeof roots[0] === "string"
-        ? (roots[0] as string)
-        : undefined;
-  const body = {
-    provider: detectProvider(
-      fallback === "cursor" || fallback === "claude_code" || fallback === "antigravity" ? fallback : "claude_code",
-    ),
-    hook_event_name: raw.hook_event_name ?? argEvent,
-    session_id:
-      (raw.session_id as string) ||
-      (raw.conversation_id as string) ||
-      (raw.conversationId as string) ||
-      (raw.generation_id as string) ||
-      process.env.CURSOR_CONVERSATION_ID,
-    tool_name: (raw.tool_name as string) || (raw.tool as string) || (toolCall.name as string),
-    // Opaque per-call id: pairs a tool's start and end and keeps parallel calls apart.
-    tool_use_id: (raw.tool_use_id as string) || (raw.toolUseId as string) || (toolCall.id as string),
-    cwd,
-    file_path:
-      typeof raw.file_path === "string" ? raw.file_path : typeof editedPath === "string" ? editedPath : undefined,
-    model: (raw.model as string) || (raw.model_name as string) || (raw.modelName as string),
-    status: raw.status ?? (typeof raw.error === "string" && raw.error ? "failed" : undefined),
-  };
-  try {
-    // This OS user's own connector (port recorded per user; see port.ts).
-    const { userPort } = await import("./port.js");
-    await fetch(`http://127.0.0.1:${userPort()}/hooks/agent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    /* connector may be starting up; the next event will report */
+  // The installer passes the tool (and, where stdin lacks it, the event name).
+  const body = normalizeHookPayload(raw, process.argv[at + 1], process.argv[at + 2], process.env);
+  if (body) {
+    try {
+      // This OS user's own connector (port recorded per user; see port.ts).
+      const { userPort } = await import("./port.js");
+      await fetch(`http://127.0.0.1:${userPort()}/hooks/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      /* connector may be starting up; the next event will report */
+    }
   }
   process.stdout.write("{}\n");
 }

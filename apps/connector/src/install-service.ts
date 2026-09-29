@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, platform, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { removeAgentHooks } from "./agent-hooks.js";
 import { deleteSecret } from "./secret-store.js";
 import { userPort } from "./port.js";
@@ -306,16 +306,46 @@ WantedBy=default.target
   );
   const reload = spawnSync("systemctl", ["--user", "daemon-reload"], QUIET);
   const enable = spawnSync("systemctl", ["--user", "enable", "--now", LINUX_UNIT], QUIET);
-  return reload.status === 0 && enable.status === 0;
+  if (reload.status === 0 && enable.status === 0) return true;
+  // No systemd user session (WSL, some minimal desktops): start at sign-in
+  // through the XDG autostart folder instead, and start it now for this session.
+  try {
+    mkdirSync(dirname(linuxAutostartPath()), { recursive: true });
+    writeFileSync(
+      linuxAutostartPath(),
+      `[Desktop Entry]
+Type=Application
+Name=Techlio Connector
+Comment=Techlio AI activity connector (background service)
+Exec="${dest}" --service
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+`,
+    );
+    startDetached(dest);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function linuxAutostartPath(): string {
+  return join(homedir(), ".config", "autostart", "techlio-connector.desktop");
 }
 
 function unregisterLinux(): void {
   spawnSync("systemctl", ["--user", "disable", "--now", LINUX_UNIT], QUIET);
   if (existsSync(linuxUnitPath())) unlinkSync(linuxUnitPath());
+  if (existsSync(linuxAutostartPath())) unlinkSync(linuxAutostartPath());
   spawnSync("systemctl", ["--user", "daemon-reload"], QUIET);
+  // A copy started for the session (autostart fallback) is stopped too.
+  spawnSync("pkill", ["-f", `${installDir()}/techlio-connector --service`], QUIET);
 }
 
 // ------------------------------------------------------------ companions ---
+
+/** Editor CLIs the IDE companion extension is installed through. */
+const COMPANION_CLIS = ["cursor", "code", "windsurf", "antigravity"] as const;
 
 function which(cmd: string): boolean {
   const probe = platform() === "win32" ? "where" : "which";
@@ -330,7 +360,8 @@ function connectIdes(): void {
     return; // companion is optional
   }
   if (!existsSync(file)) return;
-  for (const cmd of ["cursor", "code"]) {
+  // VS Code and the VS Code–based editors that ship a CLI (Windsurf, Antigravity).
+  for (const cmd of COMPANION_CLIS) {
     if (!which(cmd)) continue;
     // On Windows both CLIs are .cmd shims, which only run through a shell.
     const result = spawnSync(cmd, ["--install-extension", file, "--force"], {
@@ -385,6 +416,13 @@ function announce(message: string, isError = false): void {
       .join(" + [Environment]::NewLine + ");
     const ps = `Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show((${text}), 'Techlio Connector', 'OK', '${isError ? "Warning" : "Information"}') | Out-Null`;
     spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps], QUIET);
+  } else if (os === "linux" && (process.env.DISPLAY || process.env.WAYLAND_DISPLAY)) {
+    // Started from a file manager: a desktop dialog if available, else a notification.
+    if (which("zenity")) {
+      spawnSync("zenity", [isError ? "--warning" : "--info", "--title=Techlio Connector", `--text=${message}`], QUIET);
+    } else if (which("notify-send")) {
+      spawnSync("notify-send", ["Techlio Connector", message], QUIET);
+    }
   }
 }
 
@@ -438,7 +476,9 @@ export async function installBackgroundService(): Promise<void> {
       ? `Techlio connector is running in the background (v${health.version}). There is no window to keep open; it starts automatically when you sign in.\n\n${
           os === "win32"
             ? "Its icon is next to the clock (click ^ if hidden): right-click it to pause, stop, or start collection."
-            : "Its icon is in the menu bar: click it to pause, stop, or start collection."
+            : os === "linux"
+              ? `Pause or resume it from My connectors in the dashboard. Check it any time with: ${dest} --status`
+              : "Its icon is in the menu bar: click it to pause, stop, or start collection."
         }\n\n${next}`
       : `Techlio connector is running in the background for this session, but this computer did not allow it to start automatically at sign-in. Ask IT to allow it.\n\n${next}`,
   );
@@ -451,7 +491,7 @@ export function uninstallBackgroundService(options: { purgeData?: boolean } = {}
   else unregisterLinux();
   removeAgentHooks();
   // The IDE companion extension installed alongside the connector.
-  for (const cmd of ["cursor", "code"]) {
+  for (const cmd of COMPANION_CLIS) {
     if (which(cmd)) spawnSync(cmd, ["--uninstall-extension", COMPANION_EXTENSION_ID], { ...QUIET, shell: os === "win32" });
   }
   if (options.purgeData) {

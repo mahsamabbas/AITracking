@@ -163,6 +163,16 @@ export async function connectorFetch(path: string, init?: RequestInit): Promise<
 export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
 /** Installer package: sets the connector up as a background LaunchAgent (no app, no Dock icon). */
 export const CONNECTOR_MAC_PKG = "/downloads/techlio-connector-macos.pkg";
+/** Linux: a one-line installer (picks the CPU, verifies the checksum) plus the raw archives. */
+export const CONNECTOR_LINUX_SCRIPT = "/install-connector-linux.sh";
+export const CONNECTOR_LINUX_X64 = "/downloads/techlio-connector-linux-x64.tar.gz";
+export const CONNECTOR_LINUX_ARM64 = "/downloads/techlio-connector-linux-arm64.tar.gz";
+
+/** Terminal command that installs the Linux connector from this dashboard. */
+export function linuxInstallCommand(): string {
+  const origin = typeof window === "undefined" ? "https://techlio-pulse.vercel.app" : window.location.origin;
+  return `curl -fsSL ${origin}${CONNECTOR_LINUX_SCRIPT} | TECHLIO_SITE=${origin} sh`;
+}
 
 const sharedHealth = shared(async () => {
   try {
@@ -199,11 +209,16 @@ export function useConnectorOnline(pollMs = 8_000): {
 
 export { connectorFoundLocally, showConnectorInstallStepper, useConnectorSetupPhase } from "./connector-setup";
 
-export function detectConnectorPlatform(): "mac" | "windows" | "other" {
+export type ConnectorPlatform = "mac" | "windows" | "linux" | "other";
+
+export function detectConnectorPlatform(): ConnectorPlatform {
   if (typeof navigator === "undefined") return "other";
   const ua = navigator.userAgent;
   if (/Win/i.test(ua)) return "windows";
+  if (/Android/i.test(ua)) return "other";
   if (/Mac|iPhone|iPad/i.test(ua)) return "mac";
+  // Ubuntu, Fedora, Debian, … and ChromeOS's Linux environment.
+  if (/Linux|X11|CrOS/i.test(ua)) return "linux";
   return "other";
 }
 

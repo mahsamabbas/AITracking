@@ -33,14 +33,16 @@ export function DonutChart({
   const pieData = data.filter((d) => d.value > 0);
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
   return (
-    <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative mx-auto w-full min-w-0 max-w-[280px] flex-1 sm:mx-0 sm:min-w-[160px]">
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
+      <div className="relative mx-auto w-full min-w-0 max-w-[280px] shrink-0 sm:min-w-[160px]">
         <ChartFrame height={height} isEmpty={total === 0} emptyBody={emptyBody} emptyVariant={emptyVariant}>
           <PieChart>
             <Pie {...anim}
               data={pieData}
               dataKey="value"
               nameKey="name"
+              cx="50%"
+              cy="50%"
               innerRadius="62%"
               outerRadius="92%"
               paddingAngle={pieData.length > 1 ? 2 : 0}
@@ -83,7 +85,7 @@ export function DonutChart({
       {total > 0 || data.some((d) => d.value === 0) ? (
         // Legend wraps under the donut in narrow cards instead of truncating names.
         <ul
-          className={`w-full min-w-0 space-y-2 sm:min-w-[210px] sm:flex-1 ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
+          className={`w-full min-w-0 max-w-md space-y-2 sm:min-w-[210px] sm:max-w-none sm:flex-1 sm:basis-[210px] ${data.length > 8 ? "scroll-y-sm pr-1" : ""}`}
         >
           {data.map((d, i) => {
             const color = d.color ?? CHART_COLORS[i % CHART_COLORS.length];
