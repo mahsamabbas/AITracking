@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { PACKAGED_API_URL } from "./production-hosts.js";
 import { userPort } from "./port.js";
 
 /** Optional local env for API URL / port — identity is claimed, not stored here. */
@@ -38,7 +39,7 @@ loadLocalEnv();
 export const config = {
   /** Per-user port (see port.ts); may be moved at startup if another user holds it. */
   port: userPort(),
-  apiBaseUrl: process.env.TECHLIO_API_URL ?? "https://techlio-pulse-api.vercel.app",
+  apiBaseUrl: process.env.TECHLIO_API_URL ?? PACKAGED_API_URL,
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
   provider: process.env.TECHLIO_PROVIDER ?? "cursor",

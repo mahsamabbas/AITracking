@@ -4,6 +4,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -13,6 +14,7 @@ import { join } from "node:path";
 import { removeAgentHooks } from "./agent-hooks.js";
 import { deleteSecret } from "./secret-store.js";
 import { userPort } from "./port.js";
+import { PACKAGED_API_URL, PACKAGED_DASHBOARD_ORIGIN, PACKAGED_DASHBOARD_ORIGINS } from "./production-hosts.js";
 
 /**
  * Registers the connector as a per-user background service so it starts at
@@ -40,10 +42,9 @@ const WIN_TASK = "TechlioConnector";
 const LINUX_UNIT = "techlio-connector.service";
 
 // Defaults baked into the packaged build; overridable at install time.
-const API_URL = process.env.TECHLIO_API_URL ?? "https://techlio-pulse-api.vercel.app";
-// First entry is the dashboard people open; the rest stay trusted during the move.
-const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://techlio-pulse.vercel.app,https://ai-tracking-bhgg.vercel.app,https://ai-tracking-bhgg-techlio1.vercel.app,https://ai-tracking-bhgg-*-techlio1.vercel.app,https://tracking-app-api-t9yd.vercel.app";
-export const DASHBOARD_URL = DASHBOARD.split(",")[0];
+const API_URL = process.env.TECHLIO_API_URL ?? PACKAGED_API_URL;
+const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? PACKAGED_DASHBOARD_ORIGINS;
+export const DASHBOARD_URL = DASHBOARD.split(",")[0] ?? PACKAGED_DASHBOARD_ORIGIN;
 const VSIX_URL = `${DASHBOARD_URL}/downloads/techlio-companion.vsix`;
 const WIN_TRAY_TASK = "TechlioConnectorTray";
 /** publisher.name of apps/extension (the IDE companion). */
@@ -77,20 +78,34 @@ function exeName(): string {
   return platform() === "win32" ? "techlio-connector.exe" : "techlio-connector";
 }
 
+function parseEnvFile(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq < 1) continue;
+    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+/** Always refresh dashboard/API URLs so an upgrade matches the installer that was just deployed. */
 function writeEnv(dir: string): void {
-  const envPath = join(dir, ".env");
-  if (existsSync(envPath)) return;
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
-  writeFileSync(
-    envPath,
-    [
-      `TECHLIO_API_URL=${API_URL}`,
-      `TECHLIO_DASHBOARD_ORIGINS=${DASHBOARD}`,
-      `CONNECTOR_DB=${join(dataDir(), "queue.db")}`,
-      "",
-    ].join(platform() === "win32" ? "\r\n" : "\n"),
-    { mode: 0o600 },
-  );
+  const envPath = join(dir, ".env");
+  const prev = existsSync(envPath) ? parseEnvFile(readFileSync(envPath, "utf8")) : {};
+  const next: Record<string, string> = {
+    ...prev,
+    TECHLIO_API_URL: API_URL,
+    TECHLIO_DASHBOARD_ORIGINS: DASHBOARD,
+    CONNECTOR_DB: prev.CONNECTOR_DB || join(dataDir(), "queue.db"),
+  };
+  const body = Object.entries(next)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(platform() === "win32" ? "\r\n" : "\n");
+  writeFileSync(envPath, `${body}\n`, { mode: 0o600 });
 }
 
 // ---------------------------------------------------------------- macOS ---

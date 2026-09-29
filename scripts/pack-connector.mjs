@@ -19,6 +19,26 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const downloads = join(root, "apps/web/public/downloads");
 const out = join(downloads, "build");
 
+const PACKAGED_API = (process.env.TECHLIO_API_URL || process.env.NEXT_PUBLIC_API_URL || "https://techlio-pulse-api.vercel.app").replace(/\/+$/, "");
+const PACKAGED_DASHBOARD = (
+  process.env.TECHLIO_DASHBOARD_ORIGINS ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+  "https://techlio-pulse.vercel.app"
+)
+  .split(",")[0]
+  .replace(/\/+$/, "");
+const PACKAGED_ORIGINS =
+  process.env.TECHLIO_DASHBOARD_ORIGINS ||
+  [
+    PACKAGED_DASHBOARD,
+    PACKAGED_DASHBOARD.endsWith(".vercel.app")
+      ? PACKAGED_DASHBOARD.replace(/^https:\/\/([^.]+)\./, "https://$1-*.")
+      : null,
+  ]
+    .filter(Boolean)
+    .join(",");
+
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
@@ -33,6 +53,8 @@ const built = spawnSync(
     "--platform=node",
     "--format=cjs",
     "--target=node20",
+    `--define:process.env.TECHLIO_API_URL=${JSON.stringify(PACKAGED_API)}`,
+    `--define:process.env.TECHLIO_DASHBOARD_ORIGINS=${JSON.stringify(PACKAGED_ORIGINS)}`,
     `--outfile=${bundle}`,
   ],
   { cwd: root, stdio: "inherit" },
@@ -152,7 +174,7 @@ const MAC_LABEL = "com.techlio.connector";
 const MENUBAR_LABEL = "com.techlio.connector.menubar";
 const MENUBAR_APP = `${MAC_DIR}/Techlio Connector.app`;
 const MENUBAR_EXE = `${MENUBAR_APP}/Contents/MacOS/TechlioStatus`;
-const DASHBOARD_URL = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://techlio-pulse.vercel.app").split(",")[0];
+const DASHBOARD_URL = PACKAGED_DASHBOARD;
 
 const launchAgentPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

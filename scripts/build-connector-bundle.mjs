@@ -58,8 +58,8 @@ writeFileSync(join(bundleRoot, "package.json"), JSON.stringify(pkg, null, 2));
 
 writeFileSync(
   join(bundleRoot, ".env.example"),
-  `TECHLIO_API_URL=https://techlio-pulse-api.vercel.app
-TECHLIO_DASHBOARD_ORIGINS=https://techlio-pulse.vercel.app,https://ai-tracking-bhgg.vercel.app,https://ai-tracking-bhgg-techlio1.vercel.app,https://ai-tracking-bhgg-*-techlio1.vercel.app
+  `TECHLIO_API_URL=${process.env.TECHLIO_API_URL || process.env.NEXT_PUBLIC_API_URL || "https://techlio-pulse-api.vercel.app"}
+TECHLIO_DASHBOARD_ORIGINS=${process.env.TECHLIO_DASHBOARD_ORIGINS || process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || "https://techlio-pulse.vercel.app"}
 CONNECTOR_PORT=9477
 `,
 );

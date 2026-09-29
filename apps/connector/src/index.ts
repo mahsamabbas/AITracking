@@ -18,11 +18,13 @@ import { createHash, randomBytes } from "node:crypto";
 import { getSecret, setSecret, backend as secretBackend } from "./secret-store.js";
 import { claudeOtelConfigured, ensureAgentHooks } from "./agent-hooks.js";
 import { config } from "./config.js";
+import { PACKAGED_DASHBOARD_ORIGINS, KNOWN_API_BASES } from "./production-hosts.js";
 import {
   clearIdentity,
   identityDir,
   loadIdentity,
   publicIdentity,
+  saveIdentity,
   type ConnectorIdentity,
 } from "./identity.js";
 import { claimFromPortal } from "./pairing.js";
@@ -55,7 +57,30 @@ let paused = loadPaused();
 /** Actual host agent — declared by the IDE companion, not hardcoded as Claude. */
 let hostProvider = config.provider;
 let contextLabel: string | undefined;
-let identity: ConnectorIdentity | null = loadIdentity();
+
+function bareUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function isLoopbackApi(url: string): boolean {
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(bareUrl(url));
+}
+
+/** Packaged/upgraded installs follow the installer API; local dev pairing is left alone. */
+function syncIdentityApiHost(current: ConnectorIdentity | null): ConnectorIdentity | null {
+  if (!current) return current;
+  const next = bareUrl(config.apiBaseUrl);
+  const cur = bareUrl(current.apiBaseUrl);
+  if (next === cur) return current;
+  const followPackaged = process.env.TECHLIO_PACKAGED === "1" || Boolean(process.env.TECHLIO_API_URL);
+  if (!followPackaged) return current;
+  if (isLoopbackApi(next) && !process.env.TECHLIO_API_URL) return current;
+  const updated = { ...current, apiBaseUrl: next };
+  saveIdentity(updated);
+  return updated;
+}
+
+let identity: ConnectorIdentity | null = syncIdentityApiHost(loadIdentity());
 let activeSessionId: string | undefined = identity ? crypto.randomUUID() : undefined;
 /** Commits / CI signals when no agent session is active. */
 let localWorkflowSessionId: string | undefined;
@@ -308,22 +333,7 @@ function enqueueHeartbeat(): void {
 
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
-/**
- * Dashboards this connector answers. The previous hosting (tracking-app-*)
- * stays accepted while people move over; `*` matches Vercel deployment URLs.
- */
-const DEFAULT_DASHBOARD_ORIGINS = [
-  "https://techlio-pulse.vercel.app",
-  "https://ai-tracking-bhgg.vercel.app",
-  "https://ai-tracking-bhgg-techlio1.vercel.app",
-  // Deployment and branch URLs of the dashboard project (Vercel team techlio1).
-  "https://ai-tracking-bhgg-*-techlio1.vercel.app",
-  // Previous hosting, still accepted while people move over.
-  "https://tracking-app-api-t9yd.vercel.app",
-];
-
-/** APIs a dashboard may pair this connector with (never an arbitrary URL). */
-const KNOWN_API_BASES = ["https://techlio-pulse-api.vercel.app", "https://ai-tracking-techlio1.vercel.app", "https://tracking-app-api-three.vercel.app"];
+const DEFAULT_DASHBOARD_ORIGINS = PACKAGED_DASHBOARD_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
 
 /**
  * Dashboards the API this connector reports to vouches for
