@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -16,8 +16,9 @@ import {
   SelectFilter,
 } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
-import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
+import { RangePicker, rangeFromParams, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
+import { analyticsPollMs } from "@/lib/live-poll";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
@@ -36,7 +37,8 @@ function SessionsInner() {
   const searchParams = useSearchParams();
   const id = params.id as string;
 
-  const [range, setRange] = useState<RangeValue>({ preset: "30d" });
+  // Opened from a page with a range → show the same range, so counts match.
+  const [range, setRange] = useState<RangeValue>(() => rangeFromParams(searchParams, { preset: "30d" }));
   const [provider, setProvider] = useState(searchParams.get("provider") ?? "");
   const [classification, setClassification] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -70,6 +72,7 @@ function SessionsInner() {
       page,
       pageSize: PAGE_SIZE,
     })}`,
+    { pollMs: analyticsPollMs(range) },
   );
 
   const rows = query.data?.sessions ?? [];
@@ -129,9 +132,9 @@ function SessionsInner() {
       title="Session history"
       subtitle={`${query.data?.employee.displayName ?? "Employee"} · ${rangeLabel(range)}`}
       actions={
-        <Link href={`/employees/${id}`} className="btn-ghost">
+        <OrgLink href={`/employees/${id}`} className="btn-ghost">
           Back to analytics
-        </Link>
+        </OrgLink>
       }
     >
       <ContextBar

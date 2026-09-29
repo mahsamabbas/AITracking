@@ -36,6 +36,19 @@ function zoneOffsetMs(t: number, timeZone: string): number {
  * Midnight of `d`'s calendar day in `timeZone` (UTC when omitted), so "Today"
  * matches the day keys every chart groups by.
  */
+function startOfCalendarDate(y: number, m: number, d: number, timeZone?: string): Date {
+  if (!timeZone || timeZone === "UTC") {
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+  try {
+    const guess = Date.UTC(y, m - 1, d);
+    const first = guess - zoneOffsetMs(guess, timeZone);
+    return new Date(guess - zoneOffsetMs(first, timeZone));
+  } catch {
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+}
+
 function startOfDay(d: Date, timeZone?: string): Date {
   if (!timeZone || timeZone === "UTC") {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -43,13 +56,25 @@ function startOfDay(d: Date, timeZone?: string): Date {
   try {
     const local = new Intl.DateTimeFormat("en-CA", { timeZone }).format(d); // YYYY-MM-DD
     const [y, m, day] = local.split("-").map(Number);
-    const guess = Date.UTC(y, m - 1, day);
-    // Two passes handle DST transitions around midnight.
-    const first = guess - zoneOffsetMs(guess, timeZone);
-    return new Date(guess - zoneOffsetMs(first, timeZone));
+    return startOfCalendarDate(y, m, day, timeZone);
   } catch {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   }
+}
+
+const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Calendar `YYYY-MM-DD` is the start of that local day in `timeZone`.
+ * Full timestamps stay as given (UTC or offset already encoded).
+ */
+function parseBound(value: string, timeZone?: string): Date | null {
+  const day = CALENDAR_DAY.exec(value.trim());
+  if (day) {
+    return startOfCalendarDate(Number(day[1]), Number(day[2]), Number(day[3]), timeZone);
+  }
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /**
@@ -67,10 +92,15 @@ export function resolveRange(input: {
   const now = input.now ?? new Date();
 
   if (input.from) {
-    const from = new Date(input.from);
-    const to = input.to ? new Date(input.to) : now;
-    if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
-      return { range: { from, to }, preset: "custom" };
+    const from = parseBound(input.from, input.timeZone);
+    if (from) {
+      const toDay = input.to ? CALENDAR_DAY.test(input.to.trim()) : false;
+      const toParsed = input.to ? parseBound(input.to, input.timeZone) : now;
+      if (toParsed && !Number.isNaN(toParsed.getTime())) {
+        // Date-picker `to` is inclusive; convert to an exclusive upper bound.
+        const to = toDay ? new Date(toParsed.getTime() + DAY) : toParsed;
+        return { range: { from, to }, preset: "custom" };
+      }
     }
   }
 

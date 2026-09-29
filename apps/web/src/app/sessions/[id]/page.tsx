@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -125,18 +125,18 @@ export default function SessionDetailPage() {
         d?.employee ? (
           <>
             {d.neighbours.previousId ? (
-              <Link href={`/sessions/${d.neighbours.previousId}`} className="btn-ghost">
+              <OrgLink href={`/sessions/${d.neighbours.previousId}`} className="btn-ghost">
                 ← Previous
-              </Link>
+              </OrgLink>
             ) : null}
             {d.neighbours.nextId ? (
-              <Link href={`/sessions/${d.neighbours.nextId}`} className="btn-ghost">
+              <OrgLink href={`/sessions/${d.neighbours.nextId}`} className="btn-ghost">
                 Next →
-              </Link>
+              </OrgLink>
             ) : null}
-            <Link href={`/employees/${d.employee.id}/sessions`} className="btn-ghost">
+            <OrgLink href={`/employees/${d.employee.id}/sessions`} className="btn-ghost">
               All sessions
-            </Link>
+            </OrgLink>
           </>
         ) : null
       }

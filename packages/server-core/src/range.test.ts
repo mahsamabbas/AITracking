@@ -50,4 +50,16 @@ describe("resolveRange", () => {
     const { range } = resolveRange({ preset: "today", now, timeZone: "America/Los_Angeles" });
     expect(range.from.toISOString()).toBe("2026-09-17T07:00:00.000Z");
   });
+
+  it("treats YYYY-MM-DD custom bounds as inclusive local calendar days", () => {
+    const { range, preset } = resolveRange({
+      from: "2026-09-01",
+      to: "2026-09-03",
+      timeZone: "Asia/Karachi",
+      now: NOW,
+    });
+    expect(preset).toBe("custom");
+    expect(range.from.toISOString()).toBe("2026-08-31T19:00:00.000Z");
+    expect(range.to.toISOString()).toBe("2026-09-03T19:00:00.000Z");
+  });
 });

@@ -84,6 +84,8 @@ export const connectorHealth = pgTable("connector_health", {
   version: text("version"),
   queueDepth: integer("queue_depth"),
   paused: integer("paused").default(0),
+  /** Pause requested from the dashboard; wins over the connector's own flag. */
+  remotePaused: integer("remote_paused").default(0),
   provider: text("provider"),
   /** FR-012 — per-provider capability report from the connector. */
   capabilities: jsonb("capabilities"),

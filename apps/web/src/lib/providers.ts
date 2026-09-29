@@ -79,12 +79,3 @@ export function providerMeta(id: string | null | undefined): ProviderMeta {
 export function providerLabel(id: string | null | undefined): string {
   return providerMeta(id).label;
 }
-
-export function providerBadgeLabel(
-  id: string | null | undefined,
-  size: "sm" | "md" = "md",
-): string {
-  const meta = providerMeta(id);
-  if (size === "sm" && meta.shortLabel) return meta.shortLabel;
-  return meta.label;
-}

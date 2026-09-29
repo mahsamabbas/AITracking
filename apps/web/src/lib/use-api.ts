@@ -42,6 +42,7 @@ export function useApi<T>(
   useEffect(() => {
     if (!ready || !token || !path) return;
     let cancelled = false;
+    const ac = new AbortController();
 
     // New path (e.g. a filter changed): drop the old payload so stale numbers
     // are never shown under new filter labels, and show the loading skeleton.
@@ -56,7 +57,7 @@ export function useApi<T>(
       if (background) setRefreshing(true);
       else if (!hasData.current) setLoading(true);
       try {
-        const result = await apiGet<T>(path, token);
+        const result = await apiGet<T>(path, token, ac.signal);
         if (cancelled) return;
         setData(result);
         setFetchedAt(new Date());
@@ -65,6 +66,7 @@ export function useApi<T>(
         setStatus(200);
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof Error && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Request failed");
         setStatus(err instanceof ApiError ? err.status : null);
       } finally {
@@ -78,14 +80,22 @@ export function useApi<T>(
     // A reload with data already on screen is a refresh, not a first paint.
     void run(hasData.current);
     if (options?.pollMs) {
-      const id = setInterval(() => void run(true), options.pollMs);
+      // No background polling while the tab is hidden; refresh on return.
+      const tick = () => {
+        if (document.visibilityState === "visible") void run(true);
+      };
+      const id = setInterval(tick, options.pollMs);
+      document.addEventListener("visibilitychange", tick);
       return () => {
         cancelled = true;
+        ac.abort();
         clearInterval(id);
+        document.removeEventListener("visibilitychange", tick);
       };
     }
     return () => {
       cancelled = true;
+      ac.abort();
     };
   }, [path, token, ready, nonce, options?.pollMs, displayTzVersion]);
 

@@ -9,10 +9,6 @@ export function homePathForRole(role?: Role | null, developerId?: string | null)
   return "/";
 }
 
-export function canViewPeople(role?: Role | null): boolean {
-  return role !== "auditor";
-}
-
 export function canViewTeam(role?: Role | null): boolean {
   return role === "manager" || role === "administrator";
 }
@@ -27,10 +23,6 @@ export function canManageUsers(role?: Role | null): boolean {
 
 export function canManageConnectors(role?: Role | null): boolean {
   return role === "administrator";
-}
-
-export function canViewAudit(role?: Role | null): boolean {
-  return role === "auditor" || role === "administrator";
 }
 
 /** Roles shown on Access → Add a user (platform super admins use the CLI or platform org). */

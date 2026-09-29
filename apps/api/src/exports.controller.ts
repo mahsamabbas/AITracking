@@ -16,6 +16,7 @@ import {
   getActivityExport,
 } from "@techlio/server-core";
 import { DashboardAuthGuard, userFromRequest } from "./auth/guards.js";
+import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
 
 @Controller("v1/activity-exports")
 @UseGuards(DashboardAuthGuard)
@@ -30,6 +31,8 @@ export class ExportsController {
       preset?: string;
       from?: string;
       to?: string;
+      team?: string;
+      provider?: string;
     },
   ) {
     const user = userFromRequest(req);
@@ -42,8 +45,11 @@ export class ExportsController {
       format: body.format ?? "csv",
       developerId: body.developerId,
       preset: body.preset,
-      from: body.from ? new Date(body.from) : undefined,
-      to: body.to ? new Date(body.to) : undefined,
+      from: body.from,
+      to: body.to,
+      team: body.team || undefined,
+      provider: body.provider || undefined,
+      timeZone: await reportingTimezoneFromRequest(req, user.organizationId),
     });
     return result;
   }

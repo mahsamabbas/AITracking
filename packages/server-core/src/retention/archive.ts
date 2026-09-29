@@ -99,6 +99,19 @@ export async function readArchive(path: string): Promise<Record<string, unknown>
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
+/** One RFC 4180 CSV cell; objects as JSON, null/undefined as empty. */
+export function csvCell(v: unknown): string {
+  if (v === undefined || v === null) return "";
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** CSV of arbitrary records: every key that appears becomes a column. */
+export function recordsToCsv(records: Record<string, unknown>[]): string {
+  const cols = [...new Set(records.flatMap((r) => Object.keys(r)))];
+  return [cols.join(","), ...records.map((r) => cols.map((c) => csvCell(r[c])).join(","))].join("\r\n") + "\r\n";
+}
+
 /** CSV (opens in Excel) with the fields people report on; nested metadata as JSON. */
 export function eventsToCsv(events: Record<string, unknown>[]): string {
   const cols = [
@@ -118,17 +131,12 @@ export function eventsToCsv(events: Record<string, unknown>[]): string {
     "event_id",
     "metadata",
   ];
-  const cell = (v: unknown) => {
-    if (v === undefined || v === null) return "";
-    const s = typeof v === "string" ? v : JSON.stringify(v);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
   const lines = [cols.join(",")];
   for (const e of events) {
     const m = (e.metadata ?? {}) as Record<string, unknown>;
     lines.push(
       cols
-        .map((c) => (c === "metadata" ? cell(e.metadata) : c in e ? cell(e[c]) : cell(m[c])))
+        .map((c) => (c === "metadata" ? csvCell(e.metadata) : c in e ? csvCell(e[c]) : csvCell(m[c])))
         .join(","),
     );
   }

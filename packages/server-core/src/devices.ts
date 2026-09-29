@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { isKnownProvider, providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
 import { devAffordancesEnabled } from "./runtime.js";
@@ -34,12 +34,23 @@ export async function setConnectorPaused(input: {
       deviceId: input.deviceId,
       organizationId: input.organizationId,
       paused: pausedFlag,
+      remotePaused: pausedFlag,
       provider: input.provider,
     })
     .onConflictDoUpdate({
       target: connectorHealth.deviceId,
-      set: { paused: pausedFlag },
+      set: { paused: pausedFlag, remotePaused: pausedFlag },
     });
+}
+
+/** Whether the dashboard has paused collection for this device. */
+export async function isRemotelyPaused(deviceId: string): Promise<boolean> {
+  const rows = await db
+    .select({ remotePaused: connectorHealth.remotePaused })
+    .from(connectorHealth)
+    .where(eq(connectorHealth.deviceId, deviceId))
+    .limit(1);
+  return rows[0]?.remotePaused === 1;
 }
 
 export function hashDeviceToken(token: string): string {
@@ -234,8 +245,9 @@ export async function recordLiveHeartbeat(input: {
       deviceId: input.deviceId,
       organizationId: input.organizationId,
       lastHeartbeat: now,
-      version: input.version ?? "unknown",
-      queueDepth: input.queueDepth ?? 0,
+      version: input.version ?? null,
+      // Not reported ≠ empty queue: keep null so the UI shows "—".
+      queueDepth: input.queueDepth ?? null,
       paused: input.paused ? 1 : 0,
       provider,
       capabilities,
@@ -245,9 +257,10 @@ export async function recordLiveHeartbeat(input: {
       target: connectorHealth.deviceId,
       set: {
         lastHeartbeat: now,
-        version: input.version ?? "unknown",
-        queueDepth: input.queueDepth ?? 0,
-        paused: input.paused ? 1 : 0,
+        version: input.version ?? null,
+        queueDepth: input.queueDepth ?? null,
+        // A dashboard pause stays in force until resumed from the dashboard.
+        paused: sql`GREATEST(${input.paused ? 1 : 0}, ${connectorHealth.remotePaused})`,
         provider,
         ...(capabilities ? { capabilities, capabilitiesAt: now } : {}),
       },

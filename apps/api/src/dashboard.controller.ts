@@ -13,7 +13,9 @@ import {
   activityTypeOf,
   canViewActivityEvents,
   canViewDeveloper,
+  connectorStateOf,
   db,
+  devAffordancesEnabled,
   getHourlySnapshotDetail,
   getOrgPolicy,
   hourlySnapshots,
@@ -26,8 +28,6 @@ import { listRecentEvents } from "./services/ingest.js";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 import { orgAccessFromRequest } from "./auth/org-scope.js";
 import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
-
-const STALE_MS = 5 * 60 * 1000;
 
 export interface LiveConnector {
   deviceId: string;
@@ -66,7 +66,10 @@ export class DashboardController {
     if (!(await isDatabaseReady())) {
       return {
         dbAvailable: false,
-        hint: "Run: docker compose up -d postgres redis && pnpm db:migrate && pnpm db:seed",
+        // The setup command is for developers running it locally, not for production users.
+        hint: devAffordancesEnabled()
+          ? "Run: docker compose up -d postgres redis && pnpm db:migrate && pnpm db:seed"
+          : "The activity database is temporarily unavailable. Figures will return once it is reachable.",
         connectors: [],
         activeSessions: [],
         alerts: [],
@@ -101,14 +104,8 @@ export class DashboardController {
 
     const connectors: LiveConnector[] = connectorRes.rows.map((r) => {
       const paused = r.paused === 1;
-      const last = r.last_heartbeat ? new Date(r.last_heartbeat) : null;
-      const state: LiveConnector["state"] = paused
-        ? "paused"
-        : !last
-          ? "offline"
-          : Date.now() - last.getTime() > STALE_MS
-            ? "stale"
-            : "online";
+      // One rule for every screen (server-core connector-state).
+      const state: LiveConnector["state"] = connectorStateOf(r.paused, r.last_heartbeat);
       return {
         deviceId: r.device_id,
         developerId: r.developer_id,
@@ -116,7 +113,7 @@ export class DashboardController {
         team: r.team,
         provider: r.provider,
         connectorVersion: r.version,
-        lastHeartbeat: last ? last.toISOString() : null,
+        lastHeartbeat: r.last_heartbeat ? new Date(r.last_heartbeat).toISOString() : null,
         queueDepth: r.queue_depth,
         paused,
         state,
@@ -143,7 +140,7 @@ export class DashboardController {
              s.active_duration_ms, s.event_count
       FROM agent_sessions s
       JOIN employees e ON e.id = s.developer_id
-      LEFT JOIN projects p ON p.id = s.project_id
+      LEFT JOIN projects p ON p.id = s.project_id AND p.organization_id = s.organization_id
       WHERE s.organization_id = ${organizationId}
         AND COALESCE(s.last_event_at, s.started_at) > NOW() - INTERVAL '24 hours'
         ${selfOnly !== null ? sql`AND s.developer_id = ${selfOnly}` : sql``}

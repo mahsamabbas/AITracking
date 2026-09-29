@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { InfoDot } from "@/components/ui/InfoDot";
@@ -162,12 +162,12 @@ function ProviderProgressCard({ p, employeeId }: { p: ProviderProgress; employee
         ) : null}
       </dl>
 
-      <Link
+      <OrgLink
         href={`/employees/${employeeId}/tools/${p.provider}`}
         className="mt-3 text-xs font-medium text-brand-600 hover:text-brand-700"
       >
         {p.label} sessions and details →
-      </Link>
+      </OrgLink>
     </div>
   );
 }
@@ -201,9 +201,9 @@ function TierBDailyChart({
         <p className="text-sm font-semibold text-ink-900">
           {meta.label} <span className="hint font-normal">· daily report (Tier B)</span>
         </p>
-        <Link href={`/employees/${employeeId}/tools/${provider}`} className="text-xs font-medium text-brand-600">
+        <OrgLink href={`/employees/${employeeId}/tools/${provider}`} className="text-xs font-medium text-brand-600">
           Details →
-        </Link>
+        </OrgLink>
       </div>
       {series.length === 0 ? (
         <EmptyState compact variant="provider-missing" />

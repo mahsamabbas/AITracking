@@ -27,6 +27,8 @@ export async function uploadBatch(
         "X-Device-Id": events[0]?.device_id ?? "",
       },
       body,
+      // A hung request would keep the queue's flush lock forever.
+      signal: AbortSignal.timeout(30_000),
     });
     if (res.ok) {
       const json = (await res.json().catch(() => ({}))) as { rejected?: number; reasons?: string[] };

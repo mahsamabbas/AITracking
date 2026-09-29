@@ -15,17 +15,6 @@ export type ActivityType =
   | "commit"
   | "connector";
 
-export const ACTIVITY_TYPES: ActivityType[] = [
-  "model",
-  "tool",
-  "engineering_check",
-  "file_change",
-  "session",
-  "coverage",
-  "commit",
-  "connector",
-];
-
 /**
  * True when an AI agent reported this file change or check — not an editor.
  * Agent hooks name the tool (Claude Code Write/Edit, Cursor afterFileEdit) or
@@ -113,31 +102,5 @@ export const PRODUCTIVE_CLASSIFICATIONS: SessionClassification[] = [
   "exploration",
 ];
 
-export const CLASSIFICATION_LABELS: Record<SessionClassification, string> = {
-  engineering_output: "Verify & ship",
-  assisted_editing: "Writing code",
-  exploration: "Research & planning",
-  idle_dominant: "Long quiet gaps",
-};
-
-export const CLASSIFICATION_DESCRIPTIONS: Record<SessionClassification, string> = {
-  engineering_output:
-    "The agent ran tests or builds, or a local git commit was reported through the connector hook in this session.",
-  assisted_editing:
-    "The agent changed files in this session; no test or build events were observed.",
-  exploration:
-    "The agent used the model or tools without changing files — reads, search, questions, planning.",
-  idle_dominant:
-    "Most of the session span had little or no agent telemetry. Not a conclusion about the person.",
-};
-
 /** The idle gap after which a session is considered no longer interactive (§11). */
 export const IDLE_THRESHOLD_MS = 10 * 60 * 1000;
-
-export function isProductive(c: string): boolean {
-  return PRODUCTIVE_CLASSIFICATIONS.includes(c as SessionClassification);
-}
-
-export function toolCategoryOf(event: ActivityEvent): string {
-  return event.metadata?.tool_category ?? "other";
-}

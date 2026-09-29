@@ -24,8 +24,15 @@ export function setApiOrgContext(orgId: string | null): void {
 
 /** Viewer-selected IANA timezone — sent on API requests for reporting buckets. */
 export function setApiDisplayTimezone(timeZone: string): void {
+  // Unchanged → no refetch of every open query.
+  if (timeZone === activeDisplayTimezone) return;
   activeDisplayTimezone = timeZone;
   for (const fn of displayTzListeners) fn();
+}
+
+/** The viewer's display timezone (formatters default to it). */
+export function apiDisplayTimezone(): string {
+  return activeDisplayTimezone;
 }
 
 export function subscribeDisplayTimezone(listener: () => void): () => void {
@@ -51,9 +58,14 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: string, token: string | null): Promise<T> {
+export async function apiGet<T>(
+  path: string,
+  token: string | null,
+  signal?: AbortSignal,
+): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, {
     headers: authHeaders(token),
+    signal,
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -127,5 +139,6 @@ export async function apiDownload(path: string, token: string | null, filename: 
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoking in the same tick can cancel the download in Safari and Firefox.
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }

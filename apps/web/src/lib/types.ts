@@ -130,7 +130,7 @@ export interface CommitSummary {
 export interface OrganizationAnalytics {
   workMix?: import("./vocab").WorkMix;
   changeTrend?: ChangeTrendPoint[];
-  commits?: CommitSummary;
+  commits?: CommitSummary | null;
   preset: string;
   range: { from: string; to: string };
   totals: Totals;
@@ -279,6 +279,8 @@ export interface EmployeeAnalytics {
   workMix?: import("./vocab").WorkMix;
   aiSubscriptions?: EmployeeAiSubscription[];
   idlePeriods: IdlePeriod[];
+  /** Total long quiet gaps in range; idlePeriods lists only the longest few. */
+  idleGapCount?: number;
   recentSessions: SessionRow[];
   totalSessions: number;
 }

@@ -95,7 +95,7 @@ export function DataRetentionCard({ token }: { token: string | null }) {
                   <tbody>
                     {d.archives.map((a) => (
                       <tr key={a.id}>
-                        <td className="num whitespace-nowrap text-sm">{formatDate(`${a.day}T12:00:00Z`)}</td>
+                        <td className="num whitespace-nowrap text-sm">{formatDate(a.day)}</td>
                         <td className="text-sm text-ink-700">{a.kind === "events" ? "Agent events" : "Sessions"}</td>
                         <td className="num text-right text-sm">{formatNumber(a.rows)}</td>
                         <td className="num text-right text-sm text-ink-500">{kb(a.bytes)}</td>

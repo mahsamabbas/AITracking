@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { resolveRange } from "./range.js";
 import { renderSummaryPdf } from "./pdf.js";
+import { csvCell } from "./retention/archive.js";
 import { activityEvents, activityExports, auditLog } from "./schema.js";
 
 export async function createActivityExport(input: {
@@ -11,29 +12,44 @@ export async function createActivityExport(input: {
   format: "csv" | "pdf";
   developerId?: string;
   preset?: string;
-  from?: Date;
-  to?: Date;
+  from?: string;
+  to?: string;
+  /** Same filters as the overview charts. */
+  team?: string;
+  provider?: string;
+  timeZone?: string;
 }): Promise<{ exportId: string; downloadUrl: string }> {
   const resolved = resolveRange({
     preset: input.preset,
-    from: input.from?.toISOString(),
-    to: input.to?.toISOString(),
+    from: input.from,
+    to: input.to,
+    timeZone: input.timeZone,
   });
   const conditions = [eq(activityEvents.organizationId, input.organizationId)];
   if (input.developerId) {
     conditions.push(eq(activityEvents.developerId, input.developerId));
   }
+  if (input.team) {
+    conditions.push(
+      sql`${activityEvents.developerId} IN (SELECT id FROM employees WHERE organization_id = ${input.organizationId} AND team = ${input.team})`,
+    );
+  }
+  if (input.provider) {
+    conditions.push(sql`${activityEvents.payload}->>'provider' = ${input.provider}`);
+  }
   conditions.push(gte(activityEvents.occurredAt, resolved.range.from));
   conditions.push(lte(activityEvents.occurredAt, resolved.range.to));
 
-  const rows = await db
+  const EXPORT_MAX = 5000;
+  // One extra row tells a full export apart from a cut-off one.
+  const fetched = await db
     .select()
     .from(activityEvents)
     .where(and(...conditions))
     .orderBy(desc(activityEvents.occurredAt))
-    .limit(5000);
-
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    .limit(EXPORT_MAX + 1);
+  const capped = fetched.length > EXPORT_MAX;
+  const rows = capped ? fetched.slice(0, EXPORT_MAX) : fetched;
 
   let content: string;
   if (input.format === "pdf") {
@@ -50,7 +66,10 @@ export async function createActivityExport(input: {
       "Operational review. Not a timesheet and not a billing record.",
       `Generated: ${new Date().toISOString()}`,
       `Range: ${resolved.range.from.toISOString()} to ${resolved.range.to.toISOString()}`,
-      `Events in range: ${rows.length}${rows.length === 5000 ? " (capped)" : ""}`,
+      ...(input.team || input.provider
+        ? [`Filters: ${[input.team && `team ${input.team}`, input.provider && `tool ${input.provider}`].filter(Boolean).join(", ")}`]
+        : []),
+      `Events in range: ${rows.length}${capped ? ` (capped at the ${EXPORT_MAX} most recent)` : ""}`,
       "",
       "Events by type",
       ...(typeLines.length > 0 ? typeLines : ["No events in this range."]),
@@ -65,15 +84,19 @@ export async function createActivityExport(input: {
       const provider =
         (r.payload as { provider?: string }).provider ?? "";
       return [
-        esc(r.eventId),
-        esc(r.eventType),
-        esc(r.occurredAt.toISOString()),
-        esc(r.developerId),
-        esc(provider),
-        esc(r.sessionId ?? ""),
+        csvCell(r.eventId),
+        csvCell(r.eventType),
+        csvCell(r.occurredAt.toISOString()),
+        csvCell(r.developerId),
+        csvCell(provider),
+        csvCell(r.sessionId ?? ""),
       ].join(",");
     });
-    content = header + lines.join("\n");
+    // Say so when the list is cut off, rather than let it look complete.
+    const note = capped
+      ? `\n# Capped at the ${EXPORT_MAX} most recent events — narrow the date range for the complete list.`
+      : "";
+    content = header + lines.join("\n") + note;
   }
 
   const exportId = randomUUID();
@@ -92,7 +115,7 @@ export async function createActivityExport(input: {
       organizationId: input.organizationId,
       actorId: input.requestedBy ?? null,
       action: "activity.export",
-      detail: { exportId, format: input.format, rowCount: rows.length },
+      detail: { exportId, format: input.format, rowCount: rows.length, team: input.team ?? null, provider: input.provider ?? null },
       createdAt: new Date(),
     });
   } catch {

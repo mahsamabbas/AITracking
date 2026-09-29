@@ -28,18 +28,3 @@ export function validatePortalPassword(password: string): PasswordPolicyError | 
   if (!/[^A-Za-z0-9]/.test(password)) return "password_needs_special";
   return null;
 }
-
-export function passwordPolicyMessage(code: PasswordPolicyError): string {
-  switch (code) {
-    case "password_too_short":
-      return "Password must be at least 8 characters.";
-    case "password_too_long":
-      return `Password must be at most ${PORTAL_FIELD_LIMITS.password} characters.`;
-    case "password_needs_uppercase":
-      return "Include at least one capital letter.";
-    case "password_needs_special":
-      return "Include at least one special character.";
-    default:
-      return "Password does not meet requirements.";
-  }
-}

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -24,6 +24,7 @@ import { FilterBar } from "@/components/filters/FilterBar";
 import { ContextBar } from "@/components/ui/ContextBar";
 import { RangePicker, rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
+import { analyticsPollMs } from "@/lib/live-poll";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
@@ -38,6 +39,7 @@ export default function EmployeeToolPage() {
 
   const query = useApi<ToolAnalytics>(
     `/v1/employees/${id}/tools/${provider}${qs(rangeParams(range))}`,
+    { pollMs: analyticsPollMs(range) },
   );
 
   const d = query.data;
@@ -81,15 +83,15 @@ export default function EmployeeToolPage() {
       subtitle={`How this employee uses ${meta.label} · ${rangeLabel(range)}`}
       actions={
         <>
-          <Link
-            href={`/employees/${id}/sessions${qs({ provider })}`}
+          <OrgLink
+            href={`/employees/${id}/sessions${qs({ provider, ...rangeParams(range) })}`}
             className="btn-ghost"
           >
             Session history
-          </Link>
-          <Link href={`/employees/${id}`} className="btn-ghost">
+          </OrgLink>
+          <OrgLink href={`/employees/${id}`} className="btn-ghost">
             Employee
-          </Link>
+          </OrgLink>
         </>
       }
     >
@@ -141,7 +143,7 @@ export default function EmployeeToolPage() {
             <ChartSkeleton height={260} />
           </div>
         </>
-      ) : t.sessions === 0 ? (
+      ) : t.sessions === 0 && t.activeMs === 0 ? (
         <Card>
           <EmptyState
             variant="no-activity"
@@ -285,7 +287,7 @@ export default function EmployeeToolPage() {
                 icon="sessions"
                 title={`${meta.label} sessions`}
                 subtitle="Click a session to inspect its full event trail"
-                href={`/employees/${id}/sessions${qs({ provider })}`}
+                href={`/employees/${id}/sessions${qs({ provider, ...rangeParams(range) })}`}
                 hrefLabel={`All ${d.totalSessions}`}
               />
               <SessionTable

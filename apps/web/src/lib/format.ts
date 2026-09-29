@@ -1,5 +1,15 @@
 /** Shared formatting. Durations are always labelled — never bare numbers. */
 
+import { apiDisplayTimezone } from "./api";
+
+/** A calendar day key (YYYY-MM-DD) names a day, not an instant. */
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Today as YYYY-MM-DD in the display timezone (the one reports bucket by). */
+export function todayKey(timeZone: string = apiDisplayTimezone()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+}
+
 export function formatDuration(ms: number | null | undefined, opts?: { compact?: boolean }): string {
   if (ms == null) return "—";
   if (ms <= 0) return "0m";
@@ -13,11 +23,6 @@ export function formatDuration(ms: number | null | undefined, opts?: { compact?:
   if (hours === 0) return `${minutes}m`;
   if (opts?.compact || hours >= 100) return `${hours}h`;
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
-}
-
-export function formatHours(ms: number | null | undefined): string {
-  if (ms == null) return "—";
-  return `${(ms / 3_600_000).toFixed(1)}h`;
 }
 
 export function formatNumber(n: number | null | undefined): string {
@@ -36,7 +41,7 @@ export function formatDateTime(iso?: string | null, timeZone?: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone,
+    timeZone: timeZone ?? apiDisplayTimezone(),
   });
 }
 
@@ -45,14 +50,16 @@ export function formatTime(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: timeZone ?? apiDisplayTimezone() });
 }
 
 export function formatDate(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone });
+  // Day keys parse as UTC midnight; format them in UTC so they never shift a day.
+  const zone = DAY_KEY.test(iso) ? "UTC" : (timeZone ?? apiDisplayTimezone());
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: zone });
 }
 
 export function formatRelative(iso?: string | null): string {
@@ -73,12 +80,6 @@ export function formatRelative(iso?: string | null): string {
 export function percentChange(current: number, previous: number): number | null {
   if (!previous) return current > 0 ? null : 0;
   return ((current - previous) / previous) * 100;
-}
-
-export function formatDelta(pct: number | null): string {
-  if (pct == null) return "new";
-  const rounded = Math.round(pct);
-  return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }
 
 export function initialsOf(name: string): string {

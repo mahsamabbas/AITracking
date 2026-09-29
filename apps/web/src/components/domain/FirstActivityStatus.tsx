@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import type { LiveStatus } from "@/lib/types";
@@ -36,9 +36,9 @@ export function FirstActivityStatus({
       <>
         Last agent event from {providerLabel(session.provider)}{" "}
         {formatRelative(session.lastEventAt ?? session.startedAt)}.{" "}
-        <Link href={`/employees/${developerId}`} className="font-medium text-brand-600 hover:text-brand-700">
+        <OrgLink href={`/employees/${developerId}`} className="font-medium text-brand-600 hover:text-brand-700">
           See your activity →
-        </Link>
+        </OrgLink>
       </>
     );
   } else if (paused) {

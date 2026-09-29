@@ -35,6 +35,7 @@ import {
 } from "@/lib/validation";
 import type { FilterMeta } from "@/lib/types";
 import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 
 type TabId = "profile" | "security" | "organization" | "data";
 
@@ -260,9 +261,9 @@ function ProfileTab({
             </dl>
             <p className="text-2xs text-ink-500">
               These fields appear on your{" "}
-              <Link href={`/employees/${user.developerId}`} className="text-brand-600 hover:text-brand-700">
+              <OrgLink href={`/employees/${user.developerId}`} className="text-brand-600 hover:text-brand-700">
                 employee profile
-              </Link>
+              </OrgLink>
               . Status and join date are managed by your organisation.
             </p>
           </>

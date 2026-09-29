@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useRouter } from "next/navigation";
+import { useAppPaths } from "@/lib/app-paths";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -17,6 +18,7 @@ import {
   type RangeValue,
 } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
+import { analyticsPollMs } from "@/lib/live-poll";
 import { useAuth } from "@/lib/auth-context";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
@@ -63,6 +65,7 @@ const COLUMNS: { key: SortKey; label: string; title: string }[] = [
 
 export default function LeaderboardPage() {
   const router = useRouter();
+  const { resolvePath } = useAppPaths();
   const { user } = useAuth();
   const allowed = user?.role === "administrator" || user?.role === "manager";
   const [range, setRange] = useState<RangeValue>({ preset: "7d" });
@@ -83,6 +86,7 @@ export default function LeaderboardPage() {
           sort,
         })}`
       : null,
+    { pollMs: analyticsPollMs(range) },
   );
 
   if (user && (!allowed || query.status === 403)) {
@@ -92,9 +96,9 @@ export default function LeaderboardPage() {
           <EmptyState
             variant="no-permission"
             action={
-              <Link href="/" className="btn-ghost">
+              <OrgLink href="/" className="btn-ghost">
                 Back to overview
-              </Link>
+              </OrgLink>
             }
           />
         </Card>
@@ -210,13 +214,14 @@ export default function LeaderboardPage() {
                 </thead>
                 <tbody>
                   {rows.map((r) => {
-                    const tierA = r.sessions > 0;
+                    // Agent time in range counts even when the session started before it.
+                    const tierA = r.sessions > 0 || r.activeMs > 0;
                     const tokens =
                       r.tokenInput == null && r.tokenOutput == null
                         ? null
                         : (r.tokenInput ?? 0) + (r.tokenOutput ?? 0);
                     return (
-                      <tr key={r.id} className="row-link" onClick={() => router.push(`/employees/${r.id}`)}>
+                      <tr key={r.id} className="row-link" onClick={() => router.push(resolvePath(`/employees/${r.id}`))}>
                         <td className="num text-right font-semibold text-ink-900">
                           {r.rank ?? <span className="hint font-normal">—</span>}
                         </td>

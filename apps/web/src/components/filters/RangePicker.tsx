@@ -66,14 +66,21 @@ export function RangePicker({
 /** Serialises a range into the query params every analytics endpoint accepts. */
 export function rangeParams(value: RangeValue): Record<string, string | undefined> {
   if (value.preset === "custom" && value.from) {
+    // Calendar dates, not UTC midnights — the API resolves them in the reporting timezone.
     return {
-      from: new Date(value.from).toISOString(),
-      to: value.to
-        ? new Date(new Date(value.to).getTime() + 86_400_000).toISOString()
-        : undefined,
+      from: value.from,
+      to: value.to,
     };
   }
   return { preset: value.preset };
+}
+
+/** Inverse of rangeParams: a range carried in a link's query string. */
+export function rangeFromParams(params: { get(name: string): string | null }, fallback: RangeValue): RangeValue {
+  const from = params.get("from");
+  if (from) return { preset: "custom", from, to: params.get("to") ?? undefined };
+  const preset = params.get("preset");
+  return RANGE_PRESETS.some((p) => p.id === preset) ? { preset: preset as RangePreset } : fallback;
 }
 
 export function rangeLabel(value: RangeValue): string {

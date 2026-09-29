@@ -17,12 +17,15 @@ export function ActivityStrip({ totals: t, commits }: { totals: Totals; commits?
     { label: "Model calls", value: formatNumber(t.modelRequests), icon: "model" },
     { label: "Tool calls", value: formatNumber(t.toolCalls), icon: "tool" },
     { label: "File changes", value: formatNumber(t.fileChanges), icon: "file" },
-    { label: "Commits", value: formatNumber(commits?.commits ?? 0), icon: "commit" },
+    // No commit data (AI-tool view, or it could not be loaded) is "—", never a made-up 0.
+    { label: "Commits", value: commits ? formatNumber(commits.commits) : "—", icon: "commit" },
     {
       label: "Shipped",
-      value: commits?.commits
-        ? `${formatNumber(commits.shipped)} · ${Math.round((commits.shipped / commits.commits) * 100)}%`
-        : "0",
+      value: !commits
+        ? "—"
+        : commits.commits
+          ? `${formatNumber(commits.shipped)} · ${Math.round((commits.shipped / commits.commits) * 100)}%`
+          : "0",
       icon: "ship",
     },
     // Tokens and checks appear only when an agent reported them.

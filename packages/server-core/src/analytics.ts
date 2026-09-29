@@ -7,16 +7,11 @@ import {
   connectorStateOf,
   rollupConnectorState,
 } from "./connector-state.js";
-import { resolveOrgTimezone, resolveReportingTimezone, timezoneFromEnv } from "./timezone.js";
+import { resolveOrgTimezone, resolveReportingTimezone } from "./timezone.js";
 
 export interface DateRange {
   from: Date;
   to: Date;
-}
-
-/** Env fallback only — prefer {@link scopeTimezone} when you have an organisation id. */
-export function orgTimezone(): string {
-  return timezoneFromEnv();
 }
 
 async function scopeTimezone(f: ScopeFilters): Promise<string> {
@@ -32,8 +27,14 @@ async function scopeTimezone(f: ScopeFilters): Promise<string> {
 }
 
 /** Same-length window immediately before `range`, for period-over-period deltas. */
-export function previousRange(range: DateRange): DateRange {
-  const span = range.to.getTime() - range.from.getTime();
+/**
+ * The comparison window for "vs previous period": same length as the part of
+ * the current range that has actually happened, so "Today" at 3 pm compares
+ * with yesterday until 3 pm — not with all of yesterday.
+ */
+export function previousRange(range: DateRange, now = new Date()): DateRange {
+  const end = Math.min(range.to.getTime(), Math.max(now.getTime(), range.from.getTime() + 1));
+  const span = end - range.from.getTime();
   return {
     from: new Date(range.from.getTime() - span),
     to: new Date(range.from.getTime()),
@@ -89,6 +90,8 @@ export async function listEmployeeDirectory(
   f: EmployeeDirectoryFilters,
 ): Promise<EmployeeDirectoryRow[]> {
   const tz = await resolveReportingTimezone(f.organizationId, f.timeZone);
+  // An AI-tool filter scopes every per-person number, not just active time.
+  const providerCond = f.provider ? sql`AND s.provider = ${f.provider}` : sql``;
 
   const base = await db.execute<{
     id: string;
@@ -126,6 +129,7 @@ export async function listEmployeeDirectory(
       FROM agent_sessions s
       WHERE s.organization_id = ${f.organizationId}
         AND s.started_at >= ${f.range.from} AND s.started_at < ${f.range.to}
+        ${providerCond}
       GROUP BY s.developer_id
     ),
     health AS (
@@ -183,9 +187,10 @@ export async function listEmployeeDirectory(
       SELECT developer_id,
              to_char((started_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
              SUM(active_duration_ms) AS active_ms
-      FROM agent_sessions
+      FROM agent_sessions s
       WHERE organization_id = ${f.organizationId}
         AND started_at >= ${f.range.from} AND started_at < ${f.range.to}
+        ${providerCond}
       GROUP BY developer_id, day
       ORDER BY day ASC
     `),
@@ -511,11 +516,9 @@ export async function dailyTrend(
 
   const byDay = new Map(res.rows.map((r) => [r.day, r]));
   const out: TrendPoint[] = [];
-  const cursor = new Date(range.from);
-  const dayMs = 86_400_000;
-  const spanDays = Math.ceil((range.to.getTime() - range.from.getTime()) / dayMs);
-  for (let i = 0; i < Math.min(spanDays, 370); i++) {
-    const key = new Date(cursor.getTime() + i * dayMs).toISOString().slice(0, 10);
+  // Local calendar days (same keys as the SQL above and every other chart).
+  // UTC keys of a local-midnight range ran one day behind, so today was always 0.
+  for (const key of dayKeysInRange(range, tz).slice(0, 370)) {
     const r = byDay.get(key);
     out.push({
       date: key,
@@ -744,8 +747,14 @@ export async function coverageSummary(
   organizationId: string,
   range: DateRange,
   developerIds?: string[],
+  team?: string,
 ): Promise<CoverageSummary> {
-  const scope: ScopeFilters = { organizationId, developerIds };
+  const scope: ScopeFilters = { organizationId, developerIds, team };
+  // Same people as the headcount and charts beside it.
+  const inTeam = (col: string) =>
+    team
+      ? sql`AND ${sql.raw(col)} IN (SELECT id FROM employees WHERE organization_id = ${organizationId} AND team = ${team})`
+      : sql``;
   const [gaps, sessionsRow, health, silent] = await Promise.all([
     db.execute<{ count: number }>(sql`
       SELECT COUNT(*)::int AS count FROM activity_events
@@ -753,6 +762,7 @@ export async function coverageSummary(
         AND occurred_at >= ${range.from} AND occurred_at < ${range.to}
         AND event_type IN ('telemetry_gap_started','connector_paused','upload_failed','provider_capability_missing')
         ${developerIdIn("activity_events.developer_id", developerIds)}
+        ${inTeam("activity_events.developer_id")}
     `),
     db.execute<{ partial: number; unassigned: number }>(sql`
       SELECT COUNT(*) FILTER (WHERE s.coverage_state <> 'complete')::int AS partial,
@@ -780,6 +790,7 @@ export async function coverageSummary(
         FROM devices d LEFT JOIN connector_health ch ON ch.device_id = d.id
         WHERE d.organization_id = ${organizationId} AND d.revoked_at IS NULL AND d.kind = 'connector'
           ${developerIdIn("d.developer_id", developerIds)}
+          ${inTeam("d.developer_id")}
         GROUP BY d.developer_id
       )
       SELECT COUNT(*) FILTER (WHERE paused AND NOT online)::int AS paused,
@@ -791,6 +802,7 @@ export async function coverageSummary(
       SELECT COUNT(*)::int AS count FROM employees e
       WHERE e.organization_id = ${organizationId} AND e.status = 'active'
         ${developerIdIn("e.id", developerIds)}
+        ${team ? sql`AND e.team = ${team}` : sql``}
         AND NOT EXISTS (
           SELECT 1 FROM agent_sessions s
           WHERE s.developer_id = e.id
@@ -825,7 +837,8 @@ export interface OrganizationAnalytics {
   /** Agent file changes + commits per day (same day keys as dailyTrend). */
   changeTrend: ChangeTrendPoint[];
   /** Commit → Verified → Shipped for the range. */
-  commits: CommitSummary;
+  /** null on AI-tool-scoped views (commits are not attributable to one tool). */
+  commits: CommitSummary | null;
   tools: ToolUsage[];
   hourPattern: HourPattern[];
   weekdayPattern: WeekdayPattern[];
@@ -875,7 +888,7 @@ export async function organizationAnalytics(input: {
     weekdayPattern(scope, input.range),
     classificationSplit(scope, input.range),
     toolCategoryBreakdown(scope, input.range),
-    coverageSummary(input.organizationId, input.range, input.developerIds),
+    coverageSummary(input.organizationId, input.range, input.developerIds, input.team),
     db.execute<{ total: number; connected: number }>(sql`
       SELECT COUNT(*)::int AS total,
              COUNT(*) FILTER (
@@ -911,6 +924,28 @@ export async function organizationAnalytics(input: {
     tools,
   });
 
+  // Teams: active time from the same event-time engine as every other card
+  // (session sums disagreed with the KPIs); session and people counts as before.
+  const teamOf = await db.execute<{ id: string; team: string }>(sql`
+    SELECT id, COALESCE(team, 'Unassigned') AS team FROM employees WHERE organization_id = ${input.organizationId}
+  `);
+  const teamById = new Map(teamOf.rows.map((r) => [r.id, r.team]));
+  const teamActive = new Map<string, number>();
+  for (const [developerId, ms] of timed.activeByDeveloper) {
+    const team = teamById.get(developerId) ?? "Unassigned";
+    teamActive.set(team, (teamActive.get(team) ?? 0) + ms);
+  }
+  const teamSessions = new Map(teamRes.rows.map((r) => [r.team, r]));
+  const teams = [...new Set([...teamSessions.keys(), ...teamActive.keys()])]
+    .map((team) => ({
+      team,
+      activeMs: Math.round(teamActive.get(team) ?? 0),
+      sessions: teamSessions.get(team)?.sessions ?? 0,
+      employees: teamSessions.get(team)?.employees ?? 0,
+    }))
+    .filter((t) => t.activeMs > 0 || t.sessions > 0)
+    .sort((a, b) => b.activeMs - a.activeMs);
+
   return {
     range: { from: input.range.from.toISOString(), to: input.range.to.toISOString() },
     totals: timed.totals,
@@ -928,12 +963,7 @@ export async function organizationAnalytics(input: {
     classifications: classes,
     toolCategories: categories,
     coverage,
-    teams: teamRes.rows.map((r) => ({
-      team: r.team,
-      activeMs: Number(r.active_ms ?? 0),
-      sessions: r.sessions,
-      employees: r.employees,
-    })),
+    teams,
     changeTrend,
     commits,
   };
@@ -1048,12 +1078,13 @@ export async function idlePeriods(
   developerId: string,
   range: DateRange,
   limit = 20,
-): Promise<IdlePeriod[]> {
+): Promise<{ periods: IdlePeriod[]; total: number }> {
   const res = await db.execute<{
     gap_start: Date;
     gap_end: Date;
     gap_ms: string;
     had_gap_event: boolean;
+    total: number;
   }>(sql`
     WITH ordered AS (
       SELECT occurred_at,
@@ -1068,7 +1099,9 @@ export async function idlePeriods(
     SELECT occurred_at AS gap_start,
            next_at     AS gap_end,
            (EXTRACT(EPOCH FROM (next_at - occurred_at)) * 1000)::bigint AS gap_ms,
-           event_type IN ('telemetry_gap_started','connector_paused') AS had_gap_event
+           event_type IN ('telemetry_gap_started','connector_paused') AS had_gap_event,
+           -- Every gap in range, before LIMIT (the list shows only the longest).
+           COUNT(*) OVER ()::int AS total
     FROM ordered
     WHERE next_at IS NOT NULL
       AND next_at - occurred_at > INTERVAL '10 minutes'
@@ -1076,12 +1109,15 @@ export async function idlePeriods(
     ORDER BY gap_ms DESC
     LIMIT ${limit}
   `);
-  return res.rows.map((r) => ({
-    from: new Date(r.gap_start).toISOString(),
-    to: new Date(r.gap_end).toISOString(),
-    durationMs: Number(r.gap_ms ?? 0),
-    reason: r.had_gap_event ? "coverage_gap" : "idle_gap",
-  }));
+  return {
+    total: res.rows[0]?.total ?? 0,
+    periods: res.rows.map((r) => ({
+      from: new Date(r.gap_start).toISOString(),
+      to: new Date(r.gap_end).toISOString(),
+      durationMs: Number(r.gap_ms ?? 0),
+      reason: r.had_gap_event ? "coverage_gap" : "idle_gap",
+    })),
+  };
 }
 
 export interface ProjectUsage {
@@ -1105,7 +1141,7 @@ export async function projectBreakdown(
            SUM(s.active_duration_ms) AS active_ms,
            COUNT(*)::int             AS sessions
     FROM agent_sessions s
-    LEFT JOIN projects p ON p.id = s.project_id
+    LEFT JOIN projects p ON p.id = s.project_id AND p.organization_id = s.organization_id
     WHERE ${scopeWhere(f, range)}
     GROUP BY s.project_id, p.name
     ORDER BY active_ms DESC
@@ -1351,60 +1387,71 @@ export interface CommitSummary {
  * Commit → Verified → Shipped for the scope and range (commit time in range;
  * shipped = a matching commit_pushed exists, whenever it happened).
  */
-export async function commitSummary(f: ScopeFilters, range: DateRange): Promise<CommitSummary> {
-  if (f.provider) {
-    return { commits: 0, verified: 0, shipped: 0, filesChanged: 0, linesAdded: 0, linesDeleted: 0, repos: [], recent: [] };
-  }
+/**
+ * Commit → Verified → Shipped for the scope. Totals and repositories cover
+ * every commit in range (a row LIMIT here used to cap them at 500); only the
+ * "recent" list is limited. `null` on AI-tool-scoped views: a commit is not
+ * attributable to one tool, so "0 commits" there would be wrong, not empty.
+ */
+export async function commitSummary(f: ScopeFilters, range: DateRange): Promise<CommitSummary | null> {
+  if (f.provider) return null;
   const res = await db.execute<{
-    ref: string;
-    occurred_at: Date;
-    repo: string | null;
-    files: number | null;
-    added: number | null;
-    deleted: number | null;
-    verified: boolean | null;
-    shipped_at: Date | null;
-    developer_id: string;
-    display_name: string | null;
+    totals: { commits: number; verified: number; shipped: number; files: number; added: number; deleted: number };
+    repos: { name: string; commits: number; shipped: number }[];
+    recent: {
+      ref: string;
+      occurred_at: string;
+      repo: string | null;
+      files: number | null;
+      added: number | null;
+      deleted: number | null;
+      verified: boolean | null;
+      shipped_at: string | null;
+      developer_id: string;
+      display_name: string | null;
+    }[];
   }>(sql`
-    SELECT COALESCE(c.payload->'metadata'->>'commit_ref', c.event_id::text) AS ref, c.occurred_at,
-           c.payload->'metadata'->>'path_category' AS repo,
-           (c.payload->'metadata'->>'files_changed')::int AS files,
-           (c.payload->'metadata'->>'lines_added')::int AS added,
-           (c.payload->'metadata'->>'lines_deleted')::int AS deleted,
-           (c.payload->'metadata'->>'verified')::boolean AS verified,
-           p.occurred_at AS shipped_at, c.developer_id, emp.display_name
-    FROM activity_events c
-    LEFT JOIN employees emp ON emp.id = c.developer_id
-    LEFT JOIN LATERAL (
-      SELECT x.occurred_at FROM activity_events x
-      WHERE x.organization_id = c.organization_id AND x.developer_id = c.developer_id
-        AND x.event_type = 'commit_pushed'
-        AND x.payload->'metadata'->>'commit_ref' = c.payload->'metadata'->>'commit_ref'
-      ORDER BY x.occurred_at LIMIT 1
-    ) p ON TRUE
-    WHERE ${commitScope(f, range)}
-    ORDER BY c.occurred_at DESC
-    LIMIT 500
+    WITH c AS (
+      SELECT COALESCE(c.payload->'metadata'->>'commit_ref', c.event_id::text) AS ref, c.occurred_at,
+             c.payload->'metadata'->>'path_category' AS repo,
+             (c.payload->'metadata'->>'files_changed')::int AS files,
+             (c.payload->'metadata'->>'lines_added')::int AS added,
+             (c.payload->'metadata'->>'lines_deleted')::int AS deleted,
+             (c.payload->'metadata'->>'verified')::boolean AS verified,
+             p.occurred_at AS shipped_at, c.developer_id, emp.display_name
+      FROM activity_events c
+      LEFT JOIN employees emp ON emp.id = c.developer_id
+      LEFT JOIN LATERAL (
+        SELECT x.occurred_at FROM activity_events x
+        WHERE x.organization_id = c.organization_id AND x.developer_id = c.developer_id
+          AND x.event_type = 'commit_pushed'
+          AND x.payload->'metadata'->>'commit_ref' = c.payload->'metadata'->>'commit_ref'
+        ORDER BY x.occurred_at LIMIT 1
+      ) p ON TRUE
+      WHERE ${commitScope(f, range)}
+    )
+    SELECT
+      (SELECT json_build_object(
+         'commits', COUNT(*), 'verified', COUNT(*) FILTER (WHERE verified), 'shipped', COUNT(shipped_at),
+         'files', COALESCE(SUM(files), 0), 'added', COALESCE(SUM(added), 0), 'deleted', COALESCE(SUM(deleted), 0))
+       FROM c) AS totals,
+      (SELECT COALESCE(json_agg(r), '[]'::json) FROM (
+         SELECT COALESCE(repo, 'Unknown repository') AS name, COUNT(*)::int AS commits, COUNT(shipped_at)::int AS shipped
+         FROM c GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10) r) AS repos,
+      (SELECT COALESCE(json_agg(x ORDER BY x.occurred_at DESC), '[]'::json) FROM (
+         SELECT * FROM c ORDER BY occurred_at DESC LIMIT 25) x) AS recent
   `);
-  const rows = res.rows;
-  const repos = new Map<string, { name: string; commits: number; shipped: number }>();
-  for (const r of rows) {
-    const name = r.repo ?? "Unknown repository";
-    const entry = repos.get(name) ?? { name, commits: 0, shipped: 0 };
-    entry.commits++;
-    if (r.shipped_at) entry.shipped++;
-    repos.set(name, entry);
-  }
+  const row = res.rows[0];
+  const t = row?.totals ?? { commits: 0, verified: 0, shipped: 0, files: 0, added: 0, deleted: 0 };
   return {
-    commits: rows.length,
-    verified: rows.filter((r) => r.verified).length,
-    shipped: rows.filter((r) => r.shipped_at).length,
-    filesChanged: rows.reduce((s, r) => s + (r.files ?? 0), 0),
-    linesAdded: rows.reduce((s, r) => s + (r.added ?? 0), 0),
-    linesDeleted: rows.reduce((s, r) => s + (r.deleted ?? 0), 0),
-    repos: [...repos.values()].sort((a, b) => b.commits - a.commits).slice(0, 10),
-    recent: rows.slice(0, 25).map((r) => ({
+    commits: Number(t.commits),
+    verified: Number(t.verified),
+    shipped: Number(t.shipped),
+    filesChanged: Number(t.files),
+    linesAdded: Number(t.added),
+    linesDeleted: Number(t.deleted),
+    repos: (row?.repos ?? []).map((r) => ({ name: r.name, commits: Number(r.commits), shipped: Number(r.shipped) })),
+    recent: (row?.recent ?? []).map((r) => ({
       ref: r.ref,
       occurredAt: new Date(r.occurred_at).toISOString(),
       repo: r.repo,
@@ -1454,6 +1501,10 @@ export async function withEventTime(
   weekdays?: WeekdayPattern[];
   tools?: ToolUsage[];
   workMix: WorkMixSummary;
+  /** developer → event-time active ms (for per-team totals). */
+  activeByDeveloper: Map<string, number>;
+  /** provider → event-time active ms. */
+  activeByProvider: Map<string, number>;
 }> {
   const tz = await scopeTimezone(f);
   const engineScope = {
@@ -1475,6 +1526,8 @@ export async function withEventTime(
     // Every observed agent minute is work (verify, writing, or research);
     // idle is reported separately, never folded in.
     productiveMs: tl.totals.activeMs,
+    // Same measure as the employee directory: event-time active per session.
+    avgSessionMs: t.sessions > 0 ? Math.round(tl.totals.activeMs / t.sessions) : 0,
   });
   const sessionsByDay = new Map((parts.trend ?? []).map((p) => [p.date, p]));
   return {
@@ -1506,5 +1559,7 @@ export async function withEventTime(
       activeMs: cur.totals.activeMs,
       workingMs: cur.totals.workingMs,
     },
+    activeByDeveloper: new Map([...cur.byDeveloper].map(([id, slice]) => [id, slice.activeMs])),
+    activeByProvider: cur.byProvider,
   };
 }

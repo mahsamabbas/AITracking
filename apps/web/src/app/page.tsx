@@ -39,7 +39,7 @@ import {
 } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { API_BASE, apiPost, qs } from "@/lib/api";
+import { apiDownload, apiPost, qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import {
@@ -63,31 +63,25 @@ export default function OverviewPage() {
   const [team, setTeam] = useState("");
   const [provider, setProvider] = useState("");
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   async function downloadExport(format: "csv" | "pdf") {
     if (!token) return;
     setExporting(format);
+    setExportError(null);
     try {
+      // Same range and filters as the charts on screen.
       const created = await apiPost<{ downloadUrl: string }>("/v1/activity-exports", token, {
         format,
         preset: range.preset === "custom" ? undefined : range.preset,
-        from: range.preset === "custom" && range.from ? new Date(range.from).toISOString() : undefined,
-        to:
-          range.preset === "custom" && range.to
-            ? new Date(new Date(range.to).getTime() + 86_400_000).toISOString()
-            : undefined,
+        from: range.preset === "custom" && range.from ? range.from : undefined,
+        to: range.preset === "custom" && range.to ? range.to : undefined,
+        team: team || undefined,
+        provider: provider || undefined,
       });
-      const response = await fetch(`${API_BASE}${created.downloadUrl}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Export download failed");
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `activity-summary.${format}`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await apiDownload(created.downloadUrl, token, `activity-summary.${format}`);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
     } finally {
       setExporting(null);
     }
@@ -139,7 +133,8 @@ export default function OverviewPage() {
   );
   const teamView = canViewTeam(user?.role);
 
-  const hasActivity = (t?.sessions ?? 0) > 0;
+  // Agent time in range counts even when the session started before it.
+  const hasActivity = (t?.sessions ?? 0) > 0 || (t?.activeMs ?? 0) > 0;
   const liveConnectors = live.data?.connectors ?? [];
   const emptyVariant = emptyActivityVariant(liveConnectors);
   const coverage = d?.coverage;
@@ -177,6 +172,11 @@ export default function OverviewPage() {
                 >
                   {exporting === "pdf" ? "Exporting…" : "Export PDF"}
                 </button>
+                {exportError ? (
+                  <span role="alert" className="text-xs text-rose-600">
+                    {exportError}
+                  </span>
+                ) : null}
               </>
             ) : null}
             <OrgLink href="/employees" className="btn-primary">

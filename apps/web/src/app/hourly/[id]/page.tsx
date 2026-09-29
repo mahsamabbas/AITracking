@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -70,9 +70,9 @@ export default function HourlyDetailPage() {
       subtitle="Deterministic metrics linked to every source event that produced them"
       actions={
         d ? (
-          <Link href={`/employees/${d.snapshot.developerId}`} className="btn-ghost">
+          <OrgLink href={`/employees/${d.snapshot.developerId}`} className="btn-ghost">
             Employee analytics
-          </Link>
+          </OrgLink>
         ) : null
       }
     >
@@ -174,9 +174,9 @@ export default function HourlyDetailPage() {
                   {d.versions.map((v) => (
                     <li key={v.id} className="flex items-center gap-3 text-sm">
                       <Badge tone={v.id === d.snapshot.id ? "info" : "neutral"}>v{v.version}</Badge>
-                      <Link href={`/hourly/${v.id}`} className="text-brand-600 hover:text-brand-700">
+                      <OrgLink href={`/hourly/${v.id}`} className="text-brand-600 hover:text-brand-700">
                         Open snapshot
-                      </Link>
+                      </OrgLink>
                       <span className="hint">{v.recalcReason ?? "original"}</span>
                     </li>
                   ))}

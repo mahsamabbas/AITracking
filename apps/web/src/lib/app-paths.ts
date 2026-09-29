@@ -12,6 +12,7 @@ export function useAppPaths() {
     resolvePath(path: string) {
       if (!platform || !path.startsWith("/")) return path;
       if (path.startsWith("/platform/")) return path;
+      if (path === "/") return `${base}/overview`;
       return `${base}${path}`;
     },
     home: platform ? `${base}/overview` : "/",

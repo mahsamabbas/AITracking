@@ -75,14 +75,6 @@ export function clearEnrollment(): void {
   }
 }
 
-export function wasBiometricPromptDismissed(): boolean {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 export function dismissBiometricPrompt(): void {
   try {
     localStorage.setItem(DISMISSED_KEY, "1");

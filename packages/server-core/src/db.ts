@@ -39,6 +39,9 @@ function poolOptions(): pg.PoolConfig {
 }
 
 export const pool = new pg.Pool(poolOptions());
+// An idle client dropped by the server or pooler emits "error"; without a
+// listener that is an uncaught exception that takes the process down.
+pool.on("error", (err) => console.error("[pg pool] idle client error:", err.message));
 
 export const db = drizzle(pool, { schema });
 

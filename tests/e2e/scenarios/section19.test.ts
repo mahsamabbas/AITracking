@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mergeIntervals, totalDurationMs } from "@techlio/aggregation";
 import { ActivityEventSchema, EventTypes } from "@techlio/event-schema";
-import { scanEventForSecrets } from "@techlio/server-core";
-import { canViewDeveloper } from "../../../apps/api/src/auth/roles.js";
+import { canViewDeveloper, scanEventForSecrets } from "@techlio/server-core";
 function containsSecret(value: string): boolean {
   return /ghp_[a-zA-Z0-9]{20,}/.test(value);
 }

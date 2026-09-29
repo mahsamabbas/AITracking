@@ -52,6 +52,55 @@ function isMine(id: LocalIdentity): boolean {
 let cachedSetupBase: string | null = null;
 
 /**
+ * A full scan that found nothing is remembered briefly: with no connector
+ * installed every caller would otherwise probe all ports on every tick.
+ * Cleared by a user action ("Check again", Connect) via forgetFailedConnectorScan.
+ */
+const FAILED_SCAN_TTL_MS = 10_000;
+let failedScanAt = 0;
+let failedSetupScanAt = 0;
+
+export function forgetFailedConnectorScan(): void {
+  failedScanAt = 0;
+  failedSetupScanAt = 0;
+}
+
+/** Run `fn` once for concurrent callers, and reuse its result for `freshMs`. */
+function shared<T>(fn: () => Promise<T>, freshMs: number): (force?: boolean) => Promise<T> {
+  let inflight: Promise<T> | null = null;
+  let last: { at: number; value: T } | null = null;
+  return (force = false) => {
+    if (inflight) return inflight;
+    if (!force && last && Date.now() - last.at < freshMs) return Promise.resolve(last.value);
+    inflight = fn()
+      .then((value) => {
+        last = { at: Date.now(), value };
+        return value;
+      })
+      .finally(() => {
+        inflight = null;
+      });
+    return inflight;
+  };
+}
+
+/** Poll `run` every `ms` while the tab is visible; re-check as soon as it becomes visible again. */
+function useVisiblePoll(run: () => void, ms: number): void {
+  useEffect(() => {
+    run();
+    const tick = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    const t = setInterval(tick, ms);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [run, ms]);
+}
+
+/**
  * The base URL of this person's connector on this computer, or null. A
  * connector paired to someone else is never used. When several are found,
  * one already paired to this person wins over an unactivated one.
@@ -61,6 +110,7 @@ export async function connectorBase(): Promise<string | null> {
     const id = await probe(cachedBase);
     if (id && isMine(id) && (id.paired || !viewerDeveloperId)) return cachedBase;
   }
+  if (Date.now() - failedScanAt < FAILED_SCAN_TTL_MS) return null;
   const found = await Promise.all(
     CONNECTOR_PORTS.map(async (port) => {
       const base = `http://127.0.0.1:${port}`;
@@ -70,6 +120,9 @@ export async function connectorBase(): Promise<string | null> {
   const mine = found.filter((f): f is { base: string; id: LocalIdentity } => f.id != null && isMine(f.id));
   const pick = mine.find((f) => f.id.paired) ?? mine[0];
   cachedBase = pick?.base ?? null;
+  // Remember "nothing of mine here" only if nothing answered at all (a
+  // connector of another account still needs the setup path to find it).
+  failedScanAt = cachedBase || found.some((f) => f.id) ? 0 : Date.now();
   return cachedBase;
 }
 
@@ -82,6 +135,7 @@ export async function setupConnectorBase(): Promise<string | null> {
   const own = await connectorBase();
   if (own) return own;
   if (cachedSetupBase && (await probe(cachedSetupBase))) return cachedSetupBase;
+  if (Date.now() - failedSetupScanAt < FAILED_SCAN_TTL_MS) return null;
   const found = await Promise.all(
     CONNECTOR_PORTS.map(async (port) => {
       const base = `http://127.0.0.1:${port}`;
@@ -89,6 +143,7 @@ export async function setupConnectorBase(): Promise<string | null> {
     }),
   );
   cachedSetupBase = found.find(Boolean) ?? null;
+  failedSetupScanAt = cachedSetupBase ? 0 : Date.now();
   return cachedSetupBase;
 }
 
@@ -108,21 +163,19 @@ export async function connectorFetch(path: string, init?: RequestInit): Promise<
 export const CONNECTOR_WINDOWS_EXE = "/downloads/techlio-connector-win-x64.exe";
 /** Installer package: sets the connector up as a background LaunchAgent (no app, no Dock icon). */
 export const CONNECTOR_MAC_PKG = "/downloads/techlio-connector-macos.pkg";
-export const CONNECTOR_MAC_ARM = "/downloads/techlio-connector-macos-arm64.pkg";
-export const CONNECTOR_MAC_INTEL = "/downloads/techlio-connector-macos-x64.pkg";
 
-export function connectorDownloadPath(platform: "mac" | "windows" | "other"): string {
-  if (platform === "windows") return CONNECTOR_WINDOWS_EXE;
-  return CONNECTOR_MAC_PKG;
-}
-
-export async function fetchConnectorHealth(): Promise<boolean> {
+const sharedHealth = shared(async () => {
   try {
     const r = await setupConnectorFetch("/health");
     return r.ok;
   } catch {
     return false;
   }
+}, 2_500);
+
+export function fetchConnectorHealth(force = false): Promise<boolean> {
+  if (force) forgetFailedConnectorScan();
+  return sharedHealth(force);
 }
 
 export function useConnectorOnline(pollMs = 8_000): {
@@ -131,15 +184,15 @@ export function useConnectorOnline(pollMs = 8_000): {
 } {
   const [online, setOnline] = useState<boolean | null>(null);
 
+  const poll = useCallback(() => {
+    void fetchConnectorHealth().then(setOnline);
+  }, []);
+  // User-initiated ("Check if running"): always a fresh scan.
   const refresh = useCallback(async () => {
-    setOnline(await fetchConnectorHealth());
+    setOnline(await fetchConnectorHealth(true));
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), pollMs);
-    return () => clearInterval(t);
-  }, [refresh, pollMs]);
+  useVisiblePoll(poll, pollMs);
 
   return { online, refresh };
 }
@@ -152,13 +205,6 @@ export function detectConnectorPlatform(): "mac" | "windows" | "other" {
   if (/Win/i.test(ua)) return "windows";
   if (/Mac|iPhone|iPad/i.test(ua)) return "mac";
   return "other";
-}
-
-export function detectMacChip(): "arm" | "intel" {
-  if (typeof navigator === "undefined") return "arm";
-  const ua = navigator.userAgent;
-  if (/Intel/i.test(ua)) return "intel";
-  return "arm";
 }
 
 /**
@@ -182,21 +228,6 @@ export async function localAccessState(): Promise<LocalAccess> {
   return "unknown";
 }
 
-export function useLocalAccess(pollMs = 5_000): LocalAccess {
-  const [state, setState] = useState<LocalAccess>("unknown");
-  useEffect(() => {
-    let alive = true;
-    const check = () => void localAccessState().then((s) => alive && setState(s));
-    check();
-    const t = setInterval(check, pollMs);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [pollMs]);
-  return state;
-}
-
 /**
  * Why this page can or cannot reach the connector — each cause needs a
  * different fix, and to the page they otherwise all look like "not detected".
@@ -208,7 +239,14 @@ export function useLocalAccess(pollMs = 5_000): LocalAccess {
  */
 export type ConnectorReach = "ok" | "permission-prompt" | "permission-denied" | "wrong-site" | "not-running";
 
-export async function diagnoseConnector(): Promise<ConnectorReach> {
+const sharedDiagnosis = shared(diagnoseConnectorNow, 2_500);
+
+export function diagnoseConnector(force = false): Promise<ConnectorReach> {
+  if (force) forgetFailedConnectorScan();
+  return sharedDiagnosis(force);
+}
+
+async function diagnoseConnectorNow(): Promise<ConnectorReach> {
   if (await setupConnectorBase()) return "ok";
   const access = await localAccessState();
   if (access === "denied") return "permission-denied";
@@ -227,15 +265,15 @@ export async function diagnoseConnector(): Promise<ConnectorReach> {
 
 export function useConnectorReach(pollMs = 6_000): { reach: ConnectorReach | null; check: () => Promise<ConnectorReach> } {
   const [reach, setReach] = useState<ConnectorReach | null>(null);
+  const poll = useCallback(() => {
+    void diagnoseConnector().then(setReach);
+  }, []);
+  // From a click: fresh, and runs inside the gesture so the browser can prompt.
   const check = useCallback(async () => {
-    const r = await diagnoseConnector();
+    const r = await diagnoseConnector(true);
     setReach(r);
     return r;
   }, []);
-  useEffect(() => {
-    void check();
-    const t = setInterval(() => void check(), pollMs);
-    return () => clearInterval(t);
-  }, [check, pollMs]);
+  useVisiblePoll(poll, pollMs);
   return { reach, check };
 }

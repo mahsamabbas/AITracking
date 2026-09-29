@@ -1,4 +1,5 @@
 import type { RangeValue } from "@/components/filters/RangePicker";
+import { todayKey } from "./format";
 
 /** How often live strips and current-range analytics refresh (no WebSocket). */
 export const LIVE_POLL_MS = 30_000;
@@ -7,7 +8,7 @@ export const LIVE_POLL_MS = 30_000;
 export function rangeIncludesNow(range: RangeValue): boolean {
   if (range.preset === "yesterday") return false;
   if (range.preset === "custom") {
-    return !range.to || range.to >= new Date().toISOString().slice(0, 10);
+    return !range.to || range.to >= todayKey();
   }
   return true;
 }

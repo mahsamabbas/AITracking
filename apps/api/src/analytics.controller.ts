@@ -14,6 +14,7 @@ import type { FastifyRequest } from "fastify";
 import {
   activityTotals,
   aiProgress,
+  withEngineActive,
   aiUsageLeaderboard,
   activityCalendar,
   workday,
@@ -240,7 +241,7 @@ export class AnalyticsController {
       // aggregates metrics itself.
       summary: {
         listed: rows.length,
-        withActivity: rows.filter((r) => r.sessions > 0).length,
+        withActivity: rows.filter((r) => r.sessions > 0 || r.activeMs > 0).length,
         activeMs: rows.reduce((s, r) => s + r.activeMs, 0),
         sessions: rows.reduce((s, r) => s + r.sessions, 0),
         coverageWarnings: rows.filter((r) => r.coverageWarning).length,
@@ -371,8 +372,10 @@ export class AnalyticsController {
       commits,
       aiSubscriptions,
       /** Unified AI Progress: per-provider rollup, effective capabilities, Tier B daily, coverage. */
-      aiProgress: progress,
-      idlePeriods: gaps,
+      aiProgress: withEngineActive(progress, timed.activeByProvider),
+      idlePeriods: gaps.periods,
+      /** Every long quiet gap in range (idlePeriods lists only the 8 longest). */
+      idleGapCount: gaps.total,
       recentSessions: recent.sessions,
       totalSessions: recent.total,
     };

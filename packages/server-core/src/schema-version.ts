@@ -6,7 +6,7 @@ import { pool } from "./db.js";
  * shows up as a clear health warning and 503s instead of opaque 500s.
  * A unit test keeps this in step with the last file in infra/sql.
  */
-export const EXPECTED_SCHEMA_MIGRATION = "016_lock_public_data_api.sql";
+export const EXPECTED_SCHEMA_MIGRATION = "017_connector_remote_pause.sql";
 
 export async function schemaStatus(): Promise<{
   expected: string;

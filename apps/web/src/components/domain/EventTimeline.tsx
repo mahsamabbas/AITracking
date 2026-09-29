@@ -1,4 +1,4 @@
-import { formatDuration, formatTime } from "@/lib/format";
+import { formatDateTime, formatDuration, formatTime } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { ACTIVITY_TYPE, eventLabel } from "@/lib/vocab";
 import type { ActivityEventRow } from "@/lib/types";
@@ -90,7 +90,7 @@ export function EventTimeline({
                 {e.late ? (
                   <span
                     className="badge-warn"
-                    title={`Received ${e.received_at ? new Date(e.received_at).toLocaleString() : "later"} — after an outage or offline period. Hourly figures were recalculated as a new version.`}
+                    title={`Received ${e.received_at ? formatDateTime(e.received_at) : "later"} — after an outage or offline period. Hourly figures were recalculated as a new version.`}
                   >
                     arrived late
                   </span>

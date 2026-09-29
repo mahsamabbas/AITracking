@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { IconChip, type IconName, type Tone } from "./Icon";
 import { InfoDot } from "./InfoDot";
 
@@ -47,12 +47,12 @@ export function CardHeader({
       <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
         {action}
         {href ? (
-          <Link
+          <OrgLink
             href={href}
             className="text-xs font-medium text-brand-600 hover:text-brand-700"
           >
             {hrefLabel} →
-          </Link>
+          </OrgLink>
         ) : null}
       </div>
     </header>

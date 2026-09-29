@@ -33,19 +33,3 @@ export const createUserSchema = Yup.object({
     .oneOf([...ORG_ASSIGNABLE_ROLES], "Choose a valid role.")
     .required(),
 });
-
-export const changePasswordSchema = Yup.object({
-  currentPassword: Yup.string().required("Enter your current password.").max(FIELD_LIMITS.password),
-  newPassword: Yup.string()
-    .required("Enter a new password.")
-    .max(FIELD_LIMITS.password)
-    .test("portal-password", function (value) {
-      if (!value) return true;
-      const err = validatePortalPassword(value);
-      if (err) return this.createError({ message: passwordErrorMessage(err) });
-      return true;
-    }),
-  confirmPassword: Yup.string()
-    .required("Confirm your new password.")
-    .oneOf([Yup.ref("newPassword")], "Passwords must match."),
-});

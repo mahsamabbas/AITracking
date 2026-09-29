@@ -76,5 +76,5 @@ TLS is enabled automatically in `@techlio/server-core` for non-localhost URLs.
 ## Prevent filling up again
 
 - Run **`pnpm dev:worker`** (or deploy the worker) so `RETENTION_DAYS` (default 90) purges old `activity_events`.
-- Periodically: `pnpm db:cleanup-prod` (when connected).
+- Periodically: `pnpm db:retention:prod` (summarises, archives and purges old raw events).
 - Do not run the connector under **`sudo`** (avoids duplicate commit events).

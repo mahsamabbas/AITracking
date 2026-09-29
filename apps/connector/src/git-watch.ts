@@ -138,7 +138,9 @@ export function createGitWatcher(options: {
   } catch {
     /* unreadable: start fresh (event ids are deterministic, so no double counting) */
   }
-  const rootOf = new Map<string, string | null>();
+  /** cwd → repo root. "Not a repo" answers expire, so a later `git init` is picked up. */
+  const rootOf = new Map<string, { root: string | null; at: number }>();
+  const NOT_A_REPO_TTL_MS = 10 * 60_000;
   /** One scan per repo at a time; a request during a scan queues one more pass. */
   const inflight = new Map<string, Promise<void>>();
   const rescan = new Set<string>();
@@ -153,10 +155,11 @@ export function createGitWatcher(options: {
 
   async function resolveRoot(cwd: string | undefined): Promise<string | null> {
     if (!cwd) return null;
-    if (rootOf.has(cwd)) return rootOf.get(cwd) ?? null;
+    const cached = rootOf.get(cwd);
+    if (cached && (cached.root || Date.now() - cached.at < NOT_A_REPO_TTL_MS)) return cached.root;
     const out = await git(cwd, ["rev-parse", "--show-toplevel"]);
     const root = out?.trim() || null;
-    rootOf.set(cwd, root);
+    rootOf.set(cwd, { root, at: Date.now() });
     return root;
   }
 
@@ -283,7 +286,7 @@ export function createGitWatcher(options: {
     if (existing) clearTimeout(existing);
     const t = setTimeout(() => {
       pendingScan.delete(repo.root);
-      void scan(repo);
+      scan(repo).catch(() => undefined);
     }, delayMs);
     t.unref?.();
     pendingScan.set(repo.root, t);
@@ -294,7 +297,7 @@ export function createGitWatcher(options: {
     async observe(cwd: string | undefined): Promise<void> {
       const repo = await repoFor(cwd);
       if (!repo) return;
-      void scan(repo);
+      scan(repo).catch(() => undefined);
       scheduleScan(repo, OBSERVE_RESCAN_MS);
     },
     /** A passing check ran in `cwd` (CI gate / pre-commit, agent test or build). */
@@ -311,7 +314,20 @@ export function createGitWatcher(options: {
     },
     start(): void {
       const t = setInterval(() => {
-        for (const repo of Object.values(state.repos)) void scan(repo);
+        for (const repo of Object.values(state.repos)) {
+          // A deleted or moved repository would otherwise be scanned (two git
+          // processes every 30 s) forever.
+          if (!existsSync(repo.root)) {
+            delete state.repos[repo.root];
+            try {
+              save();
+            } catch {
+              /* best effort; retried next tick */
+            }
+            continue;
+          }
+          scan(repo).catch(() => undefined);
+        }
       }, SCAN_EVERY_MS);
       t.unref?.();
     },

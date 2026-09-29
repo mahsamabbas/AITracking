@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -24,6 +24,7 @@ import {
   type RangeValue,
 } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
+import { analyticsPollMs } from "@/lib/live-poll";
 import { useAppPaths } from "@/lib/app-paths";
 import { qs } from "@/lib/api";
 import { formatDuration, formatRelative } from "@/lib/format";
@@ -77,9 +78,11 @@ export default function EmployeesPage() {
       connectorState: connectorState || undefined,
       sort,
     })}`,
+    // Keeps "This hour" and today's totals current, like the overview.
+    { pollMs: analyticsPollMs(range) },
   );
 
-  const rows = query.data?.employees ?? [];
+  const rows = useMemo(() => query.data?.employees ?? [], [query.data]);
 
   const displayedRows = useMemo(() => {
     const copy = [...rows];
@@ -272,7 +275,7 @@ export default function EmployeesPage() {
                       <tr
                         key={r.id}
                         className="row-link"
-                        onClick={() => router.push(`/employees/${r.id}`)}
+                        onClick={() => router.push(resolvePath(`/employees/${r.id}`))}
                       >
                         <td>
                           <div className="flex items-center gap-2.5">
@@ -302,7 +305,7 @@ export default function EmployeesPage() {
                           )}
                         </td>
                         <td className="num whitespace-nowrap text-right font-medium text-ink-900">
-                          {r.sessions === 0 ? (
+                          {r.sessions === 0 && r.activeMs === 0 ? (
                             <span className="hint font-sans font-normal">No activity</span>
                           ) : (
                             formatDuration(r.activeMs)
@@ -338,13 +341,13 @@ export default function EmployeesPage() {
                             : r.currentHourEvents}
                         </td>
                         <td className="text-right">
-                          <Link
-                            href={resolvePath(`/employees/${r.id}`)}
+                          <OrgLink
+                            href={`/employees/${r.id}`}
                             className="text-xs font-medium text-brand-600 hover:text-brand-700"
                             onClick={(e) => e.stopPropagation()}
                           >
                             Open
-                          </Link>
+                          </OrgLink>
                         </td>
                       </tr>
                     );

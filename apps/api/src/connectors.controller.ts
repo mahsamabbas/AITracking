@@ -20,6 +20,7 @@ import {
   verifyDeviceToken,
   recordLiveHeartbeat,
   hashDeviceToken,
+  isRemotelyPaused,
   ingestBatch,
   getDevice,
   bindDevicePublicKey,
@@ -231,15 +232,16 @@ export class ConnectorsController {
       deviceId: id,
       organizationId: verified.organizationId!,
       developerId: verified.developerId!,
-      version: body.version ?? "unknown",
-      queueDepth: body.queueDepth ?? 0,
+      version: body.version,
+      queueDepth: body.queueDepth,
       paused: Boolean(body.paused),
       provider: body.provider ?? null,
       tokenHash: hashDeviceToken(token),
       capabilities: body.capabilities,
     });
 
-    return { ok: true };
+    // The connector pauses/resumes collection to match the dashboard.
+    return { ok: true, remotePaused: await isRemotelyPaused(id) };
   }
 
   @Get(":id/health")

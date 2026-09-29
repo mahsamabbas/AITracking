@@ -34,8 +34,6 @@
     "db:retention": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/retention.ts",
     "db:retention:prod": "bash scripts/retention-prod.sh",
     "db:purge-demo": "node scripts/purge-demo-data.mjs",
-    "db:shrink-prod": "node scripts/shrink-neon-database.mjs --production",
-    "db:cleanup-prod": "node scripts/shrink-neon-database.mjs --production --days 90 --purge-demo --confirm --vacuum",
     "db:switch-supabase": "bash scripts/switch-production-to-supabase.sh",
     "prepare": "husky",
     "commits:sync": "node scripts/techlio-sync-commits.mjs"

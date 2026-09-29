@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -45,6 +46,8 @@ import {
   formatDate,
   formatDuration,
   formatNumber,
+  formatTime,
+  todayKey,
 } from "@/lib/format";
 import {
   LONG_QUIET_GAPS,
@@ -87,7 +90,7 @@ export default function EmployeeDetailPage() {
   // Workday graph: the day picked on the calendar, else the most recent day with activity.
   const [pickedDay, setPickedDay] = useState<string | null>(null);
   const lastActiveDay = calendar.data?.days.length ? calendar.data.days[calendar.data.days.length - 1].date : null;
-  const workDay = pickedDay ?? lastActiveDay ?? new Date().toISOString().slice(0, 10);
+  const workDay = pickedDay ?? lastActiveDay ?? todayKey();
 
   const d = query.data;
   const t = d?.totals;
@@ -125,9 +128,9 @@ export default function EmployeeDetailPage() {
           <EmptyState
             variant="no-permission"
             action={
-              <Link href="/" className="btn-ghost">
+              <OrgLink href="/" className="btn-ghost">
                 Back to overview
-              </Link>
+              </OrgLink>
             }
           />
         </Card>
@@ -150,14 +153,14 @@ export default function EmployeeDetailPage() {
       actions={
         d ? (
           <>
-            <Link href={`/employees/${employeeId}/sessions`} className="btn-ghost">
+            <OrgLink href={`/employees/${employeeId}/sessions${qs(rangeParams(range))}`} className="btn-ghost">
               All sessions
               <span className="num ml-1 text-ink-400">{d.totalSessions}</span>
-            </Link>
+            </OrgLink>
             {canViewTeam(user?.role) ? (
-              <Link href="/employees" className="btn-ghost">
+              <OrgLink href="/employees" className="btn-ghost">
                 Directory
-              </Link>
+              </OrgLink>
             ) : null}
           </>
         ) : null
@@ -293,7 +296,7 @@ export default function EmployeeDetailPage() {
             <StatTile
               label={LONG_QUIET_GAPS.label}
               value={formatDuration(t.idleMs, { compact: true })}
-              hint={`${d.idlePeriods.length} gaps over 10 min`}
+              hint={`${d.idleGapCount ?? d.idlePeriods.length} gaps over 10 min`}
               accent="slate"
               icon="clock"
               spark={d.dailyTrend.map((p) => p.idleMs)}
@@ -409,7 +412,7 @@ export default function EmployeeDetailPage() {
                 icon="sessions"
                 title="Recent sessions"
                 subtitle="Most recent first — open one for its full event trail"
-                href={`/employees/${employeeId}/sessions`}
+                href={`/employees/${employeeId}/sessions${qs(rangeParams(range))}`}
                 hrefLabel={`All ${d.totalSessions} sessions`}
               />
               <SessionTable sessions={d.recentSessions} projectNames={projectNames} />
@@ -472,9 +475,9 @@ export default function EmployeeDetailPage() {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="num text-sm text-ink-900">
-                          {formatDate(g.from)} · {new Date(g.from).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          {formatDate(g.from)} · {formatTime(g.from)}
                           {" → "}
-                          {new Date(g.to).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(g.to)}
                         </p>
                         <p className="hint">
                           {g.reason === "coverage_gap"

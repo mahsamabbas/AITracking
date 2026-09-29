@@ -38,7 +38,7 @@ export default function PlatformPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const orgs = query.data?.organizations ?? [];
+  const orgs = useMemo(() => query.data?.organizations ?? [], [query.data]);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return orgs;
@@ -168,7 +168,7 @@ export default function PlatformPage() {
             { label: "Organisations", value: formatNumber(totals.orgs), icon: "team" as const, tone: "brand" as const },
             { label: "Active tenants", value: formatNumber(totals.active), icon: "live" as const, tone: "teal" as const },
             { label: "Monitored people", value: formatNumber(totals.people), icon: "people" as const, tone: "violet" as const },
-            { label: "Live connectors", value: formatNumber(totals.connectors), icon: "plug" as const, tone: "sky" as const },
+            { label: "Registered connectors", value: formatNumber(totals.connectors), icon: "plug" as const, tone: "sky" as const },
           ] as const
         ).map((tile) => (
           <div

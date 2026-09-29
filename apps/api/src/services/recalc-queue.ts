@@ -26,8 +26,9 @@ export function initRecalcQueue(): void {
     // Without Redis there is no worker queue. Recalculate inline so a late
     // event still produces a new hourly version (FR-023) instead of silently
     // leaving the earlier snapshot as the latest.
-    setLateRecalcHandler((job) => {
-      void finalizeHourForDeveloper(
+    setLateRecalcHandler(async (job) => {
+      // Returned (awaited by ingest) so it completes before the response.
+      await finalizeHourForDeveloper(
         job.organizationId,
         job.developerId,
         new Date(job.hour),
@@ -39,7 +40,10 @@ export function initRecalcQueue(): void {
   }
   const connection = redisConnection();
   const queue = new Queue("hourly-recalc", { connection });
-  setLateRecalcHandler((job) => {
-    void queue.add("recalc", job);
+  setLateRecalcHandler(async (job) => {
+    // Finished jobs are removed so Redis does not keep every job forever.
+    await queue
+      .add("recalc", job, { removeOnComplete: 1000, removeOnFail: 5000 })
+      .catch((err) => console.error("[late-recalc queue]", err));
   });
 }

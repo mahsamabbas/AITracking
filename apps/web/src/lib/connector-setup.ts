@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "./api";
-import { connectorOwner, setConnectorViewer, setupConnectorFetch } from "./connector-local";
+import { connectorOwner, forgetFailedConnectorScan, setConnectorViewer, setupConnectorFetch } from "./connector-local";
 
 /** Routes developers may use until the local agent is installed and paired. */
 export const CONNECTOR_ONBOARDING_PATHS = [
@@ -66,6 +66,7 @@ async function connectorReportingToServer(): Promise<boolean> {
     const r = await fetch(`${API_BASE}/v1/dashboard/live?limit=1`, {
       headers: { Authorization: `Bearer ${viewerToken}` },
       cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
     });
     if (!r.ok) return false;
     const json = (await r.json()) as { connectors?: { state?: string }[] };
@@ -75,9 +76,38 @@ async function connectorReportingToServer(): Promise<boolean> {
   }
 }
 
-export async function fetchConnectorSetupPhase(): Promise<
-  Exclude<ConnectorSetupPhase, "loading">
-> {
+type SettledPhase = Exclude<ConnectorSetupPhase, "loading">;
+
+/**
+ * One check at a time, shared by every caller (shell, gate, tour, stepper,
+ * guide…): concurrent callers get the same promise, and a result younger than
+ * FRESH_MS is reused. Each check probes up to 20 local ports and calls the
+ * API, so uncoordinated pollers multiplied that per page.
+ */
+const FRESH_MS = 2_500;
+let inflight: Promise<SettledPhase> | null = null;
+let lastResult: { at: number; phase: SettledPhase } | null = null;
+const phaseListeners = new Set<(phase: SettledPhase) => void>();
+
+export function fetchConnectorSetupPhase(options: { force?: boolean } = {}): Promise<SettledPhase> {
+  if (inflight) return inflight;
+  if (!options.force && lastResult && Date.now() - lastResult.at < FRESH_MS) {
+    return Promise.resolve(lastResult.phase);
+  }
+  if (options.force) forgetFailedConnectorScan();
+  inflight = computeConnectorSetupPhase()
+    .then((phase) => {
+      lastResult = { at: Date.now(), phase };
+      for (const listener of phaseListeners) listener(phase);
+      return phase;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
+
+async function computeConnectorSetupPhase(): Promise<SettledPhase> {
   const attempt = async (): Promise<Exclude<ConnectorSetupPhase, "loading">> => {
     try {
       const health = await setupConnectorFetch("/health");
@@ -95,7 +125,7 @@ export async function fetchConnectorSetupPhase(): Promise<
 
   let phase = await attempt();
   // First probe after reload is often false "offline" before localhost / viewer id settles.
-  if (phase === "offline") {
+  if (phase === "offline" && !lastResult) {
     await sleep(450);
     phase = await attempt();
   }
@@ -131,18 +161,57 @@ export function showConnectorInstallStepper(phase: ConnectorSetupPhase): boolean
   return false;
 }
 
-export function useConnectorSetupPhase(pollMs = 5_000) {
+/** Subscribers of the shared poller: id → requested interval. */
+const pollers = new Map<number, number>();
+let pollerSeq = 0;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onVisible(): void {
+  if (document.visibilityState === "visible") schedulePoll(0);
+}
+
+/** One timer for all subscribers (shortest interval wins); paused while the tab is hidden. */
+function schedulePoll(delay?: number): void {
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = null;
+  if (pollers.size === 0) {
+    document.removeEventListener("visibilitychange", onVisible);
+    return;
+  }
+  document.addEventListener("visibilitychange", onVisible);
+  const every = Math.min(...pollers.values());
+  pollTimer = setTimeout(() => {
+    if (document.visibilityState === "hidden") return; // resumes on visibilitychange
+    void fetchConnectorSetupPhase().finally(() => schedulePoll());
+  }, delay ?? every);
+}
+
+/**
+ * Connector setup phase, kept current by the shared poller. `enabled: false`
+ * (e.g. roles that never install a connector) makes no requests at all.
+ */
+export function useConnectorSetupPhase(pollMs = 5_000, enabled = true) {
   const [phase, setPhase] = useState<ConnectorSetupPhase>(() => initialConnectorSetupPhase());
 
   const refresh = useCallback(async () => {
-    setPhase(await fetchConnectorSetupPhase());
+    const next = await fetchConnectorSetupPhase({ force: true });
+    setPhase(next);
+    return next;
   }, []);
 
   useEffect(() => {
-    void refresh();
-    const t = setInterval(() => void refresh(), pollMs);
-    return () => clearInterval(t);
-  }, [refresh, pollMs]);
+    if (!enabled) return;
+    const id = ++pollerSeq;
+    phaseListeners.add(setPhase);
+    pollers.set(id, pollMs);
+    void fetchConnectorSetupPhase().then(setPhase);
+    schedulePoll();
+    return () => {
+      phaseListeners.delete(setPhase);
+      pollers.delete(id);
+      schedulePoll();
+    };
+  }, [enabled, pollMs]);
 
   return { phase, refresh };
 }

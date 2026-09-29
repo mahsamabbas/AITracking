@@ -28,7 +28,6 @@ function measure(selector: string): Rect | null {
 function popoverStyle(
   target: Rect,
   placement: TourPlacement,
-  pad: number,
 ): { top: number; left: number; arrow: TourPlacement } {
   const gap = 14;
   const popW = 320;
@@ -128,7 +127,7 @@ export function TourSpotlight({
     : null;
 
   const pop = highlight
-    ? popoverStyle(highlight, step.placement ?? "bottom", pad)
+    ? popoverStyle(highlight, step.placement ?? "bottom")
     : { top: 80, left: 24, arrow: "top" as TourPlacement };
 
   const isLast = stepIndex >= steps.length - 1;

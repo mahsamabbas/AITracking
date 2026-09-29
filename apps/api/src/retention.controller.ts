@@ -5,6 +5,7 @@ import {
   archiveStore,
   db,
   eventsToCsv,
+  recordsToCsv,
   lastMaintenanceReport,
   readArchive,
   retentionPolicy,
@@ -98,15 +99,7 @@ export class ArchivesController {
       row.kind === "events"
         ? eventsToCsv(records)
         : // Sessions: every column as-is.
-          (() => {
-            const cols = [...new Set(records.flatMap((r) => Object.keys(r)))];
-            const cell = (v: unknown) => {
-              if (v === undefined || v === null) return "";
-              const s = typeof v === "string" ? v : JSON.stringify(v);
-              return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-            };
-            return [cols.join(","), ...records.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\r\n") + "\r\n";
-          })();
+          recordsToCsv(records);
     reply
       .header("Content-Type", "text/csv; charset=utf-8")
       .header("Content-Disposition", `attachment; filename="${base}.csv"`)

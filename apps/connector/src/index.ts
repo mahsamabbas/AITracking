@@ -288,7 +288,7 @@ async function postApiHeartbeat(): Promise<void> {
   if (!identity) return;
   const caps = providerCapability(hostProvider);
   try {
-    await fetch(`${apiBase()}/v1/connectors/${identity.deviceId}/heartbeat`, {
+    const res = await fetch(`${apiBase()}/v1/connectors/${identity.deviceId}/heartbeat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -306,7 +306,20 @@ async function postApiHeartbeat(): Promise<void> {
           ...capabilityReport(),
         },
       }),
+      signal: AbortSignal.timeout(15_000),
     });
+    // Follow a pause/resume made on the dashboard. A pause the employee set
+    // here (tray / local API) is theirs and is never lifted by the dashboard.
+    const reply = (await res.json().catch(() => ({}))) as { remotePaused?: boolean };
+    if (reply.remotePaused === true && !paused) {
+      pauseCollection();
+      pausedByDashboard = true;
+      note("paused from the dashboard");
+    } else if (reply.remotePaused === false && paused && pausedByDashboard) {
+      resumeCollection();
+      pausedByDashboard = false;
+      note("resumed from the dashboard");
+    }
   } catch {
     /* API may be down; event queue still retries */
   }
@@ -585,15 +598,16 @@ function enqueueCoverageGap(reason: "paused" | "offline"): void {
   void flushQueue();
 }
 
-app.post("/pause", async () => {
+/** True while collection is paused because the dashboard asked (not the employee). */
+let pausedByDashboard = false;
+
+function pauseCollection(): void {
   paused = true;
   savePaused(true);
   enqueueCoverageGap("paused");
-  void postApiHeartbeat();
-  return { paused: true };
-});
+}
 
-app.post("/resume", async () => {
+function resumeCollection(): void {
   paused = false;
   savePaused(false);
   const resumed = baseEvent(EventTypes.connector_resumed, {
@@ -605,6 +619,18 @@ app.post("/resume", async () => {
   const batch = [resumed, ended].filter((e): e is ActivityEvent => e !== null);
   if (batch.length) queue.enqueue(batch);
   void flushQueue();
+}
+
+app.post("/pause", async () => {
+  pauseCollection();
+  pausedByDashboard = false;
+  void postApiHeartbeat();
+  return { paused: true };
+});
+
+app.post("/resume", async () => {
+  resumeCollection();
+  pausedByDashboard = false;
   void postApiHeartbeat();
   return { paused: false };
 });
@@ -877,7 +903,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
     );
     return duration ? { ...event, duration_ms: duration } : event;
   });
-  void gitWatch.observe(payload.cwd);
+  gitWatch.observe(payload.cwd).catch(() => undefined); // a failed state write must not crash the service
   let clean = events
     .map(sanitizeEvent)
     .filter((event): event is NonNullable<typeof event> => event !== null);
@@ -916,7 +942,7 @@ function acceptAgentHook(payload: ClaudeHookPayload, fallbackProvider: string) {
         (e.metadata?.tool_category === "test" || e.metadata?.tool_category === "build"),
     )
   ) {
-    void gitWatch.markCheck(payload.cwd);
+    gitWatch.markCheck(payload.cwd).catch(() => undefined); // a failed state write must not crash the service
   }
   const fresh = clean.filter((event) => {
     // Same-provider repeat guard (e.g. native + Claude-format both under Cursor).
@@ -946,7 +972,7 @@ app.post("/hooks/ci-gate", async (req) => {
   if (paused || !identity) return { accepted: 0, unpaired: !identity };
   const body = (req.body ?? {}) as { status?: string; cwd?: string };
   if (body.status === "failed") return { accepted: 0 };
-  void gitWatch.markCheck(typeof body.cwd === "string" ? body.cwd : undefined);
+  gitWatch.markCheck(typeof body.cwd === "string" ? body.cwd : undefined).catch(() => undefined); // a failed state write must not crash the service
   const event = baseEvent(EventTypes.test_completed, {
     session_id: workflowSessionId(),
     status: "succeeded",
@@ -1027,8 +1053,20 @@ app.post("/v1/logs", async (req, reply) => {
   return { partialSuccess: {} };
 });
 
+/** Dedupe windows are seconds long; older entries can never match again. */
+function pruneStaleEntries(map: Map<string, number>, maxAgeMs: number): void {
+  const cutoff = Date.now() - maxAgeMs;
+  for (const [key, at] of map) if (at < cutoff) map.delete(key);
+}
+
 setInterval(() => {
   void flushQueue();
+  // These maps gained an entry per hook event and were never pruned.
+  pruneStaleEntries(recentAgentEvents, 60_000);
+  pruneStaleEntries(recentCursorAction, 60_000);
+  // Calls that never reported completion (agent crashed, hook lost).
+  pruneStaleEntries(modelStartedAt, 3_600_000);
+  pruneStaleEntries(toolStartedAt, 3_600_000);
 }, 15_000);
 
 setInterval(() => {

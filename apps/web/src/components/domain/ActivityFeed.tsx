@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { rangeLabel, rangeParams, type RangeValue } from "@/components/filters/RangePicker";
 import { useApi } from "@/lib/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { apiGet, qs } from "@/lib/api";
+import { apiDisplayTimezone, apiGet, qs } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 import { rangeIncludesNow, analyticsPollMs } from "@/lib/live-poll";
 import type { ActivityEventRow } from "@/lib/types";
@@ -24,7 +24,13 @@ interface FeedPage {
 const PAGE = 50;
 
 function dayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  // Group by the display timezone's day, the same day the range was bucketed by.
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: apiDisplayTimezone(),
+  });
 }
 
 /**

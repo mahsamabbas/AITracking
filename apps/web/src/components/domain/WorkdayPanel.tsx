@@ -5,7 +5,7 @@ import { ChartSkeleton } from "@/components/ui/States";
 import { ProviderBadge } from "@/components/domain/Badges";
 import { WORKDAY_SERIES, WorkdayChart, clockIn, type WorkdayData } from "@/components/charts/WorkdayChart";
 import { useApi } from "@/lib/use-api";
-import { formatDuration, formatNumber } from "@/lib/format";
+import { formatDuration, formatNumber, todayKey } from "@/lib/format";
 
 function shiftDate(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -39,7 +39,7 @@ export function WorkdayPanel({
   const query = useApi<WorkdayData>(`/v1/employees/${employeeId}/workday?date=${date}`);
   const d = query.data;
   const t = d?.totals;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKey();
   const pretty = new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
     weekday: "long",
     day: "numeric",

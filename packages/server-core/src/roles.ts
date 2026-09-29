@@ -86,13 +86,3 @@ export function homePathForRole(role: Role, developerId?: string | null): string
   if (role === "auditor") return "/audit";
   return "/";
 }
-
-export function navForRole(role: Role): string[] {
-  if (role === "super_admin") return ["/platform"];
-  if (role === "developer") return ["/", "/employees/:self", "/my-connectors", "/policy"];
-  if (role === "auditor") return ["/audit", "/connectors", "/policy"];
-  if (role === "administrator") {
-    return ["/", "/employees", "/connectors", "/users", "/audit", "/policy"];
-  }
-  return ["/", "/employees", "/connectors", "/policy"];
-}

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useRouter } from "next/navigation";
+import { useAppPaths } from "@/lib/app-paths";
 import { useMemo, useState } from "react";
 import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import { formatDateTime, formatDuration } from "@/lib/format";
@@ -22,6 +23,7 @@ export function SessionTable({
   emptyBody?: string;
 }) {
   const router = useRouter();
+  const { resolvePath } = useAppPaths();
   const [sortKey, setSortKey] = useState<SessionSortKey>("startedAt");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
 
@@ -102,7 +104,7 @@ export function SessionTable({
             <tr
               key={s.id}
               className="row-link"
-              onClick={() => router.push(`/sessions/${s.id}`)}
+              onClick={() => router.push(resolvePath(`/sessions/${s.id}`))}
             >
               <td className="whitespace-nowrap">
                 <span className="num text-sm text-ink-900">{formatDateTime(s.startedAt)}</span>
@@ -150,13 +152,13 @@ export function SessionTable({
                 </div>
               </td>
               <td className="text-right">
-                <Link
+                <OrgLink
                   href={`/sessions/${s.id}`}
                   className="text-xs font-medium text-brand-600 hover:text-brand-700"
                   onClick={(e) => e.stopPropagation()}
                 >
                   Open
-                </Link>
+                </OrgLink>
               </td>
             </tr>
           ))}

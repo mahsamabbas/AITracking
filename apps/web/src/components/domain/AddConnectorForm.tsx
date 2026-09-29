@@ -7,29 +7,7 @@ import { Callout } from "@/components/ui/Callout";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { Button } from "@/components/ui/Button";
 import { claimLocalConnector } from "@/components/domain/ConnectThisComputer";
-import { providerLabel } from "@/lib/providers";
 import { FIELD_LIMITS } from "@/lib/validation";
-
-const SETUP: Record<string, string[]> = {
-  cursor: [
-    "Keep the Techlio connector running on this computer.",
-    "The connector connects Cursor automatically if it is installed. Restart Cursor if it was already open.",
-  ],
-  claude_code: [
-    "Keep the Techlio connector running.",
-    "Point Claude Code hooks at http://127.0.0.1:9477/hooks/claude",
-  ],
-  vscode: [
-    "Keep the Techlio connector running on this computer.",
-    "The connector connects VS Code automatically if it is installed. Restart VS Code if it was already open.",
-  ],
-  gemini: [
-    "Gemini activation is unavailable until its normalized event adapter is implemented.",
-  ],
-  codex: [
-    "Codex activation is unavailable until its normalized event adapter is implemented.",
-  ],
-};
 
 export function ActivateConnectorForm({
   displayName,
@@ -129,11 +107,4 @@ export function ActivateConnectorForm({
       ) : null}
     </form>
   );
-}
-
-export function connectorSetupSteps(provider: string | null | undefined): string[] {
-  if (!provider) return SETUP.cursor;
-  return SETUP[provider] ?? [
-    `Keep the Techlio connector running for ${providerLabel(provider)}.`,
-  ];
 }

@@ -59,7 +59,10 @@ const STORAGE_KEY = "techlio-connector-tour-step";
 export function ConnectorOnboardingTour() {
   const { token, user, ready, locked } = useAuth();
   const pathname = usePathname();
-  const { phase } = useConnectorSetupPhase(4_000);
+  const { phase } = useConnectorSetupPhase(
+    4_000,
+    Boolean(ready && token && !locked && developerNeedsLocalConnector(user?.role, user?.developerId)),
+  );
   const [stepIndex, setStepIndex] = useState(0);
   const [dismissed, setDismissed] = useState(true);
 

@@ -28,7 +28,8 @@ function usageHeadline(row: EmployeeAiSubscription): {
   }
   if (unit === "cursor_admin_requests") {
     return {
-      label: "Chat requests (Cursor daily report)",
+      // tokensUsed carries Cursor's billable request count (see ai-plan.ts).
+      label: "Billable requests (Cursor daily report)",
       value: formatTokens(row.tokensUsed),
       missing: false,
     };

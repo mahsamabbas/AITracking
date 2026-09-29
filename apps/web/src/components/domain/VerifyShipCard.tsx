@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/States";
 import { formatNumber, formatRelative } from "@/lib/format";
@@ -100,9 +100,9 @@ export function VerifyShipCard({
                   <li key={c.ref} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2.5">
                     <span className="num w-24 shrink-0 text-xs text-ink-500">{formatRelative(c.occurredAt)}</span>
                     {showPerson ? (
-                      <Link href={`/employees/${c.developerId}`} className="text-sm font-medium text-ink-900 hover:text-brand-600">
+                      <OrgLink href={`/employees/${c.developerId}`} className="text-sm font-medium text-ink-900 hover:text-brand-600">
                         {c.developerName ?? "Unknown"}
-                      </Link>
+                      </OrgLink>
                     ) : null}
                     <span className="min-w-0 truncate text-sm text-ink-700">{c.repo ?? "Repository"}</span>
                     <span className="num text-xs text-ink-500">

@@ -17,7 +17,7 @@ interface OrgPolicy {
   archiveConfigured?: boolean;
   staleHeartbeatMinutes: number;
   idleThresholdMinutes: number;
-  monitoringNoticeStatus: string;
+  monitoringNoticeStatus: string | null;
   notificationRules: string[];
 }
 
@@ -72,9 +72,11 @@ export default function PolicyPage() {
               title="Current configuration"
               subtitle="Applied to every aggregate on every screen"
               action={
-                <Badge tone={p.monitoringNoticeStatus === "approved" ? "ok" : "warn"}>
-                  Notice: {p.monitoringNoticeStatus}
-                </Badge>
+                p.monitoringNoticeStatus ? (
+                  <Badge tone={p.monitoringNoticeStatus === "approved" ? "ok" : "warn"}>
+                    Notice: {p.monitoringNoticeStatus}
+                  </Badge>
+                ) : undefined
               }
             />
             <CardBody>
@@ -191,9 +193,9 @@ export default function PolicyPage() {
                   ))}
                 </div>
                 <p className="hint mt-3">
-                  Notifications cover telemetry reliability — stale connectors, upload failures,
-                  unsupported versions, prolonged unassigned activity, and summary-generation
-                  failures. There are no alerts about a person&apos;s output.
+                  Notifications cover telemetry reliability — stale or offline connectors, paused
+                  collection, and activity not assigned to a project. There are no alerts about a
+                  person&apos;s output.
                 </p>
               </CardBody>
             </Card>

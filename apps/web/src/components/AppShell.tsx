@@ -134,7 +134,11 @@ export function AppShell({
 }) {
   const path = usePathname();
   const { user, logout, ready, token } = useAuth();
-  const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
+  // Only developers install a connector; other roles never probe for one.
+  const { phase: connectorPhase } = useConnectorSetupPhase(
+    4_000,
+    developerNeedsLocalConnector(user?.role, user?.developerId),
+  );
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -176,7 +180,8 @@ export function AppShell({
     const ro = new ResizeObserver(apply);
     ro.observe(el);
     return () => ro.disconnect();
-  });
+    // The header mounts once the session is ready and changes with the route.
+  }, [ready, path]);
 
   if (path === "/login") return <>{children}</>;
 

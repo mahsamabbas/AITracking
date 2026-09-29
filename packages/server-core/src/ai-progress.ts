@@ -311,6 +311,18 @@ export async function aiProgress(input: {
   };
 }
 
+/**
+ * Re-time provider cards with event-time active ms (the engine behind the
+ * headline, Workday graph and Tools table) so every view agrees.
+ */
+export function withEngineActive(progress: AiProgress, activeByProvider: Map<string, number>): AiProgress {
+  const providers = progress.providers.map((p) => ({ ...p, activeMs: activeByProvider.get(p.provider) ?? 0 }));
+  const total = providers.reduce((s, p) => s + p.activeMs, 0);
+  for (const p of providers) p.sharePct = total > 0 ? Math.round((p.activeMs / total) * 100) : 0;
+  providers.sort((a, b) => b.activeMs - a.activeMs);
+  return { ...progress, providers };
+}
+
 export interface ProgressTimeline {
   date: string;
   timezone: string;

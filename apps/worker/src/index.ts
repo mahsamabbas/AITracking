@@ -54,12 +54,18 @@ function scheduleNextHourly() {
   setTimeout(async () => {
     const hour = new Date();
     hour.setUTCHours(hour.getUTCHours() - 1, 0, 0, 0);
-    await hourlyQueue.add("finalize", { hour: hour.toISOString() });
-    scheduleNextHourly();
+    try {
+      await hourlyQueue.add("finalize", { hour: hour.toISOString() }, { removeOnComplete: 500, removeOnFail: 1000 });
+    } catch (err) {
+      console.warn("Could not queue hourly finalize", err);
+    } finally {
+      // Always schedule the next run: one Redis blip must not stop finalizing forever.
+      scheduleNextHourly();
+    }
   }, delay);
 }
 
-new Worker(
+const finalizeWorker = new Worker(
   "hourly-finalize",
   async (job) => {
     const hour = new Date(job.data.hour as string);
@@ -77,7 +83,7 @@ new Worker(
   { connection },
 );
 
-new Worker(
+const recalcWorker = new Worker(
   "hourly-recalc",
   async (job) => {
     const { organizationId, developerId, hour, version, reason } = job.data as {
@@ -241,8 +247,13 @@ async function pullAllTierB(): Promise<void> {
   await pullCopilotTierB(organizationId);
 }
 
-void pullAllTierB();
-setInterval(() => void pullAllTierB(), 60 * 60 * 1000);
+// BullMQ: without an "error" listener a connection error can stop job processing.
+finalizeWorker.on("error", (err) => console.warn("hourly-finalize worker error", err));
+recalcWorker.on("error", (err) => console.warn("hourly-recalc worker error", err));
+
+const runPull = () => void pullAllTierB().catch((err) => console.warn("Tier B pull failed", err));
+runPull();
+setInterval(runPull, 60 * 60 * 1000);
 
 scheduleNextHourly();
 console.log(

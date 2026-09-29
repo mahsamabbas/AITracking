@@ -1,4 +1,6 @@
 import { organizationDisabled } from "./platform.js";
+import { IDLE_THRESHOLD_MS } from "./activity.js";
+import { STALE_MS } from "./connector-state.js";
 import { archiveStore } from "./retention/archive-store.js";
 import { retentionPolicy } from "./retention/policy.js";
 import { desc, eq, sql } from "drizzle-orm";
@@ -7,7 +9,7 @@ import { db, pool } from "./db.js";
 import { portalUsers, auditLog, employees } from "./schema.js";
 import { ORG_ASSIGNABLE_ROLES, type OrgAssignableRole, type Role } from "./roles.js";
 import { devAffordancesEnabled } from "./runtime.js";
-import { resolveOrgTimezone, timezoneFromEnv } from "./timezone.js";
+import { resolveOrgTimezone } from "./timezone.js";
 import { validatePortalPassword, PORTAL_FIELD_LIMITS } from "./password-policy.js";
 
 export const DEV_ORG = "550e8400-e29b-41d4-a716-446655440010";
@@ -471,40 +473,13 @@ export async function getOrgPolicy(organizationId: string) {
     retentionSummariesDays: null as number | null,
     retentionSessionsDays: retention.sessionDays,
     archiveConfigured: archiveStore() !== null,
-    staleHeartbeatMinutes: 5,
-    idleThresholdMinutes: 10,
-    monitoringNoticeStatus: "draft" as const,
-    notificationRules: [
-      "stale_connector",
-      "upload_failed",
-      "unsupported_version",
-      "unassigned_session",
-      "summary_failed",
-    ],
-  };
-}
-
-/** @deprecated Use {@link getOrgPolicy} with an organisation id. */
-export function getOrgPolicySync() {
-  const retention = retentionPolicy();
-  const retentionEventsDays = retention.rawEventDays;
-  return {
-    timezone: timezoneFromEnv(),
-    retentionEventsDays,
-    /** null: hourly summaries are kept indefinitely. */
-    retentionSummariesDays: null as number | null,
-    retentionSessionsDays: retention.sessionDays,
-    archiveConfigured: archiveStore() !== null,
-    staleHeartbeatMinutes: 5,
-    idleThresholdMinutes: 10,
-    monitoringNoticeStatus: "draft" as const,
-    notificationRules: [
-      "stale_connector",
-      "upload_failed",
-      "unsupported_version",
-      "unassigned_session",
-      "summary_failed",
-    ],
+    // The same constants the connector-state and idle logic use.
+    staleHeartbeatMinutes: STALE_MS / 60_000,
+    idleThresholdMinutes: IDLE_THRESHOLD_MS / 60_000,
+    /** No stored notice status per organisation yet — never a made-up "draft". */
+    monitoringNoticeStatus: null as string | null,
+    /** Alert codes the live dashboard actually raises (dashboard.controller). */
+    notificationRules: ["stale_connector", "connector_offline", "collection_paused", "unassigned_activity"],
   };
 }
 

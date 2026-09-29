@@ -6,9 +6,15 @@ import { activityEvents, auditLog, hourlySnapshots } from "./schema.js";
 import { fullEvent, slimPayload } from "./retention/payload.js";
 import { scanEventForSecrets } from "./security.js";
 import { applySessionization } from "./sessionize.js";
-import { recordLiveHeartbeat } from "./devices.js";
+import { isRemotelyPaused, recordLiveHeartbeat } from "./devices.js";
 
+/**
+ * Recently accepted event ids (fast replay rejection within this process).
+ * Bounded: the database's ON CONFLICT is the real duplicate guard, and an
+ * unbounded set grew by one entry per event forever in long-lived processes.
+ */
 const seenEvents = new Set<string>();
+const SEEN_EVENTS_MAX = 50_000;
 
 export type RecalcCallback = (job: {
   organizationId: string;
@@ -16,7 +22,7 @@ export type RecalcCallback = (job: {
   hour: string;
   version: number;
   reason: string;
-}) => void;
+}) => void | Promise<void>;
 
 let onLateRecalc: RecalcCallback | null = null;
 
@@ -57,7 +63,7 @@ async function maybeScheduleLateRecalc(event: ActivityEvent): Promise<void> {
   if (existing.length === 0) return;
   const latest = existing[0];
   const nextVersion = latest.version + 1;
-  onLateRecalc?.({
+  await onLateRecalc?.({
     organizationId: event.organization_id,
     developerId: event.developer_id,
     hour: eventHour.toISOString(),
@@ -72,6 +78,15 @@ export interface IngestAuth {
   /** Only provider_pull devices (the worker) may submit Tier B daily aggregates. */
   allowTierB?: boolean;
 }
+
+/** Still accepted while paused: they describe the pause and the connector's health. */
+const PAUSE_LIFECYCLE_EVENTS = new Set([
+  "heartbeat_sent",
+  "connector_paused",
+  "connector_resumed",
+  "telemetry_gap_started",
+  "telemetry_gap_ended",
+]);
 
 export async function ingestBatch(
   organizationId: string,
@@ -89,6 +104,10 @@ export async function ingestBatch(
   let accepted = 0;
   let rejected = 0;
   const reasons: string[] = [];
+  // Paused from the dashboard: the device's activity is not collected until
+  // resumed there (older connectors keep uploading; this makes pause real).
+  const remotePaused = deviceIdFromAuth && auth ? await isRemotelyPaused(deviceIdFromAuth) : false;
+  const lateHours = new Map<string, ActivityEvent>();
 
   for (const candidate of raw) {
     const parsedEvent = ActivityEventSchema.safeParse(candidate);
@@ -117,6 +136,11 @@ export async function ingestBatch(
     if (auth && !auth.allowTierB && event.event_type === "provider_daily_aggregate") {
       rejected++;
       reasons.push("tier_b_not_allowed");
+      continue;
+    }
+    if (remotePaused && !PAUSE_LIFECYCLE_EVENTS.has(event.event_type)) {
+      rejected++;
+      reasons.push("remote_paused");
       continue;
     }
     if (seenEvents.has(event.event_id)) {
@@ -161,10 +185,15 @@ export async function ingestBatch(
       }
 
       seenEvents.add(event.event_id);
+      if (seenEvents.size > SEEN_EVENTS_MAX) {
+        // Sets iterate in insertion order: drop the oldest.
+        seenEvents.delete(seenEvents.values().next().value as string);
+      }
       accepted++;
 
       await applySessionization(event);
-      void maybeScheduleLateRecalc(event);
+      // One recalculation per (person, hour) per batch, after the batch is stored.
+      lateHours.set(`${event.developer_id}|${hourStartUtc(new Date(event.occurred_at)).toISOString()}`, event);
 
       if (
         event.event_type === "heartbeat_sent" ||
@@ -183,7 +212,7 @@ export async function ingestBatch(
           organizationId: event.organization_id,
           developerId: event.developer_id,
           version: event.connector_version,
-          queueDepth: event.metadata?.queue_depth ?? 0,
+          queueDepth: event.metadata?.queue_depth,
           paused,
           provider: event.provider,
         });
@@ -207,6 +236,12 @@ export async function ingestBatch(
       rejected++;
       reasons.push("db_error");
     }
+  }
+
+  // Awaited: on serverless hosts work left running after the response can be
+  // frozen or dropped, leaving the earlier hourly snapshot as the latest.
+  for (const event of lateHours.values()) {
+    await maybeScheduleLateRecalc(event).catch((err) => console.error("[late-recalc]", err));
   }
 
   // Only rejections are audit-worthy. A row per accepted upload (connectors

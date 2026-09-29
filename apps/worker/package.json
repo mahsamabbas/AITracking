@@ -10,11 +10,10 @@
     "lint": "echo ok"
   },
   "dependencies": {
+    "@techlio/event-schema": "workspace:*",
     "@techlio/puller": "workspace:*",
     "@techlio/server-core": "workspace:*",
-    "bullmq": "^5.34.5",
-    "ioredis": "^5.4.2",
-    "@techlio/event-schema": "workspace:*"
+    "bullmq": "^5.34.5"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

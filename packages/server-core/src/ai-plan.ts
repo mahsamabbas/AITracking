@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { PROVIDER_CAPABILITIES } from "@techlio/event-schema";
-import { timezoneFromEnv } from "./timezone.js";
+import { resolveOrgTimezone, timezoneFromEnv } from "./timezone.js";
 
 function pgErrorCode(err: unknown): string | undefined {
   if (err && typeof err === "object" && "code" in err) {
@@ -87,13 +87,14 @@ export async function getOrgAiPlanLimits(organizationId: string): Promise<AiPlan
 }
 
 /** Calendar month in org timezone (label + UTC bounds for session queries). */
-export async function currentCalendarMonthBounds(): Promise<{
+export async function currentCalendarMonthBounds(organizationId?: string): Promise<{
   from: Date;
   to: Date;
   label: string;
 }> {
   try {
-    const tz = timezoneFromEnv();
+    // The organisation's own timezone (the server's is often UTC on hosts).
+    const tz = organizationId ? await resolveOrgTimezone(organizationId) : timezoneFromEnv();
     const res = await db.execute<{ month_start: Date; month_end: Date; label: string }>(sql`
       SELECT
         (date_trunc('month', timezone(${tz}, now()))) AT TIME ZONE ${tz} AS month_start,
@@ -282,7 +283,7 @@ async function employeeAiSubscriptionsInner(
 ): Promise<EmployeeAiSubscriptionRow[]> {
   const [limits, monthBounds] = await Promise.all([
     getOrgAiPlanLimits(organizationId),
-    currentCalendarMonthBounds(),
+    currentCalendarMonthBounds(organizationId),
   ]);
 
   const presence = await employeeAiProviderPresence(

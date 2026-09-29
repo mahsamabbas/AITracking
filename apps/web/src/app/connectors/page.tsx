@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { OrgLink } from "@/components/OrgLink";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -154,12 +154,12 @@ export default function ConnectorsPage() {
                 {rows.map((c) => (
                   <tr key={c.deviceId}>
                     <td>
-                      <Link
+                      <OrgLink
                         href={`/employees/${c.developerId}`}
                         className="text-sm font-medium text-ink-900 hover:text-brand-600"
                       >
                         {c.displayName}
-                      </Link>
+                      </OrgLink>
                       <span className="hint block">{c.team ?? "No team"}</span>
                     </td>
                     <td>
