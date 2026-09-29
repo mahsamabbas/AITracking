@@ -10,8 +10,22 @@ import { useConnectorSetupPhase } from "@/lib/connector-local";
 
 /** One banner that names the single next step, driven by the local connector. */
 function NextStepBanner() {
-  const { phase } = useConnectorSetupPhase(4_000);
+  const { phase, installedHere } = useConnectorSetupPhase(4_000);
   if (phase === "loading") return null;
+  if (installedHere === false) {
+    return (
+      <Callout tone="warn" title="Install the agent on this computer">
+        No connector is running on this computer. Download it below and install it once
+        {phase === "ready" ? (
+          " — your other connector is still reporting, so the dashboard stays open."
+        ) : (
+          <>
+            , then activate your key on <strong>My connectors</strong>.
+          </>
+        )}
+      </Callout>
+    );
+  }
   if (phase === "unpaired") {
     return (
       <Callout

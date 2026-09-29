@@ -30,13 +30,14 @@ function StepBadge({ done, n }: { done: boolean; n: number }) {
 
 export function ConnectorInstallGuide() {
   const { online, refresh } = useConnectorOnline(5_000);
-  const { phase } = useConnectorSetupPhase(4_000);
+  const { phase, installedHere } = useConnectorSetupPhase(4_000);
   const [checking, setChecking] = useState(false);
   const platform = detectConnectorPlatform();
   const macHref = CONNECTOR_MAC_PKG;
   const macLabel = "Download for Mac";
-  const step1Done = phase === "unpaired" || phase === "ready";
-  const step3Done = phase === "ready";
+  // Installed means a connector answers on this computer, not just a recent heartbeat.
+  const step1Done = installedHere !== false && (phase === "unpaired" || phase === "ready");
+  const step3Done = installedHere !== false && phase === "ready";
 
   const steps = (
     <ol className="space-y-4">
@@ -77,7 +78,7 @@ export function ConnectorInstallGuide() {
               : "Open the downloaded installer and follow the steps (macOS asks for your password once). Nothing is added to Applications or the Dock; the connector runs in the background for Intel and Apple silicon. Then click Check if running."}
           </p>
           {/* Says why it is not reachable (browser permission, other address, not installed). */}
-          {online === false && phase !== "ready" ? <LocalAccessHint onReachable={() => void refresh()} /> : null}
+          {online === false && (phase !== "ready" || installedHere === false) ? <LocalAccessHint onReachable={() => void refresh()} /> : null}
           {online === true || phase === "ready" ? (
             <p className="mt-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
               {online === true ? "Connector is running on this computer." : "Your connector is running and reporting activity."}

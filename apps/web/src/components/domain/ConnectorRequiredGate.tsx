@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   connectorOnboardingActive,
   developerNeedsLocalConnector,
+  connectorFoundLocally,
   fetchConnectorSetupPhase,
   initialConnectorSetupPhase,
   isConnectorOnboardingPath,
@@ -59,7 +60,7 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
     if (!ready || !mustComplete || phase === "loading") return;
 
     if (phase === "ready") {
-      if (pathname === "/setup-connector") {
+      if (pathname === "/setup-connector" && connectorFoundLocally() !== false) {
         router.replace(homePathForRole(user?.role, user?.developerId));
       }
       return;

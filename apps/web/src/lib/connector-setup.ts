@@ -88,6 +88,16 @@ const FRESH_MS = 2_500;
 let inflight: Promise<SettledPhase> | null = null;
 let lastResult: { at: number; phase: SettledPhase } | null = null;
 const phaseListeners = new Set<(phase: SettledPhase) => void>();
+/**
+ * Whether the last check found a connector on this computer, before the
+ * server fallback. A recent heartbeat keeps the dashboard unlocked, but only
+ * a local answer means it is installed here (null until the first check).
+ */
+let foundLocally: boolean | null = null;
+
+export function connectorFoundLocally(): boolean | null {
+  return foundLocally;
+}
 
 export function fetchConnectorSetupPhase(options: { force?: boolean } = {}): Promise<SettledPhase> {
   if (inflight) return inflight;
@@ -129,6 +139,7 @@ async function computeConnectorSetupPhase(): Promise<SettledPhase> {
     await sleep(450);
     phase = await attempt();
   }
+  foundLocally = phase !== "offline";
   // The browser cannot reach it, but the connector is reporting: it is
   // installed, activated, and tracking — do not lock the dashboard.
   if (phase === "offline" && (await connectorReportingToServer())) phase = "ready";
@@ -154,9 +165,9 @@ export function connectorOnboardingActive(
   return phase === "offline" || phase === "unpaired";
 }
 
-/** Install stepper on My connectors — only while the local agent is not running yet. */
-export function showConnectorInstallStepper(phase: ConnectorSetupPhase): boolean {
-  if (phase === "offline") return true;
+/** Install steps — whenever no connector answers on this computer. */
+export function showConnectorInstallStepper(phase: ConnectorSetupPhase, installedHere?: boolean | null): boolean {
+  if (phase === "offline" || installedHere === false) return true;
   if (phase === "loading") return readCachedConnectorPhase() === "offline";
   return false;
 }
@@ -192,26 +203,32 @@ function schedulePoll(delay?: number): void {
  */
 export function useConnectorSetupPhase(pollMs = 5_000, enabled = true) {
   const [phase, setPhase] = useState<ConnectorSetupPhase>(() => initialConnectorSetupPhase());
+  const [installedHere, setInstalledHere] = useState<boolean | null>(() => foundLocally);
+
+  const apply = useCallback((next: SettledPhase) => {
+    setPhase(next);
+    setInstalledHere(foundLocally);
+  }, []);
 
   const refresh = useCallback(async () => {
     const next = await fetchConnectorSetupPhase({ force: true });
-    setPhase(next);
+    apply(next);
     return next;
-  }, []);
+  }, [apply]);
 
   useEffect(() => {
     if (!enabled) return;
     const id = ++pollerSeq;
-    phaseListeners.add(setPhase);
+    phaseListeners.add(apply);
     pollers.set(id, pollMs);
-    void fetchConnectorSetupPhase().then(setPhase);
+    void fetchConnectorSetupPhase().then(apply);
     schedulePoll();
     return () => {
-      phaseListeners.delete(setPhase);
+      phaseListeners.delete(apply);
       pollers.delete(id);
       schedulePoll();
     };
-  }, [enabled, pollMs]);
+  }, [enabled, pollMs, apply]);
 
-  return { phase, refresh };
+  return { phase, installedHere, refresh };
 }

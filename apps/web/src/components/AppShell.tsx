@@ -135,7 +135,7 @@ export function AppShell({
   const path = usePathname();
   const { user, logout, ready, token } = useAuth();
   // Only developers install a connector; other roles never probe for one.
-  const { phase: connectorPhase } = useConnectorSetupPhase(
+  const { phase: connectorPhase, installedHere } = useConnectorSetupPhase(
     4_000,
     developerNeedsLocalConnector(user?.role, user?.developerId),
   );
@@ -161,11 +161,13 @@ export function AppShell({
     if (onboardingLocked) {
       const allowed = new Set(["/setup-connector", "/my-connectors", "/policy", "/settings"]);
       items = items.filter((item) => allowed.has(item.href));
-    } else {
+    } else if (!(developerNeedsLocalConnector(user?.role, user?.developerId) && installedHere === false)) {
+      // Keep the install tab while no connector answers on this computer,
+      // even if another of this person's connectors is still reporting.
       items = items.filter((item) => item.href !== "/setup-connector");
     }
     return items;
-  }, [user, onboardingLocked]);
+  }, [user, onboardingLocked, installedHere]);
 
   useEffect(() => setMenuOpen(false), [path]);
 

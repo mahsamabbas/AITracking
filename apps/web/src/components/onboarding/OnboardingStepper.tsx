@@ -5,11 +5,10 @@ import { useConnectorSetupPhase } from "@/lib/connector-local";
 const LABELS = ["Install agent", "Admin key", "Activate key"];
 
 export function OnboardingStepper() {
-  const { phase } = useConnectorSetupPhase(4_000);
-  if (phase === "ready") return null;
+  const { phase, installedHere } = useConnectorSetupPhase(4_000);
+  if (phase === "ready" && installedHere !== false) return null;
 
-  const current =
-    phase === "unpaired" ? 3 : phase === "offline" ? 1 : 1;
+  const current = installedHere === false || phase === "offline" ? 1 : phase === "unpaired" ? 3 : 1;
 
   return (
     <nav className="mb-5" aria-label="Onboarding progress">

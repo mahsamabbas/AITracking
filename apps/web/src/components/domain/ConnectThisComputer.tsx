@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { CONNECTOR_LOCAL, connectorFetch, connectorOwner, setupConnectorFetch } from "@/lib/connector-local";
@@ -106,8 +107,16 @@ export function ThisComputerStatus() {
 
   if (state.kind === "offline") {
     return (
-      <Callout tone="warn" title="Connector not detected on this computer">
-        Download the connector from this page and install it once, then activate your key.
+      <Callout
+        tone="warn"
+        title="Connector not detected on this computer"
+        action={
+          <Link href="/setup-connector" className="btn-primary inline-flex h-8 items-center px-3 text-xs">
+            Install connector
+          </Link>
+        }
+      >
+        Download the connector and install it once, then activate your key.
         <LocalAccessHint />
       </Callout>
     );

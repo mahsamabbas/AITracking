@@ -197,7 +197,7 @@ export function useConnectorOnline(pollMs = 8_000): {
   return { online, refresh };
 }
 
-export { showConnectorInstallStepper, useConnectorSetupPhase } from "./connector-setup";
+export { connectorFoundLocally, showConnectorInstallStepper, useConnectorSetupPhase } from "./connector-setup";
 
 export function detectConnectorPlatform(): "mac" | "windows" | "other" {
   if (typeof navigator === "undefined") return "other";

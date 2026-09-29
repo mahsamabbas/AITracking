@@ -28,8 +28,8 @@ export default function MyConnectorsPage() {
   }>(user?.role === "developer" ? "/v1/connectors/mine" : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
-  const showInstallStepper = showConnectorInstallStepper(connectorPhase);
+  const { phase: connectorPhase, installedHere } = useConnectorSetupPhase(4_000);
+  const showInstallStepper = showConnectorInstallStepper(connectorPhase, installedHere);
 
   const developerId = user?.developerId;
   const mine = (live.data?.connectors ?? []).filter(
