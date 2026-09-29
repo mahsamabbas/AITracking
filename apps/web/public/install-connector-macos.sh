@@ -2,7 +2,7 @@
 # Techlio local connector — Node.js only, no repo clone.
 set -euo pipefail
 
-TECHLIO_SITE="${TECHLIO_SITE:-https://ai-tracking-bhgg.vercel.app}"
+TECHLIO_SITE="${TECHLIO_SITE:-https://techlio-pulse.vercel.app}"
 INSTALL_DIR="${TECHLIO_INSTALL_DIR:-$HOME/.techlio/connector}"
 BUNDLE_URL="${TECHLIO_SITE}/downloads/techlio-connector.zip"
 

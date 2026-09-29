@@ -313,6 +313,7 @@ const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
  * stays accepted while people move over; `*` matches Vercel deployment URLs.
  */
 const DEFAULT_DASHBOARD_ORIGINS = [
+  "https://techlio-pulse.vercel.app",
   "https://ai-tracking-bhgg.vercel.app",
   "https://ai-tracking-bhgg-techlio1.vercel.app",
   // Deployment and branch URLs of the dashboard project (Vercel team techlio1).
@@ -322,7 +323,7 @@ const DEFAULT_DASHBOARD_ORIGINS = [
 ];
 
 /** APIs a dashboard may pair this connector with (never an arbitrary URL). */
-const KNOWN_API_BASES = ["https://ai-tracking-techlio1.vercel.app", "https://tracking-app-api-three.vercel.app"];
+const KNOWN_API_BASES = ["https://techlio-pulse-api.vercel.app", "https://ai-tracking-techlio1.vercel.app", "https://tracking-app-api-three.vercel.app"];
 
 /**
  * Dashboards the API this connector reports to vouches for
