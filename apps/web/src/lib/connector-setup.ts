@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { API_BASE } from "./api";
 import { connectorOwner, setConnectorViewer, setupConnectorFetch } from "./connector-local";
 
 /** Routes developers may use until the local agent is installed and paired. */
@@ -51,6 +52,29 @@ export function isConnectorOnboardingPath(pathname: string): boolean {
   );
 }
 
+let viewerToken: string | null = null;
+
+/**
+ * Server-side truth: does this person have a connector that sent a heartbeat
+ * in the last few minutes (online, or paused on purpose)? Independent of the
+ * browser — a missed "Allow" prompt or an ad blocker must never make a
+ * running, tracking connector look uninstalled.
+ */
+async function connectorReportingToServer(): Promise<boolean> {
+  if (!viewerToken) return false;
+  try {
+    const r = await fetch(`${API_BASE}/v1/dashboard/live?limit=1`, {
+      headers: { Authorization: `Bearer ${viewerToken}` },
+      cache: "no-store",
+    });
+    if (!r.ok) return false;
+    const json = (await r.json()) as { connectors?: { state?: string }[] };
+    return (json.connectors ?? []).some((c) => c.state === "online" || c.state === "paused");
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchConnectorSetupPhase(): Promise<
   Exclude<ConnectorSetupPhase, "loading">
 > {
@@ -75,6 +99,9 @@ export async function fetchConnectorSetupPhase(): Promise<
     await sleep(450);
     phase = await attempt();
   }
+  // The browser cannot reach it, but the connector is reporting: it is
+  // installed, activated, and tracking — do not lock the dashboard.
+  if (phase === "offline" && (await connectorReportingToServer())) phase = "ready";
   writeCachedConnectorPhase(phase);
   return phase;
 }
@@ -86,8 +113,9 @@ export function initialConnectorSetupPhase(): ConnectorSetupPhase {
 }
 
 /** Call before probing so the correct connector is selected on shared machines. */
-export function syncConnectorViewer(developerId: string | null | undefined): void {
+export function syncConnectorViewer(developerId: string | null | undefined, token?: string | null): void {
   setConnectorViewer(developerId);
+  if (token !== undefined) viewerToken = token;
 }
 
 export function connectorOnboardingActive(

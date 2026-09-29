@@ -162,6 +162,20 @@ export class ConnectorsController {
     };
   }
 
+  /**
+   * Public: the dashboard address(es) connectors reporting to this API should
+   * accept requests from. Lets the website move to a new domain (set
+   * DASHBOARD_ORIGINS on the API) without reinstalling every connector.
+   */
+  @Get("config")
+  config() {
+    const dashboardOrigins = (process.env.DASHBOARD_ORIGINS ?? "")
+      .split(",")
+      .map((o) => o.trim().replace(/\/+$/, ""))
+      .filter((o) => /^https:\/\/[a-z0-9*.-]+(:\d+)?$/i.test(o));
+    return { dashboardOrigins };
+  }
+
   @Get("mine")
   @UseGuards(DashboardAuthGuard)
   async mine(@Req() req: FastifyRequest) {

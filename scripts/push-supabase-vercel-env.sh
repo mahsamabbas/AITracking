@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUPABASE_ENV="$ROOT/apps/api/.env.supabase.local"
 API_DIR="$ROOT/.vercel-api"
-API_PROJECT="${VERCEL_API_PROJECT:-tracking-app-api}"
+API_PROJECT="${VERCEL_API_PROJECT:-ai-tracking}"
 
 read_var() {
   local file="$1" key="$2"

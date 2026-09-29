@@ -313,28 +313,69 @@ const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
  * stays accepted while people move over; `*` matches Vercel deployment URLs.
  */
 const DEFAULT_DASHBOARD_ORIGINS = [
-  "https://techlio-web.vercel.app",
-  "https://techlio-*-mahsamabbas-projects.vercel.app",
+  "https://ai-tracking-bhgg.vercel.app",
+  "https://ai-tracking-bhgg-techlio1.vercel.app",
+  // Deployment and branch URLs of the dashboard project (Vercel team techlio1).
+  "https://ai-tracking-bhgg-*-techlio1.vercel.app",
+  // Previous hosting, still accepted while people move over.
   "https://tracking-app-api-t9yd.vercel.app",
 ];
 
 /** APIs a dashboard may pair this connector with (never an arbitrary URL). */
-const KNOWN_API_BASES = ["https://techlio-api.vercel.app", "https://tracking-app-api-three.vercel.app"];
+const KNOWN_API_BASES = ["https://ai-tracking-techlio1.vercel.app", "https://tracking-app-api-three.vercel.app"];
 
-/** Localhost and TECHLIO_DASHBOARD_ORIGINS (comma-separated production dashboard URLs). */
+/**
+ * Dashboards the API this connector reports to vouches for
+ * (GET /v1/connectors/config). Cached on disk so a restart while offline still
+ * accepts the dashboard, and so moving the website to a new domain needs an
+ * API setting instead of reinstalling every connector.
+ */
+const ORIGINS_FILE = join(identityDir(), "trusted-origins.json");
+const ORIGIN_PATTERN = /^https:\/\/[a-z0-9*.-]+(:\d+)?$/i;
+let apiTrustedOrigins: string[] = (() => {
+  try {
+    const list = JSON.parse(readFileSync(ORIGINS_FILE, "utf8")) as unknown;
+    return Array.isArray(list) ? list.filter((o): o is string => typeof o === "string" && ORIGIN_PATTERN.test(o)) : [];
+  } catch {
+    return [];
+  }
+})();
+
+async function refreshTrustedOrigins(): Promise<void> {
+  try {
+    const r = await fetch(`${apiBase().replace(/\/+$/, "")}/v1/connectors/config`, { signal: AbortSignal.timeout(8_000) });
+    if (!r.ok) return;
+    const body = (await r.json()) as { dashboardOrigins?: unknown };
+    const list = Array.isArray(body.dashboardOrigins)
+      ? body.dashboardOrigins.filter((o): o is string => typeof o === "string" && ORIGIN_PATTERN.test(o)).slice(0, 20)
+      : [];
+    apiTrustedOrigins = list;
+    mkdirSync(identityDir(), { recursive: true, mode: 0o700 });
+    writeFileSync(ORIGINS_FILE, JSON.stringify(list), { mode: 0o600 });
+  } catch {
+    /* offline or an older API: keep the cached list */
+  }
+}
+
+/** Localhost, TECHLIO_DASHBOARD_ORIGINS / built-in defaults, and dashboards the API vouches for. */
 function dashboardOriginAllowed(origin: string): boolean {
   if (LOCAL_ORIGIN.test(origin)) return true;
-  const allowed = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? DEFAULT_DASHBOARD_ORIGINS.join(","))
-    .split(",")
+  const allowed = [
+    ...(process.env.TECHLIO_DASHBOARD_ORIGINS ?? DEFAULT_DASHBOARD_ORIGINS.join(",")).split(","),
+    ...apiTrustedOrigins,
+  ]
     .map((item) => item.trim())
     .filter(Boolean);
-  return allowed.some((pattern) => {
-    if (!pattern.includes("*")) return pattern === origin;
-    const expression = pattern
-      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, "[^/]+");
-    return new RegExp(`^${expression}$`).test(origin);
-  });
+  return allowed.some((pattern) => originMatches(pattern, origin));
+}
+
+/** Exact origin, or a pattern where `*` stands for one or more host characters. */
+function originMatches(pattern: string, origin: string): boolean {
+  if (!pattern.includes("*")) return pattern === origin;
+  const expression = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, "[^/]+");
+  return new RegExp(`^${expression}$`).test(origin);
 }
 
 const app = Fastify({ logger: false });
@@ -439,6 +480,15 @@ function trustedApiBase(requested: string | undefined, origin: string | string[]
   const bare = (url: string) => url.replace(/\/+$/, "");
   if (!requested || bare(requested) === bare(config.apiBaseUrl)) return config.apiBaseUrl;
   if (KNOWN_API_BASES.includes(bare(requested))) return bare(requested);
+  // A dashboard the current API vouches for (see refreshTrustedOrigins) may
+  // name its own API — how a deployment moves hosts without reinstalling.
+  if (
+    typeof origin === "string" &&
+    /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(bare(requested)) &&
+    apiTrustedOrigins.some((pattern) => originMatches(pattern, origin))
+  ) {
+    return bare(requested);
+  }
   const local = (url: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url.replace(/\/$/, ""));
   if (typeof origin === "string" && local(origin) && local(requested)) return requested;
   throw new Error("api_not_allowed");
@@ -477,6 +527,7 @@ app.post("/claim", async (req, reply) => {
     queue.clear();
     if (identity.provider) hostProvider = identity.provider;
     enqueueHeartbeat();
+    void refreshTrustedOrigins();
     return publicIdentity(identity);
   } catch (err) {
     const message = err instanceof Error ? err.message : "claim_failed";
@@ -1018,6 +1069,8 @@ void (async () => {
       console.log(`Techlio connector is running at http://127.0.0.1:${port} for ${osUser()}`);
       closeStoppedGap();
       gitWatch.start();
+      void refreshTrustedOrigins();
+      setInterval(() => void refreshTrustedOrigins(), 30 * 60_000).unref?.();
       const hooks = ensureAgentHooks();
       console.log("Dashboard pings are hidden. Agent events print below as they happen.");
       if (hooks.claude) console.log("Claude Code hooks are installed. Restart Claude Code if it is already open.");

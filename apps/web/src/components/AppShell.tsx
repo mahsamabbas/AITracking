@@ -133,13 +133,13 @@ export function AppShell({
   maxWidth?: string;
 }) {
   const path = usePathname();
-  const { user, logout, ready } = useAuth();
+  const { user, logout, ready, token } = useAuth();
   const { phase: connectorPhase } = useConnectorSetupPhase(4_000);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    syncConnectorViewer(user?.developerId);
-  }, [user?.developerId]);
+    syncConnectorViewer(user?.developerId, token);
+  }, [user?.developerId, token]);
 
   const onboardingLocked = Boolean(
     user &&

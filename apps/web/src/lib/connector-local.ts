@@ -196,3 +196,46 @@ export function useLocalAccess(pollMs = 5_000): LocalAccess {
   }, [pollMs]);
   return state;
 }
+
+/**
+ * Why this page can or cannot reach the connector — each cause needs a
+ * different fix, and to the page they otherwise all look like "not detected".
+ *   ok                 reachable (the dashboard can activate/pause it)
+ *   permission-prompt  the browser is waiting for the person to click Allow
+ *   permission-denied  "Local network access" was blocked for this site
+ *   wrong-site         a connector answers but was set up for another Techlio address
+ *   not-running        nothing answers on this computer
+ */
+export type ConnectorReach = "ok" | "permission-prompt" | "permission-denied" | "wrong-site" | "not-running";
+
+export async function diagnoseConnector(): Promise<ConnectorReach> {
+  if (await setupConnectorBase()) return "ok";
+  const access = await localAccessState();
+  if (access === "denied") return "permission-denied";
+  if (access === "prompt") return "permission-prompt";
+  // An opaque (no-cors) request succeeds whenever something answered, even if
+  // the connector refused this site — that separates "wrong site" from "off".
+  const answered = await Promise.all(
+    CONNECTOR_PORTS.map((port) =>
+      fetch(`http://127.0.0.1:${port}/health`, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(1_500) })
+        .then(() => true)
+        .catch(() => false),
+    ),
+  );
+  return answered.some(Boolean) ? "wrong-site" : "not-running";
+}
+
+export function useConnectorReach(pollMs = 6_000): { reach: ConnectorReach | null; check: () => Promise<ConnectorReach> } {
+  const [reach, setReach] = useState<ConnectorReach | null>(null);
+  const check = useCallback(async () => {
+    const r = await diagnoseConnector();
+    setReach(r);
+    return r;
+  }, []);
+  useEffect(() => {
+    void check();
+    const t = setInterval(() => void check(), pollMs);
+    return () => clearInterval(t);
+  }, [check, pollMs]);
+  return { reach, check };
+}

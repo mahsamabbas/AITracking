@@ -76,17 +76,11 @@ export function ConnectorInstallGuide() {
               ? "Open the downloaded file once. If Windows warns you, choose More info, then Run anyway. It installs itself in the background and shows a confirmation — no window stays open. It appears in Settings → Apps if you ever need to remove it. Then click Check if running."
               : "Open the downloaded installer and follow the steps (macOS asks for your password once). Nothing is added to Applications or the Dock; the connector runs in the background for Intel and Apple silicon. Then click Check if running."}
           </p>
-          {online === false ? (
-            <>
-              <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
-                Not detected on this computer yet — complete the install, then click “Check if running”.
-              </p>
-              <LocalAccessHint />
-            </>
-          ) : null}
-          {online === true ? (
+          {/* Says why it is not reachable (browser permission, other address, not installed). */}
+          {online === false && phase !== "ready" ? <LocalAccessHint onReachable={() => void refresh()} /> : null}
+          {online === true || phase === "ready" ? (
             <p className="mt-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-              Local agent is running.
+              {online === true ? "Connector is running on this computer." : "Your connector is running and reporting activity."}
             </p>
           ) : null}
         </div>

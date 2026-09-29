@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-API_PROJECT="${VERCEL_API_PROJECT:-techlio-api}"
-WEB_PROJECT="${VERCEL_WEB_PROJECT:-techlio-web}"
+API_PROJECT="${VERCEL_API_PROJECT:-ai-tracking}"
+WEB_PROJECT="${VERCEL_WEB_PROJECT:-ai-tracking-bhgg}"
 
 echo "==> Build shared packages"
 pnpm --filter @techlio/server-core run build

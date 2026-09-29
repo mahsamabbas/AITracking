@@ -40,9 +40,9 @@ const WIN_TASK = "TechlioConnector";
 const LINUX_UNIT = "techlio-connector.service";
 
 // Defaults baked into the packaged build; overridable at install time.
-const API_URL = process.env.TECHLIO_API_URL ?? "https://techlio-api.vercel.app";
+const API_URL = process.env.TECHLIO_API_URL ?? "https://ai-tracking-techlio1.vercel.app";
 // First entry is the dashboard people open; the rest stay trusted during the move.
-const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://techlio-web.vercel.app,https://techlio-*-mahsamabbas-projects.vercel.app,https://tracking-app-api-t9yd.vercel.app";
+const DASHBOARD = process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://ai-tracking-bhgg.vercel.app,https://ai-tracking-bhgg-techlio1.vercel.app,https://ai-tracking-bhgg-*-techlio1.vercel.app,https://tracking-app-api-t9yd.vercel.app";
 export const DASHBOARD_URL = DASHBOARD.split(",")[0];
 const VSIX_URL = `${DASHBOARD_URL}/downloads/techlio-companion.vsix`;
 const WIN_TRAY_TASK = "TechlioConnectorTray";

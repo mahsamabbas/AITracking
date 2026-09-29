@@ -33,8 +33,8 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
   );
 
   useEffect(() => {
-    syncConnectorViewer(user?.developerId);
-  }, [user?.developerId]);
+    syncConnectorViewer(user?.developerId, token);
+  }, [user?.developerId, token]);
 
   useEffect(() => {
     if (!ready) return;
@@ -43,9 +43,9 @@ export function ConnectorRequiredGate({ children }: { children: React.ReactNode 
 
   const refresh = useCallback(async () => {
     if (!mustComplete) return;
-    syncConnectorViewer(user?.developerId);
+    syncConnectorViewer(user?.developerId, token);
     setPhase(await fetchConnectorSetupPhase());
-  }, [mustComplete, user?.developerId]);
+  }, [mustComplete, user?.developerId, token]);
 
   useEffect(() => {
     void refresh();

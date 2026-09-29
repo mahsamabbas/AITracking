@@ -2,8 +2,8 @@
 # Push required production env vars to new Vercel projects (run after vercel login).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-API_PROJECT="${VERCEL_API_PROJECT:-techlio-api}"
-WEB_PROJECT="${VERCEL_WEB_PROJECT:-techlio-web}"
+API_PROJECT="${VERCEL_API_PROJECT:-ai-tracking}"
+WEB_PROJECT="${VERCEL_WEB_PROJECT:-ai-tracking-bhgg}"
 API_URL="${NEXT_PUBLIC_API_URL:-}"
 
 upsert_api_env() {
@@ -41,6 +41,13 @@ upsert_api_env JWT_SECRET "$JWT_SECRET"
 upsert_api_env SKIP_REDIS "1"
 upsert_api_env ORG_TIMEZONE "${ORG_TIMEZONE:-Asia/Karachi}"
 upsert_api_env NODE_ENV production
+
+# Connectors fetch GET /v1/connectors/config — must include this dashboard host.
+TEAM_SLUG="${VERCEL_SCOPE:-techlio1}"
+WEB_ORIGIN="${WEB_DASHBOARD_ORIGIN:-https://${WEB_PROJECT}.vercel.app}"
+DASHBOARD_ORIGINS="${DASHBOARD_ORIGINS:-${WEB_ORIGIN},https://${WEB_PROJECT}-*-${TEAM_SLUG}.vercel.app}"
+echo "==> DASHBOARD_ORIGINS → $API_PROJECT"
+upsert_api_env DASHBOARD_ORIGINS "$DASHBOARD_ORIGINS"
 
 if [[ -n "$API_URL" ]]; then
   echo "==> NEXT_PUBLIC_API_URL → $WEB_PROJECT"

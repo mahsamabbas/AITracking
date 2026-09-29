@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Push variables from a local API env file to Vercel production (never uploaded with deploy).
-# Usage: VERCEL_API_PROJECT=techlio-api bash scripts/push-api-env-to-vercel.sh [path-to-env]
+# Usage: VERCEL_API_PROJECT=ai-tracking bash scripts/push-api-env-to-vercel.sh [path-to-env]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${1:-$ROOT/apps/api/.env}"
-API_PROJECT="${VERCEL_API_PROJECT:-techlio-api}"
+API_PROJECT="${VERCEL_API_PROJECT:-ai-tracking}"
 API_DIR="$ROOT/.vercel-api"
 
 SKIP_KEYS_REGEX='^(TECHLIO_DEV_MODE|ALLOW_DEV_HEADER_AUTH|VERCEL_|NX_|TURBO_)'

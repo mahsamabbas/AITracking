@@ -4,8 +4,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="${1:-}"
 # Override for your Vercel team (defaults suit a fresh account; legacy names below).
-API_PROJECT="${VERCEL_API_PROJECT:-techlio-api}"
-WEB_PROJECT="${VERCEL_WEB_PROJECT:-techlio-web}"
+API_PROJECT="${VERCEL_API_PROJECT:-ai-tracking}"
+WEB_PROJECT="${VERCEL_WEB_PROJECT:-ai-tracking-bhgg}"
+SCOPE_ARGS=()
+if [[ -n "${VERCEL_SCOPE:-}" ]]; then
+  SCOPE_ARGS=(--scope "$VERCEL_SCOPE")
+fi
 
 usage() {
   echo "Usage: $0 api|web|all"
@@ -26,8 +30,8 @@ deploy_one() {
   # Deploy from the repo root: the project's Root Directory ($root_dir) selects
   # the app, and the build needs the whole monorepo (packages/*, lockfile).
   # --cwd "$root_dir" uploaded only that folder and the build failed.
-  vercel link --project "$project" --yes
-  vercel deploy --prod --yes
+  vercel link --project "$project" --yes "${SCOPE_ARGS[@]}"
+  vercel deploy --prod --yes "${SCOPE_ARGS[@]}"
 }
 
 case "$TARGET" in
