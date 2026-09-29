@@ -275,7 +275,7 @@ final class StatusController: NSObject, NSMenuDelegate {
 
 let args = CommandLine.arguments
 let dashboard = args.firstIndex(of: "--dashboard").flatMap { i in i + 1 < args.count ? args[i + 1] : nil }
-    ?? "https://tracking-app-api-t9yd.vercel.app"
+    ?? "https://techlio-web.vercel.app"
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory) // menu bar only, never in the Dock

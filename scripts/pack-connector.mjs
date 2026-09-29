@@ -152,7 +152,7 @@ const MAC_LABEL = "com.techlio.connector";
 const MENUBAR_LABEL = "com.techlio.connector.menubar";
 const MENUBAR_APP = `${MAC_DIR}/Techlio Connector.app`;
 const MENUBAR_EXE = `${MENUBAR_APP}/Contents/MacOS/TechlioStatus`;
-const DASHBOARD_URL = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app-api-t9yd.vercel.app").split(",")[0];
+const DASHBOARD_URL = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://techlio-web.vercel.app").split(",")[0];
 
 const launchAgentPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

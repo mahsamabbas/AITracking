@@ -308,12 +308,23 @@ function enqueueHeartbeat(): void {
 
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
+/**
+ * Dashboards this connector answers. The previous hosting (tracking-app-*)
+ * stays accepted while people move over; `*` matches Vercel deployment URLs.
+ */
+const DEFAULT_DASHBOARD_ORIGINS = [
+  "https://techlio-web.vercel.app",
+  "https://techlio-*-mahsamabbas-projects.vercel.app",
+  "https://tracking-app-api-t9yd.vercel.app",
+];
+
+/** APIs a dashboard may pair this connector with (never an arbitrary URL). */
+const KNOWN_API_BASES = ["https://techlio-api.vercel.app", "https://tracking-app-api-three.vercel.app"];
+
 /** Localhost and TECHLIO_DASHBOARD_ORIGINS (comma-separated production dashboard URLs). */
 function dashboardOriginAllowed(origin: string): boolean {
   if (LOCAL_ORIGIN.test(origin)) return true;
-  const allowed = (
-    process.env.TECHLIO_DASHBOARD_ORIGINS ?? "https://tracking-app-api-t9yd.vercel.app"
-  )
+  const allowed = (process.env.TECHLIO_DASHBOARD_ORIGINS ?? DEFAULT_DASHBOARD_ORIGINS.join(","))
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -427,6 +438,7 @@ app.get("/identity", async () => publicIdentity(identity));
 function trustedApiBase(requested: string | undefined, origin: string | string[] | undefined): string {
   const bare = (url: string) => url.replace(/\/+$/, "");
   if (!requested || bare(requested) === bare(config.apiBaseUrl)) return config.apiBaseUrl;
+  if (KNOWN_API_BASES.includes(bare(requested))) return bare(requested);
   const local = (url: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url.replace(/\/$/, ""));
   if (typeof origin === "string" && local(origin) && local(requested)) return requested;
   throw new Error("api_not_allowed");

@@ -2,7 +2,7 @@
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
 
-$TechlioSite = if ($env:TECHLIO_SITE) { $env:TECHLIO_SITE } else { "https://tracking-app-api-t9yd.vercel.app" }
+$TechlioSite = if ($env:TECHLIO_SITE) { $env:TECHLIO_SITE } else { "https://techlio-web.vercel.app" }
 $InstallDir = if ($env:TECHLIO_INSTALL_DIR) { $env:TECHLIO_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".techlio\connector" }
 $BundleUrl = "$TechlioSite/downloads/techlio-connector.zip"
 

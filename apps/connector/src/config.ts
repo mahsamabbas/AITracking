@@ -38,7 +38,7 @@ loadLocalEnv();
 export const config = {
   /** Per-user port (see port.ts); may be moved at startup if another user holds it. */
   port: userPort(),
-  apiBaseUrl: process.env.TECHLIO_API_URL ?? "https://tracking-app-api-three.vercel.app",
+  apiBaseUrl: process.env.TECHLIO_API_URL ?? "https://techlio-api.vercel.app",
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
   provider: process.env.TECHLIO_PROVIDER ?? "cursor",
