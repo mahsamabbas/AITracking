@@ -247,3 +247,13 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - .vercelignore now excludes apps/api/.env* (the Neon password was uploaded with every deploy).
 - scripts/copy-database.sh: dump/restore + RLS lock-down for Supabase Data API; refuses non-empty targets (needs a data-only merge mode to import Neon history now).
 - Still to do (owner): disconnect Neon integration in Vercel (don't delete the DB), remove PG*/POSTGRES*/NEON* vars, set API function region bom1, rotate Supabase secret key + Neon password, reissue connector keys (devices table is empty).
+
+## 2026-09-29 data retention (DB growth fix)
+- Root cause: activity_events ≈ 97% of the DB (~2.4 KB/event with bloat); payload JSON duplicated every column (65% of payload); an audit_log row per upload batch (~1 per 2 events); the only retention job lived in apps/worker, which is not deployed — nothing was ever removed.
+- Fix (server-core/src/retention/*, migrations 015 + 016):
+  - ingest stores slimPayload (no column-duplicated keys); every reader rehydrates via fullEvent/fullEventFromSql; per-upload audit row only on rejections.
+  - activity_hourly = event-time engine output per person × UTC hour (+ by_provider arrays, counts, workspaces). activityTimeline / fileChangeTrend / activityCalendar / workspaceFileChanges read summaries before retention_state.summarized_before, raw after (no double count). personIntervals() shared by engine and rollup.
+  - runDataMaintenance: summarise days older than RAW_RETENTION_DAYS (14) → archive verified gzip NDJSON to Supabase Storage (bucket activity-archive; SUPABASE_URL + SUPABASE_SECRET_KEY) → delete raw (long-lived types kept to SESSION_RETENTION_DAYS 190) → late arrivals → sessions archive/purge → exports 7d, audit 400d → slim legacy payloads. Never deletes without an archive. Lease in maintenance_runs.
+  - Vercel Cron 30 21 * * * → GET /v1/maintenance/retention (Bearer CRON_SECRET). `pnpm db:retention[:prod]`. Settings → Data & archive (CSV/JSON download, admins/auditors).
+- Verified on a 199k-event copy: 1,343/1,343 chart metrics identical after archiving 387 days; events table 473 MB → 20 MB; archive 6.9 MB (~41 B/event).
+- 016 = Supabase Data API lock-down (RLS on all tables, revoke anon/authenticated) — flagged for owner review.

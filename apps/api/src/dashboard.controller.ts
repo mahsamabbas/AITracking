@@ -178,7 +178,7 @@ export class DashboardController {
           hour_events: number;
         }>(sql`
           WITH recent AS (
-            SELECT e.developer_id, e.occurred_at, e.payload
+            SELECT e.developer_id, e.occurred_at, e.event_type, e.payload
             FROM activity_events e
             WHERE e.organization_id = ${organizationId}
               AND e.occurred_at > NOW() - INTERVAL '2 hours'
@@ -190,13 +190,13 @@ export class DashboardController {
                   WHERE pu.developer_id = r.developer_id AND pu.organization_id = ${organizationId}
                   LIMIT 1) AS avatar_url,
                  (SELECT x.payload->>'provider' FROM recent x WHERE x.developer_id = r.developer_id
-                   AND x.payload->>'event_type' LIKE ANY (ARRAY['model_%','tool_%','file_%','session_%'])
+                   AND x.event_type LIKE ANY (ARRAY['model_%','tool_%','file_%','session_%'])
                    ORDER BY x.occurred_at DESC LIMIT 1) AS provider,
                  MAX(r.occurred_at) AS last_at,
                  (SELECT x.payload->'metadata'->>'model_name' FROM recent x WHERE x.developer_id = r.developer_id
                    AND x.payload->'metadata'->>'model_name' IS NOT NULL ORDER BY x.occurred_at DESC LIMIT 1) AS last_model,
                  (SELECT x.payload->'metadata'->>'tool_name' FROM recent x WHERE x.developer_id = r.developer_id
-                   AND x.payload->>'event_type' LIKE 'tool_%' ORDER BY x.occurred_at DESC LIMIT 1) AS last_tool,
+                   AND x.event_type LIKE 'tool_%' ORDER BY x.occurred_at DESC LIMIT 1) AS last_tool,
                  COUNT(*) FILTER (WHERE r.occurred_at >= date_trunc('hour', NOW()))::int AS hour_events
           FROM recent r
           JOIN employees emp ON emp.id = r.developer_id

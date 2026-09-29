@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gte, lt } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, employees, hourlySnapshots } from "./schema.js";
+import { fullEvent } from "./retention/payload.js";
 
 const COVERAGE_EVENT_TYPES = new Set([
   "connector_paused",
@@ -84,7 +85,7 @@ export async function finalizeHourForDeveloper(
       coverageGapEventIds.push(row.eventId);
       coverageGapTypes.add(row.eventType);
     }
-    const p = row.payload as {
+    const p = fullEvent(row) as unknown as {
       event_type?: string;
       occurred_at?: string;
       duration_ms?: number;

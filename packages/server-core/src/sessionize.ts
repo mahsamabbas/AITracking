@@ -48,10 +48,8 @@ export async function applySessionization(event: ActivityEvent): Promise<void> {
     const remapped = sessionIdForDeveloper(event.developer_id, sessionId);
     await db
       .update(activityEvents)
-      .set({
-        sessionId: remapped,
-        payload: sql`${activityEvents.payload} || jsonb_build_object('session_id', ${remapped}::text)`,
-      })
+      // The column is authoritative (payloads no longer carry session_id).
+      .set({ sessionId: remapped })
       .where(
         and(
           eq(activityEvents.organizationId, event.organization_id),

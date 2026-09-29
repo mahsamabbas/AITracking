@@ -12,7 +12,9 @@ interface OrgPolicy {
   organizationId: string;
   timezone: string;
   retentionEventsDays: number;
-  retentionSummariesDays: number;
+  retentionSummariesDays: number | null;
+  retentionSessionsDays?: number;
+  archiveConfigured?: boolean;
   staleHeartbeatMinutes: number;
   idleThresholdMinutes: number;
   monitoringNoticeStatus: string;
@@ -95,15 +97,26 @@ export default function PolicyPage() {
                     help: "A connector that has not checked in for this long is marked stale and raises a coverage warning.",
                   },
                   {
-                    label: "Event retention",
+                    label: "Detailed events",
                     value: `${p.retentionEventsDays} days`,
-                    help: "Detailed events are purged after this period.",
+                    help: p.archiveConfigured === false
+                      ? "After this period events are summarised. Archive storage is not configured yet, so they stay in the database until it is."
+                      : "After this period each day is summarised, archived to encrypted object storage, and removed from the database. Archives can be downloaded as CSV.",
                   },
                   {
-                    label: "Summary retention",
-                    value: `${p.retentionSummariesDays} days`,
-                    help: "Hourly summaries and audit records are kept longer than raw events.",
+                    label: "Hourly summaries",
+                    value: p.retentionSummariesDays == null ? "Kept" : `${p.retentionSummariesDays} days`,
+                    help: "Per-person hourly totals behind every chart, so reports for any past range keep working after detailed events are archived.",
                   },
+                  ...(p.retentionSessionsDays
+                    ? [
+                        {
+                          label: "Session records",
+                          value: `${p.retentionSessionsDays} days`,
+                          help: "Per-session totals (sessions, calls, tokens) — then archived with the day they started.",
+                        },
+                      ]
+                    : []),
                 ]}
               />
             </CardBody>

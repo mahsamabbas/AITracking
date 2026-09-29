@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { DataRetentionCard } from "@/components/domain/DataRetentionCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -35,7 +36,7 @@ import {
 import type { FilterMeta } from "@/lib/types";
 import Link from "next/link";
 
-type TabId = "profile" | "security" | "organization";
+type TabId = "profile" | "security" | "organization" | "data";
 
 export default function SettingsPage() {
   const { user, token, applySession } = useAuth();
@@ -54,6 +55,9 @@ export default function SettingsPage() {
     if (user?.role === "administrator" || user?.role === "super_admin" || platformOrg) {
       items.push({ id: "organization", label: "Organisation" });
     }
+    if (user?.role === "administrator" || user?.role === "auditor" || (user?.role === "super_admin" && platformOrg)) {
+      items.push({ id: "data", label: "Data & archive" });
+    }
     return items;
   }, [user?.role, platformOrg]);
 
@@ -65,6 +69,7 @@ export default function SettingsPage() {
           <ProfileTab user={user} token={token} applySession={applySession} />
         ) : null}
         {tab === "security" && user ? <SecurityTab user={user} token={token} /> : null}
+        {tab === "data" ? <DataRetentionCard token={token} /> : null}
         {tab === "organization" ? (
           <OrganizationTab
             userRole={user?.role}

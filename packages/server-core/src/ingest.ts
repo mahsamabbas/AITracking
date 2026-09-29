@@ -3,6 +3,7 @@ import { ActivityEventSchema, type ActivityEvent } from "@techlio/event-schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, auditLog, hourlySnapshots } from "./schema.js";
+import { fullEvent, slimPayload } from "./retention/payload.js";
 import { scanEventForSecrets } from "./security.js";
 import { applySessionization } from "./sessionize.js";
 import { recordLiveHeartbeat } from "./devices.js";
@@ -147,7 +148,8 @@ export async function ingestBatch(
           eventType: event.event_type,
           occurredAt: new Date(event.occurred_at),
           receivedAt: new Date(),
-          payload: event,
+          // Columns already hold ids, type, and time; store the rest (see retention/payload.ts).
+          payload: slimPayload(event),
         })
         .onConflictDoNothing()
         .returning({ eventId: activityEvents.eventId });
@@ -207,7 +209,9 @@ export async function ingestBatch(
     }
   }
 
-  if (accepted > 0 || rejected > 0) {
+  // Only rejections are audit-worthy. A row per accepted upload (connectors
+  // upload every few seconds) outgrew the events themselves.
+  if (rejected > 0) {
     await db.insert(auditLog).values({
       organizationId,
       action: "events.batch_ingest",
@@ -229,13 +233,13 @@ export async function listRecentEvents(
   },
 ): Promise<ActivityEvent[]> {
   const rows = await db
-    .select({ payload: activityEvents.payload })
+    .select()
     .from(activityEvents)
     .where(eq(activityEvents.organizationId, organizationId))
     .orderBy(desc(activityEvents.receivedAt))
     .limit(limit * 3);
 
-  let events = rows.map((r) => r.payload as ActivityEvent);
+  let events = rows.map((r) => fullEvent(r));
   if (filters?.developerId) {
     events = events.filter((e) => e.developer_id === filters.developerId);
   }

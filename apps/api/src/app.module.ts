@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ArchivesController, MaintenanceController } from "./retention.controller.js";
 import { EventsController } from "./events.controller.js";
 import { DashboardController } from "./dashboard.controller.js";
 import { AnalyticsController } from "./analytics.controller.js";
@@ -26,6 +27,8 @@ import { ProfileController } from "./profile.controller.js";
     ExportsController,
     PlatformController,
     ProfileController,
+    MaintenanceController,
+    ArchivesController,
   ],
 })
 export class AppModule {}

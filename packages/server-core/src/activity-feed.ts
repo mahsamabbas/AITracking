@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityTypeOf } from "./activity.js";
 import type { DateRange } from "./analytics.js";
+import { fullEventFromSql } from "./retention/payload.js";
 
 /**
  * The activity feed: every agent event in the selected range, newest first,
@@ -90,10 +91,12 @@ export async function listActivityFeed(input: {
       occurred_at: Date;
       received_at: Date;
       developer_id: string;
+      session_id: string | null;
+      event_type: string;
       payload: Record<string, unknown>;
       display_name: string | null;
     }>(sql`
-      SELECT e.event_id, e.occurred_at, e.received_at, e.developer_id, e.payload, emp.display_name
+      SELECT e.event_id, e.occurred_at, e.received_at, e.developer_id, e.session_id, e.event_type, e.payload, emp.display_name
       FROM activity_events e
       LEFT JOIN employees emp ON emp.id = e.developer_id
       WHERE ${scope}
@@ -110,7 +113,7 @@ export async function listActivityFeed(input: {
 
   const rows = page.rows.slice(0, limit);
   const events: FeedEvent[] = rows.map((r) => {
-    const p = r.payload as {
+    const p = fullEventFromSql(r) as {
       event_type?: string;
       provider?: string;
       session_id?: string;

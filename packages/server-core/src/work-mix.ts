@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
 import type { DateRange } from "./analytics.js";
+import { readHourly, summarizedBefore } from "./retention/hourly-store.js";
 
 /**
  * Work mix — how agent time split between verify & ship, writing code, and
@@ -235,10 +236,16 @@ export interface ActivityTimeline {
 const HOUR = 3_600_000;
 const zeroSlice = (): TimeSlice => ({ activeMs: 0, idleMs: 0, workingMs: 0, verifyMs: 0, writingMs: 0, researchMs: 0 });
 
-/** Spread merged intervals over hour buckets starting at `origin`. */
-function spread(intervals: Interval[], origin: number, hours: number, add: (hourIndex: number, ms: number) => void) {
+/** Spread merged intervals over hour buckets starting at `origin` (never before `clipFrom`). */
+export function spread(
+  intervals: Interval[],
+  origin: number,
+  hours: number,
+  add: (hourIndex: number, ms: number) => void,
+  clipFrom = origin,
+) {
   for (const i of intervals) {
-    let t = Math.max(i.start, origin);
+    let t = Math.max(i.start, origin, clipFrom);
     const end = Math.min(i.end, origin + hours * HOUR);
     while (t < end) {
       const idx = Math.floor((t - origin) / HOUR);
@@ -266,6 +273,58 @@ function subtract(a: Interval[], b: Interval[]): Interval[] {
     if (start < x.end) out.push({ start, end: x.end });
   }
   return out;
+}
+
+/** One person's merged intervals by kind — the rules every chart and summary share. */
+export interface PersonIntervals {
+  active: Interval[];
+  idle: Interval[];
+  working: Interval[];
+  verify: Interval[];
+  writing: Interval[];
+  research: Interval[];
+  /** provider → that tool's merged active intervals. */
+  perProvider: Map<string, Interval[]>;
+}
+
+export function personIntervals(events: (MixEvent & { provider?: string | null })[]): PersonIntervals {
+  const verify: Interval[] = [];
+  const writing: Interval[] = [];
+  const all: Interval[] = [];
+  const times: number[] = [];
+  const perProvider = new Map<string, Interval[]>();
+  for (const e of events) {
+    if (!isAgentWork(e)) continue;
+    times.push(new Date(e.occurred_at).getTime());
+    const interval = timedInterval(e);
+    if (!interval) continue;
+    times.push(interval.start);
+    all.push(interval);
+    const category = workCategory(e);
+    if (category === "verify") verify.push(interval);
+    else if (category === "writing") writing.push(interval);
+    if (e.provider) {
+      const list = perProvider.get(e.provider) ?? [];
+      list.push(interval);
+      perProvider.set(e.provider, list);
+    }
+  }
+  const active = mergeIntervals(all);
+  const v = mergeIntervals(verify);
+  const w = subtract(mergeIntervals(writing), v);
+  const r = subtract(active, mergeIntervals([...verify, ...writing]));
+  times.sort((a, b) => a - b);
+  const periods: Interval[] = [];
+  for (const t of times) {
+    const last = periods[periods.length - 1];
+    if (last && t - last.end <= IDLE_THRESHOLD_MS) last.end = Math.max(last.end, t);
+    else periods.push({ start: t, end: t });
+  }
+  for (const p of periods) if (p.end - p.start < 60_000) p.end = p.start + 60_000;
+  const working = mergeIntervals([...periods, ...active]);
+  const merged = new Map<string, Interval[]>();
+  for (const [p, list] of perProvider) merged.set(p, mergeIntervals(list));
+  return { active, idle: subtract(working, active), working, verify: v, writing: w, research: r, perProvider: merged };
 }
 
 export async function activityTimeline(input: {
@@ -307,13 +366,57 @@ export async function activityTimeline(input: {
   };
   if (devs && devs.length === 0) return out;
 
+  const dayOf = (day: string) => {
+    let slice = out.daily.get(day);
+    if (!slice) out.daily.set(day, (slice = zeroSlice()));
+    return slice;
+  };
+
+  // Hours before the organisation's summary boundary come from activity_hourly
+  // (raw events there may already be archived); later hours from raw events.
+  const boundary = await summarizedBefore(organizationId);
+  const rawFrom = Math.min(Math.max(origin, boundary?.getTime() ?? origin), range.to.getTime());
+  if (rawFrom > origin) {
+    const rows = await readHourly({
+      organizationId,
+      from: range.from,
+      to: new Date(rawFrom),
+      developerIds: devs,
+      team: input.team,
+      provider: input.provider,
+    });
+    for (const row of rows) {
+      const idx = Math.floor((row.hourStart.getTime() - origin) / HOUR);
+      if (idx < 0 || idx >= hours) continue;
+      const person = out.byDeveloper.get(row.developerId) ?? zeroSlice();
+      for (const key of Object.keys(person) as (keyof TimeSlice)[]) {
+        const ms = row.slice[key];
+        if (!ms) continue;
+        dayOf(bucketDay[idx])[key] += ms;
+        out.totals[key] += ms;
+        person[key] += ms;
+      }
+      out.byDeveloper.set(row.developerId, person);
+      out.hourOfDay[bucketHour[idx]] += row.slice.activeMs;
+      out.weekday[bucketDow[idx]] += row.slice.activeMs;
+      if (input.provider) {
+        if (row.slice.activeMs) out.byProvider.set(input.provider, (out.byProvider.get(input.provider) ?? 0) + row.slice.activeMs);
+      } else {
+        for (const [provider, slice] of row.byProvider) {
+          if (slice.activeMs) out.byProvider.set(provider, (out.byProvider.get(provider) ?? 0) + slice.activeMs);
+        }
+      }
+    }
+  }
+  if (rawFrom >= range.to.getTime()) return out;
+
   const res = await db.execute<Record<string, unknown> & MixEvent & { developer_id: string; provider: string | null }>(sql`
     SELECT e.developer_id, e.occurred_at, e.event_type, e.payload->>'duration_ms' AS duration_ms,
            e.payload->'metadata' AS metadata, e.payload->>'provider' AS provider
     FROM activity_events e
     WHERE e.organization_id = ${organizationId}
       -- Include calls that started in range but finished within a day after it.
-      AND e.occurred_at >= ${range.from} AND e.occurred_at < ${new Date(range.to.getTime() + 86_400_000)}
+      AND e.occurred_at >= ${new Date(rawFrom)} AND e.occurred_at < ${new Date(range.to.getTime() + 86_400_000)}
       AND e.event_type NOT IN ('heartbeat_sent', 'session_heartbeat', 'commit_created', 'commit_pushed')
       ${input.provider ? sql`AND e.payload->>'provider' = ${input.provider}` : sql``}
       ${devs ? sql`AND e.developer_id IN (${sql.join(devs.map((d) => sql`${d}`), sql`, `)})` : sql``}
@@ -328,50 +431,9 @@ export async function activityTimeline(input: {
     byPerson.set(row.developer_id, list);
   }
 
-  const dayOf = (day: string) => {
-    let slice = out.daily.get(day);
-    if (!slice) out.daily.set(day, (slice = zeroSlice()));
-    return slice;
-  };
-
   for (const [developerId, events] of byPerson) {
-    const verify: Interval[] = [];
-    const writing: Interval[] = [];
-    const all: Interval[] = [];
-    const times: number[] = [];
-    const perProvider = new Map<string, Interval[]>();
-    for (const e of events) {
-      if (!isAgentWork(e)) continue;
-      times.push(new Date(e.occurred_at).getTime());
-      const interval = timedInterval(e);
-      if (!interval) continue;
-      times.push(interval.start);
-      all.push(interval);
-      const category = workCategory(e);
-      if (category === "verify") verify.push(interval);
-      else if (category === "writing") writing.push(interval);
-      if (e.provider) {
-        const list = perProvider.get(e.provider) ?? [];
-        list.push(interval);
-        perProvider.set(e.provider, list);
-      }
-    }
-    const active = mergeIntervals(all);
-    const v = mergeIntervals(verify);
-    const w = subtract(mergeIntervals(writing), v);
-    const r = subtract(active, mergeIntervals([...verify, ...writing]));
-    times.sort((a, b) => a - b);
-    const periods: Interval[] = [];
-    for (const t of times) {
-      const last = periods[periods.length - 1];
-      if (last && t - last.end <= IDLE_THRESHOLD_MS) last.end = Math.max(last.end, t);
-      else periods.push({ start: t, end: t });
-    }
-    for (const p of periods) if (p.end - p.start < 60_000) p.end = p.start + 60_000;
-    const working = mergeIntervals([...periods, ...active]);
-    const idle = subtract(working, active);
-
-    const person = zeroSlice();
+    const { active, idle, working, verify: v, writing: w, research: r, perProvider } = personIntervals(events);
+    const person = out.byDeveloper.get(developerId) ?? zeroSlice();
     const put = (list: Interval[], key: keyof TimeSlice) =>
       spread(list, origin, hours, (idx, ms) => {
         dayOf(bucketDay[idx])[key] += ms;
@@ -381,7 +443,7 @@ export async function activityTimeline(input: {
           out.hourOfDay[bucketHour[idx]] += ms;
           out.weekday[bucketDow[idx]] += ms;
         }
-      });
+      }, rawFrom);
     put(active, "activeMs");
     put(idle, "idleMs");
     put(working, "workingMs");
@@ -391,7 +453,7 @@ export async function activityTimeline(input: {
     out.byDeveloper.set(developerId, person);
     for (const [provider, list] of perProvider) {
       let ms = 0;
-      spread(mergeIntervals(list), origin, hours, (_idx, x) => (ms += x));
+      spread(list, origin, hours, (_idx, x) => (ms += x), rawFrom);
       out.byProvider.set(provider, (out.byProvider.get(provider) ?? 0) + ms);
     }
   }

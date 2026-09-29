@@ -1,4 +1,5 @@
 import { activityTimeline, type ActivityTimeline } from "./work-mix.js";
+import { readHourly, splitRange, sumByLocalDay, type HourSlice } from "./retention/hourly-store.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { AGENT_REPORTED_SQL, PRODUCTIVE_CLASSIFICATIONS } from "./activity.js";
@@ -1154,6 +1155,19 @@ export async function workspaceFileChanges(
   f: ScopeFilters,
   range: DateRange,
 ): Promise<{ name: string; fileChanges: number; sessions: number; activeMs: number }[]> {
+  // Archived days: file changes per workspace from summaries (all tools only).
+  const rawFrom = await splitRange(f.organizationId, range.from, range.to);
+  const older =
+    rawFrom > range.from && !f.provider
+      ? await readHourly({
+          organizationId: f.organizationId,
+          from: range.from,
+          to: rawFrom,
+          developerIds: f.developerId ? [f.developerId] : f.developerIds?.length ? f.developerIds : undefined,
+          team: f.team,
+        })
+      : [];
+  range = { from: rawFrom, to: range.to };
   const res = await db.execute<{
     name: string;
     file_changes: number;
@@ -1178,12 +1192,17 @@ export async function workspaceFileChanges(
     ORDER BY file_changes DESC
     LIMIT 12
   `);
-  return res.rows.map((r) => ({
-    name: r.name,
-    fileChanges: r.file_changes,
-    sessions: r.sessions,
-    activeMs: Number(r.active_ms ?? 0),
-  }));
+  const byName = new Map(
+    res.rows.map((r) => [r.name, { name: r.name, fileChanges: r.file_changes, sessions: r.sessions, activeMs: Number(r.active_ms ?? 0) }]),
+  );
+  for (const row of older) {
+    for (const [name, n] of Object.entries(row.workspaces)) {
+      const w = byName.get(name) ?? { name, fileChanges: 0, sessions: 0, activeMs: 0 };
+      w.fileChanges += Number(n) || 0;
+      byName.set(name, w);
+    }
+  }
+  return [...byName.values()].sort((a, b) => b.fileChanges - a.fileChanges).slice(0, 12);
 }
 
 /** Daily file-change counts. This is agent file activity, not git commits. */
@@ -1219,14 +1238,29 @@ export interface ChangeTrendPoint {
  */
 export async function fileChangeTrend(f: ScopeFilters, range: DateRange): Promise<ChangeTrendPoint[]> {
   const tz = await scopeTimezone(f);
-  const [files, commits] = await Promise.all([
-    db.execute<{ day: string; file_changes: number }>(sql`
-      SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
-             COUNT(*)::int AS file_changes
-      FROM activity_events e
-      WHERE ${eventScope(f, range)}
-      GROUP BY day
-    `),
+  // Days whose raw events are archived come from hourly summaries.
+  const rawFrom = await splitRange(f.organizationId, range.from, range.to);
+  const [files, summarized, commits] = await Promise.all([
+    rawFrom < range.to
+      ? db.execute<{ day: string; file_changes: number }>(sql`
+          SELECT to_char((e.occurred_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day,
+                 COUNT(*)::int AS file_changes
+          FROM activity_events e
+          WHERE ${eventScope(f, { from: rawFrom, to: range.to })}
+          GROUP BY day
+        `)
+      : Promise.resolve({ rows: [] as { day: string; file_changes: number }[] }),
+    rawFrom > range.from
+      ? readHourly({
+          organizationId: f.organizationId,
+          from: range.from,
+          to: rawFrom,
+          // Same semantics as eventScope: an empty list means no person filter.
+          developerIds: f.developerId ? [f.developerId] : f.developerIds?.length ? f.developerIds : undefined,
+          team: f.team,
+          provider: f.provider,
+        }).then((rows) => sumByLocalDay(rows, tz))
+      : Promise.resolve(new Map<string, HourSlice>()),
     f.provider
       ? Promise.resolve({ rows: [] as CommitDayRow[] })
       : db.execute<CommitDayRow>(sql`
@@ -1248,6 +1282,7 @@ export async function fileChangeTrend(f: ScopeFilters, range: DateRange): Promis
         `),
   ]);
   const fileByDay = new Map(files.rows.map((r) => [r.day, r.file_changes]));
+  for (const [day, slice] of summarized) fileByDay.set(day, (fileByDay.get(day) ?? 0) + slice.fileChanges);
   const commitByDay = new Map(commits.rows.map((r) => [r.day, r]));
   return dayKeysInRange(range, tz).map((day) => {
     const c = commitByDay.get(day);

@@ -1,4 +1,6 @@
 import { organizationDisabled } from "./platform.js";
+import { archiveStore } from "./retention/archive-store.js";
+import { retentionPolicy } from "./retention/policy.js";
 import { desc, eq, sql } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { db, pool } from "./db.js";
@@ -459,12 +461,16 @@ export async function listAuditLog(
 }
 
 export async function getOrgPolicy(organizationId: string) {
-  const retentionEventsDays = Number(process.env.RETENTION_DAYS ?? 90);
+  const retention = retentionPolicy();
+  const retentionEventsDays = retention.rawEventDays;
   const timezone = await resolveOrgTimezone(organizationId);
   return {
     timezone,
     retentionEventsDays,
-    retentionSummariesDays: 365,
+    /** null: hourly summaries are kept indefinitely. */
+    retentionSummariesDays: null as number | null,
+    retentionSessionsDays: retention.sessionDays,
+    archiveConfigured: archiveStore() !== null,
     staleHeartbeatMinutes: 5,
     idleThresholdMinutes: 10,
     monitoringNoticeStatus: "draft" as const,
@@ -480,11 +486,15 @@ export async function getOrgPolicy(organizationId: string) {
 
 /** @deprecated Use {@link getOrgPolicy} with an organisation id. */
 export function getOrgPolicySync() {
-  const retentionEventsDays = Number(process.env.RETENTION_DAYS ?? 90);
+  const retention = retentionPolicy();
+  const retentionEventsDays = retention.rawEventDays;
   return {
     timezone: timezoneFromEnv(),
     retentionEventsDays,
-    retentionSummariesDays: 365,
+    /** null: hourly summaries are kept indefinitely. */
+    retentionSummariesDays: null as number | null,
+    retentionSessionsDays: retention.sessionDays,
+    archiveConfigured: archiveStore() !== null,
     staleHeartbeatMinutes: 5,
     idleThresholdMinutes: 10,
     monitoringNoticeStatus: "draft" as const,

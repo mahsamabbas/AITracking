@@ -4,8 +4,7 @@ import {
   finalizeHourForDeveloper,
   ingestBatch,
   listHourlyTargets,
-  listOrganizationIds,
-  purgeEventsOlderThan,
+  runDataMaintenance,
   resolvePullOrganization,
   resolveProviderEmployee,
 } from "@techlio/server-core";
@@ -38,7 +37,6 @@ function redisConnection(): { host: string; port: number; password?: string; tls
 
 const connection = redisConnection();
 
-const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 90);
 const CURSOR_API_KEY = process.env.CURSOR_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? process.env.GITHUB_COPILOT_TOKEN;
 const GITHUB_ORG = process.env.GITHUB_ORG;
@@ -101,16 +99,13 @@ new Worker(
   { connection },
 );
 
+/** Same job as the API's nightly cron (summarise → archive → purge); safe to run from both. */
 async function runRetention(): Promise<void> {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - RETENTION_DAYS);
   try {
-    for (const organizationId of await listOrganizationIds()) {
-      const count = await purgeEventsOlderThan(organizationId, cutoff);
-      if (count > 0) console.log("Retention purged", count, "events", { organizationId });
-    }
+    const report = await runDataMaintenance({ budgetMs: 10 * 60_000 });
+    console.log("Data maintenance", { complete: report.complete, errors: report.errors });
   } catch (err) {
-    console.warn("Retention job skipped", err);
+    console.warn("Data maintenance skipped", err);
   }
 }
 

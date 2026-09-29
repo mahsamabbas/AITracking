@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 import type { ActivityEvent } from "@techlio/event-schema";
 import { db } from "./db.js";
 import { activityEvents, hourlySnapshots } from "./schema.js";
+import { fullEvent } from "./retention/payload.js";
 
 export async function getHourlySnapshotDetail(
   organizationId: string,
@@ -58,7 +59,7 @@ export async function getHourlySnapshotDetail(
 
   return {
     snapshot,
-    sourceEvents: eventRows.map((r) => r.payload as ActivityEvent),
+    sourceEvents: eventRows.map((r) => fullEvent(r)),
     versions: allVersions,
   };
 }

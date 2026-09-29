@@ -31,6 +31,8 @@
     "env:push-supabase-vercel": "bash scripts/push-supabase-vercel-env.sh",
     "env:push-vercel": "bash scripts/push-api-env-to-vercel.sh",
     "db:migrate:check:prod": "node scripts/migrate.mjs --check --production",
+    "db:retention": "pnpm --filter @techlio/server-core run build && pnpm --filter @techlio/api exec tsx src/scripts/retention.ts",
+    "db:retention:prod": "bash scripts/retention-prod.sh",
     "db:purge-demo": "node scripts/purge-demo-data.mjs",
     "db:shrink-prod": "node scripts/shrink-neon-database.mjs --production",
     "db:cleanup-prod": "node scripts/shrink-neon-database.mjs --production --days 90 --purge-demo --confirm --vacuum",

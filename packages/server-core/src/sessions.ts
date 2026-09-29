@@ -8,6 +8,7 @@ import {
 import { timezoneFromEnv } from "./timezone.js";
 import { db } from "./db.js";
 import { activityEvents, agentSessions, projects, workItems } from "./schema.js";
+import { fullEvent } from "./retention/payload.js";
 import {
   IDLE_THRESHOLD_MS,
   activityTypeOf,
@@ -223,7 +224,7 @@ export async function recomputeSessionMetrics(
   sessionId: string,
 ): Promise<void> {
   const rows = await db
-    .select({ payload: activityEvents.payload })
+    .select()
     .from(activityEvents)
     .where(
       and(
@@ -236,7 +237,7 @@ export async function recomputeSessionMetrics(
     .orderBy(asc(activityEvents.occurredAt));
 
   if (rows.length === 0) return;
-  const events = rows.map((r) => r.payload as ActivityEvent);
+  const events = rows.map((r) => fullEvent(r));
   const m = computeSessionMetrics(events);
 
   await db
@@ -394,7 +395,7 @@ export async function getSessionDetail(
   const [eventRows, projectRows, workItemRows, prevRows, nextRows] =
     await Promise.all([
       db
-        .select({ payload: activityEvents.payload, receivedAt: activityEvents.receivedAt, occurredAt: activityEvents.occurredAt })
+        .select()
         .from(activityEvents)
         .where(
           and(
@@ -466,7 +467,7 @@ export async function getSessionDetail(
     // received_at vs occurred_at (§11): an event that arrived more than five
     // minutes after it happened is flagged late — e.g. uploaded after an outage.
     events: eventRows.map((r) => ({
-      ...(r.payload as ActivityEvent),
+      ...fullEvent(r),
       received_at: r.receivedAt.toISOString(),
       late: r.receivedAt.getTime() - r.occurredAt.getTime() > LATE_EVENT_MS,
     })),

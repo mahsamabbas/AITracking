@@ -114,3 +114,18 @@ export function qs(params: Record<string, string | number | undefined | null>): 
   const s = p.toString();
   return s ? `?${s}` : "";
 }
+
+/** Authenticated file download (CSV/NDJSON exports and archives). */
+export async function apiDownload(path: string, token: string | null, filename: string): Promise<void> {
+  const r = await fetch(`${API_BASE}${path}`, { headers: authHeaders(token) });
+  if (!r.ok) {
+    const json = (await r.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new ApiError(json.message ?? json.error ?? `Download failed (${r.status})`, r.status);
+  }
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

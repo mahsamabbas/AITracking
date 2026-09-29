@@ -1,4 +1,5 @@
 import { resolveRange } from "./range.js";
+import { readHourly, splitRange, sumByLocalDay, type HourSlice } from "./retention/hourly-store.js";
 import { activityTimeline } from "./work-mix.js";
 import { AGENT_REPORTED_SQL } from "./activity.js";
 import { sql } from "drizzle-orm";
@@ -445,7 +446,9 @@ export async function activityCalendar(input: {
   const from = new Date(today.from.getTime() - (span - 1) * 86_400_000);
   const to = today.to;
 
-  const [timeline, counts, since] = await Promise.all([
+  // Days whose raw events are archived come from hourly summaries (+ sessions).
+  const rawFrom = await splitRange(organizationId, from, to);
+  const [timeline, counts, since, summarized, oldSessions] = await Promise.all([
     // Time: where each minute of agent work happened (same engine as all charts).
     activityTimeline({ organizationId, developerId, range: { from, to }, timeZone: tz }),
     // Counts: events on the day they happened (not the day their session started).
@@ -458,7 +461,7 @@ export async function activityCalendar(input: {
       FROM activity_events e
       WHERE e.organization_id = ${organizationId}
         AND e.developer_id = ${developerId}
-        AND e.occurred_at >= ${from} AND e.occurred_at < ${to}
+        AND e.occurred_at >= ${rawFrom} AND e.occurred_at < ${to}
         AND e.event_type IN ('model_request_completed', 'tool_completed', 'file_created', 'file_modified', 'file_deleted')
       GROUP BY 1
     `),
@@ -470,8 +473,32 @@ export async function activityCalendar(input: {
           WHERE organization_id = ${organizationId} AND developer_id = ${developerId})
       ) AS since
     `),
+    rawFrom > from
+      ? readHourly({ organizationId, from, to: rawFrom, developerIds: [developerId] }).then((rows) => sumByLocalDay(rows, tz))
+      : Promise.resolve(new Map<string, HourSlice>()),
+    rawFrom > from
+      ? db.execute<{ day: string; sessions: number }>(sql`
+          SELECT to_char((s.started_at AT TIME ZONE ${tz})::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS sessions
+          FROM agent_sessions s
+          WHERE s.organization_id = ${organizationId} AND s.developer_id = ${developerId}
+            AND s.started_at >= ${from} AND s.started_at < ${rawFrom}
+          GROUP BY 1
+        `)
+      : Promise.resolve({ rows: [] as { day: string; sessions: number }[] }),
   ]);
   const countsByDay = new Map(counts.rows.map((r) => [r.day, r]));
+  // Archived days: counts from summaries, sessions by the day they started.
+  const oldSessionsByDay = new Map(oldSessions.rows.map((r) => [r.day, r.sessions]));
+  for (const [day, slice] of summarized) {
+    const prev = countsByDay.get(day) as Record<string, unknown> | undefined;
+    countsByDay.set(day, {
+      day,
+      sessions: Number(prev?.sessions ?? 0) + (oldSessionsByDay.get(day) ?? 0),
+      model_requests: Number(prev?.model_requests ?? 0) + slice.modelRequests,
+      tool_calls: Number(prev?.tool_calls ?? 0) + slice.toolCalls,
+      file_changes: Number(prev?.file_changes ?? 0) + slice.fileChanges,
+    });
+  }
   const dayKeys = new Set([...countsByDay.keys(), ...[...timeline.daily.entries()].filter(([, v]) => v.activeMs > 0).map(([k]) => k)]);
   const daily = {
     rows: [...dayKeys].sort().map((day) => {
