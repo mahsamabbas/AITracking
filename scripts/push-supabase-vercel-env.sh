@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUPABASE_ENV="$ROOT/apps/api/.env.supabase.local"
 API_DIR="$ROOT/.vercel-api"
+API_PROJECT="${VERCEL_API_PROJECT:-tracking-app-api}"
 
 read_var() {
   local file="$1" key="$2"
@@ -24,7 +25,7 @@ SESSION="$(read_var "$SUPABASE_ENV" SUPABASE_SESSION_URL)"
 
 mkdir -p "$API_DIR"
 cd "$API_DIR"
-vercel link --project tracking-app-api --yes 2>/dev/null || vercel link --project tracking-app-api
+vercel link --project "$API_PROJECT" --yes 2>/dev/null || vercel link --project "$API_PROJECT"
 
 upsert_env() {
   local name="$1"

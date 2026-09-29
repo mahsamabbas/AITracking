@@ -27,3 +27,5 @@ docs
 apps/api/.env
 apps/api/.env.*
 !apps/api/.env.example
+/.env
+/.env.*

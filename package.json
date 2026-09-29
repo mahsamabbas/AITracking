@@ -29,6 +29,7 @@
     "admin:create:prod": "bash scripts/admin-create-prod.sh",
     "bootstrap:prod:access": "bash scripts/bootstrap-prod-access.sh",
     "env:push-supabase-vercel": "bash scripts/push-supabase-vercel-env.sh",
+    "env:push-vercel": "bash scripts/push-api-env-to-vercel.sh",
     "db:migrate:check:prod": "node scripts/migrate.mjs --check --production",
     "db:purge-demo": "node scripts/purge-demo-data.mjs",
     "db:shrink-prod": "node scripts/shrink-neon-database.mjs --production",
