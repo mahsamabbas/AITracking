@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DataRetentionCard } from "@/components/domain/DataRetentionCard";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -37,7 +38,7 @@ import type { FilterMeta } from "@/lib/types";
 import Link from "next/link";
 import { OrgLink } from "@/components/OrgLink";
 
-type TabId = "profile" | "security" | "organization" | "data";
+type TabId = "profile" | "appearance" | "security" | "organization" | "data";
 
 export default function SettingsPage() {
   const { user, token, applySession } = useAuth();
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   const tabs = useMemo(() => {
     const items: { id: TabId; label: string }[] = [
       { id: "profile", label: "Profile" },
+      { id: "appearance", label: "Appearance" },
       { id: "security", label: "Security" },
     ];
     if (user?.role === "administrator" || user?.role === "super_admin" || platformOrg) {
@@ -63,12 +65,13 @@ export default function SettingsPage() {
   }, [user?.role, platformOrg]);
 
   return (
-    <AppShell title="Settings" subtitle="Your account, sign-in options, and organisation appearance">
+    <AppShell title="Settings" subtitle="Your account, appearance, sign-in options, and organisation">
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       <div className="mt-6">
         {tab === "profile" && user ? (
           <ProfileTab user={user} token={token} applySession={applySession} />
         ) : null}
+        {tab === "appearance" ? <AppearanceSettings /> : null}
         {tab === "security" && user ? <SecurityTab user={user} token={token} /> : null}
         {tab === "data" ? <DataRetentionCard token={token} /> : null}
         {tab === "organization" ? (

@@ -31,6 +31,7 @@ import { formatDuration, formatRelative } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { SortableTh, type SortDirection } from "@/components/ui/SortControl";
 import type { EmployeeRow, FilterMeta } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 type SortKey = "activity" | "sessions" | "recent" | "name";
 
@@ -51,7 +52,7 @@ const CONNECTOR_STATES = [
 export default function EmployeesPage() {
   const router = useRouter();
   const { resolvePath } = useAppPaths();
-  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [range, setRange] = useState<RangeValue>(() => ({ preset: initialRangePreset("7d") }));
   const [search, setSearch] = useState("");
   const [team, setTeam] = useState("");
   const [provider, setProvider] = useState("");
@@ -144,7 +145,7 @@ export default function EmployeesPage() {
             value={sort}
             onChange={(v) => setSort((v || "activity") as SortKey)}
             allLabel="Most AI usage"
-            width="w-[170px]"
+            width="w-full min-w-0 sm:w-[170px]"
             options={SORTS.filter((s) => s.value !== "activity").map((s) => ({
               value: s.value,
               label: s.label,
@@ -170,7 +171,7 @@ export default function EmployeesPage() {
           value={provider}
           onChange={setProvider}
           allLabel="All AI tools"
-          width="w-[170px]"
+          width="w-full min-w-0 sm:w-[170px]"
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
         <div className="seg max-w-full overflow-x-auto overscroll-x-contain" role="radiogroup" aria-label="Connector state">

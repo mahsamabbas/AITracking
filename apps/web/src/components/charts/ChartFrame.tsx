@@ -7,6 +7,7 @@ import type { EmptyVariant } from "@/components/ui/States";
 export function ChartFrame({
   height = 240,
   fill,
+  minWidth,
   isEmpty,
   emptyVariant = "no-activity",
   emptyTitle,
@@ -16,6 +17,12 @@ export function ChartFrame({
   height?: number;
   /** Grow to fill the parent flex/grid cell (use with a sized parent). */
   fill?: boolean;
+  /**
+   * Narrowest width the chart stays readable at on phones and tablets. Below
+   * it the chart scrolls sideways instead of squeezing its bars and labels
+   * together; on desktop (lg+) charts always fit their card.
+   */
+  minWidth?: number;
   isEmpty?: boolean;
   emptyVariant?: EmptyVariant;
   emptyTitle?: string;
@@ -37,20 +44,42 @@ export function ChartFrame({
       </div>
     );
   }
+  // The chart is drawn in an absolutely positioned layer, so it always fills
+  // the frame: its own height by default, or all the room its card gives it
+  // when the card is stretched beside a taller one (no blank band below).
+  const minH = fill ? emptyMin : height;
+  const chart = (
+    <ResponsiveContainer width="100%" height="100%">
+      {children}
+    </ResponsiveContainer>
+  );
   return (
     <div
-      className={fill ? "chart-fill w-full" : "chart-sized w-full"}
-      style={
-        fill
-          ? { minHeight: emptyMin, height: "100%" }
-          : ({ height, "--chart-h": `${height}px` } as React.CSSProperties)
-      }
+      className="chart-fill relative w-full"
+      style={{ minHeight: minH, "--chart-h": `${minH}px` } as React.CSSProperties}
     >
-      <ResponsiveContainer width="100%" height="100%">
-        {children}
-      </ResponsiveContainer>
+      <div className="absolute inset-0 flex flex-col">
+        {minWidth ? (
+          <>
+            <div className="chart-scroll" tabIndex={0} role="region" aria-label="Chart (scrolls sideways on small screens)">
+              <div className="chart-min h-full" style={{ "--chart-min": `${minWidth}px` } as React.CSSProperties}>
+                {chart}
+              </div>
+            </div>
+            <p className="chart-scroll-hint" aria-hidden>
+              Swipe sideways to see the whole chart
+            </p>
+          </>
+        ) : (
+          chart
+        )}
+      </div>
     </div>
   );
+}
+
+export function trendMinWidth(points: number): number | undefined {
+  return points <= 10 ? undefined : Math.min(900, points * 20);
 }
 
 export const AXIS = {

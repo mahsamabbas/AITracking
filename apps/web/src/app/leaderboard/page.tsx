@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth-context";
 import { qs } from "@/lib/api";
 import { formatDuration, formatNumber, formatRelative, initialsOf } from "@/lib/format";
 import type { FilterMeta } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 type SortKey =
   | "active"
@@ -68,7 +69,7 @@ export default function LeaderboardPage() {
   const { resolvePath } = useAppPaths();
   const { user } = useAuth();
   const allowed = user?.role === "administrator" || user?.role === "manager";
-  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [range, setRange] = useState<RangeValue>(() => ({ preset: initialRangePreset("7d") }));
   const [team, setTeam] = useState("");
   const [provider, setProvider] = useState("");
   const [sort, setSort] = useState<SortKey>("active");
@@ -137,7 +138,7 @@ export default function LeaderboardPage() {
             value={sort}
             onChange={(v) => setSort((v || "active") as SortKey)}
             allLabel="AI active time"
-            width="w-[180px]"
+            width="w-full min-w-0 sm:w-[180px]"
             options={columns.filter((c) => c.key !== "active").map((c) => ({
               value: c.key,
               label: c.label,
@@ -158,7 +159,7 @@ export default function LeaderboardPage() {
           value={provider}
           onChange={setProvider}
           allLabel="All AI tools"
-          width="w-[170px]"
+          width="w-full min-w-0 sm:w-[170px]"
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
       </FilterBar>

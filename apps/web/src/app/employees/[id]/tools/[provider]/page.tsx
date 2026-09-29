@@ -30,12 +30,13 @@ import { formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
 import { TOOL_CATEGORY_LABEL, WORK_MIX, workMixSlices } from "@/lib/vocab";
 import type { ToolAnalytics } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 export default function EmployeeToolPage() {
   const params = useParams();
   const id = params.id as string;
   const provider = params.provider as string;
-  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [range, setRange] = useState<RangeValue>(() => ({ preset: initialRangePreset("7d") }));
 
   const query = useApi<ToolAnalytics>(
     `/v1/employees/${id}/tools/${provider}${qs(rangeParams(range))}`,
@@ -158,7 +159,7 @@ export default function EmployeeToolPage() {
         </Card>
       ) : (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key metrics">
             <StatTile
               label={`${meta.label} active time`}
               icon="clock"

@@ -25,7 +25,7 @@ interface NavItem {
 }
 
 const icon = (d: string) => (
-  <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <path d={d} />
   </svg>
 );
@@ -218,7 +218,8 @@ export function AppShell({
         <TimezoneSelect compact />
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3" aria-label="Main">
+      <p className="px-6 pb-2 pt-1 text-2xs font-semibold uppercase tracking-[0.08em] text-ink-400">Menu</p>
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain px-3" aria-label="Main">
         {nav.map((item) => {
           const active = isActive(path, item);
           return (
@@ -233,17 +234,26 @@ export function AppShell({
                     : undefined
               }
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-[40px] items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-fast ${
+              className={`relative flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-fast ${
                 onboardingLocked && item.href === "/setup-connector" && !active
                   ? "bg-amber-50 text-amber-900 ring-1 ring-amber-300 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700"
                   : ""
               } ${
                 active
-                  ? "bg-brand-50 text-brand-700 dark:bg-brand-100 dark:text-brand-900"
+                  ? "bg-brand-50 text-brand-700 shadow-[inset_0_0_0_1px_rgb(var(--color-brand-100))] dark:bg-brand-100 dark:text-brand-900 dark:shadow-none"
                   : "text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/5"
               }`}
             >
-              <span className={`shrink-0 ${active ? "text-brand-600" : "text-ink-400"}`}>{item.icon}</span>
+              {active ? (
+                <span aria-hidden className="absolute -left-3 top-2 bottom-2 w-[3px] rounded-r-full bg-brand-solid" />
+              ) : null}
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-fast ${
+                  active ? "bg-brand-solid text-white shadow-sm" : "text-ink-400"
+                }`}
+              >
+                {item.icon}
+              </span>
               <span className="min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
               {onboardingLocked && item.href === "/setup-connector" ? (
                 <span className="shrink-0 whitespace-nowrap rounded bg-amber-200/80 px-1.5 py-0.5 text-2xs font-semibold text-amber-950 dark:bg-amber-800 dark:text-amber-50">
@@ -256,7 +266,7 @@ export function AppShell({
       </nav>
 
       <div className="border-t border-line p-3">
-        <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+        <div className="rounded-xl border border-line/70 bg-raised p-3 dark:bg-white/[0.03]">
           <p className="text-2xs font-semibold uppercase tracking-wide text-ink-500">
             {ROLE_LABEL[user.role]}
           </p>
@@ -294,7 +304,7 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <aside className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex flex-col overflow-hidden border-r border-line bg-card lg:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] w-[240px] shrink-0 flex-col overflow-hidden border-r border-line/80 bg-card/85 backdrop-blur-xl lg:flex">
         {sidebarInner}
       </aside>
 
@@ -315,7 +325,7 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header
           ref={headerRef}
-          className="sticky top-0 z-30 border-b border-line bg-card pt-[env(safe-area-inset-top)] shadow-[0_1px_0_0_rgb(var(--color-line))]"
+          className="sticky top-0 z-30 border-b border-line/80 bg-card/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150"
         >
           <div className={`mx-auto w-full ${maxWidth} px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8`}>
             <PageHeader

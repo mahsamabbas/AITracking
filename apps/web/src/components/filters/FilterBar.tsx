@@ -21,7 +21,8 @@ export function FilterBar({
       className={`mb-5 flex flex-wrap items-center gap-2.5 ${
         sticky
           ? // Sticky only on wide screens; on phones the wrapped filters would cover the page.
-            "lg:sticky lg:top-[var(--header-h,72px)] lg:z-20 lg:-mx-8 lg:bg-canvas/90 lg:px-8 lg:py-2 lg:backdrop-blur"
+            // Opaque enough, with a hairline, that content scrolling underneath never reads as part of it.
+            "lg:sticky lg:top-[var(--header-h,72px)] lg:z-20 lg:-mx-8 lg:border-b lg:border-line/70 lg:bg-canvas/90 lg:px-8 lg:py-2.5 lg:shadow-[0_10px_18px_-16px_rgb(16_24_40/0.35)] lg:backdrop-blur-xl"
           : ""
       }`}
     >

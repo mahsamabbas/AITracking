@@ -98,7 +98,7 @@ export default function ConnectorsPage() {
       {query.loading ? (
         <StatSkeleton />
       ) : (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <StatTile label="Online" icon="live" value={counts.online} hint="heartbeat within 5 min" accent="teal" />
           <StatTile label="Stale" icon="clock" value={counts.stale} hint="no heartbeat for 5+ min" accent="amber" />
           <StatTile label="Paused" icon="plug" value={counts.paused} hint="collection paused by policy" accent="amber" />
@@ -114,7 +114,7 @@ export default function ConnectorsPage() {
             value={state}
             onChange={setState}
             allLabel="Any state"
-            width="w-[150px]"
+            width="w-full min-w-0 sm:w-[150px]"
             options={[
               { value: "online", label: "Online" },
               { value: "stale", label: "Stale" },

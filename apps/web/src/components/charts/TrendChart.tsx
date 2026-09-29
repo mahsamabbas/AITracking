@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
+import { AXIS, trendMinWidth, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
 import { formatDate, formatDuration } from "@/lib/format";
 import type { TrendPoint } from "@/lib/types";
 import type { EmptyVariant } from "@/components/ui/States";
@@ -43,7 +43,7 @@ export function TrendChart({
     );
   }
   return (
-    <ChartFrame height={height} isEmpty={isEmpty} emptyVariant={emptyVariant}>
+    <ChartFrame height={height} minWidth={trendMinWidth(data.length)} isEmpty={isEmpty} emptyVariant={emptyVariant}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="gActive" x1="0" y1="0" x2="0" y2="1">

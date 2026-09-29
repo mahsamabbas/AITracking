@@ -1,6 +1,7 @@
 /** Shared formatting. Durations are always labelled — never bare numbers. */
 
 import { apiDisplayTimezone } from "./api";
+import { hour12Preference } from "./preferences";
 
 /** A calendar day key (YYYY-MM-DD) names a day, not an instant. */
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +42,7 @@ export function formatDateTime(iso?: string | null, timeZone?: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: hour12Preference(),
     timeZone: timeZone ?? apiDisplayTimezone(),
   });
 }
@@ -50,7 +52,7 @@ export function formatTime(iso?: string | null, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: timeZone ?? apiDisplayTimezone() });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: hour12Preference(), timeZone: timeZone ?? apiDisplayTimezone() });
 }
 
 export function formatDate(iso?: string | null, timeZone?: string): string {

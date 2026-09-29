@@ -13,11 +13,12 @@ function shiftDate(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, sub, hint }: { label: string; value: string; sub?: string; hint?: string }) {
   return (
-    <div className="min-w-0" title={hint}>
-      <p className="text-2xs font-medium uppercase tracking-[0.06em] text-ink-500">{label}</p>
-      <p className="num mt-0.5 truncate text-base font-semibold text-ink-900">{value}</p>
+    <div className="min-w-0 rounded-xl border border-line/70 bg-raised px-3 py-2.5 dark:bg-white/[0.03]" title={hint}>
+      <p className="truncate text-2xs font-medium uppercase tracking-[0.06em] text-ink-500">{label}</p>
+      <p className="num mt-1 truncate text-base font-semibold leading-tight text-ink-900 sm:text-lg">{value}</p>
+      {sub ? <p className="num mt-0.5 truncate text-2xs text-ink-500">{sub}</p> : null}
     </div>
   );
 }
@@ -87,7 +88,7 @@ export function WorkdayPanel({
           <ChartSkeleton height={300} />
         ) : (
           <>
-            <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 xl:grid-cols-8">
+            <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4 2xl:grid-cols-8">
               <Stat label="Started" value={d.firstActivityAt ? clockIn(d.firstActivityAt, d.timezone) : "—"} hint="First agent activity of the day" />
               <Stat label="Last activity" value={d.lastActivityAt ? clockIn(d.lastActivityAt, d.timezone) : "—"} hint="When the last agent activity ended" />
               <Stat label="Working with AI" value={formatDuration(t.workingMs)} hint={WORKDAY_SERIES[0].hint} />
@@ -103,7 +104,12 @@ export function WorkdayPanel({
                     : "File edits reported by the agents"
                 }
               />
-              <Stat label="Sessions" value={`${t.sessions} · ${t.modelRequests} calls`} hint={`${t.modelRequests} model calls, ${t.toolCalls} tool calls`} />
+              <Stat
+                label="Sessions"
+                value={formatNumber(t.sessions)}
+                sub={`${formatNumber(t.modelRequests)} model calls`}
+                hint={`${t.modelRequests} model calls, ${t.toolCalls} tool calls`}
+              />
             </div>
 
             <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs text-ink-700">

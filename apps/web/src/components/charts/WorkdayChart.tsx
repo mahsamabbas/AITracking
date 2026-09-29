@@ -14,6 +14,7 @@ import { useChartAnimation } from "@/lib/use-reduced-motion";
 import { AXIS, ChartFrame, GRID, TooltipShell } from "./ChartFrame";
 import { formatDuration, formatNumber } from "@/lib/format";
 import { WORKDAY_SERIES } from "@/lib/vocab";
+import { hour12Preference } from "@/lib/preferences";
 
 export { WORKDAY_SERIES };
 
@@ -63,7 +64,7 @@ const minutes = (ms: number) => Math.round((ms / 60_000) * 10) / 10;
 
 /** Local clock hour label in the organisation timezone. */
 export function clockIn(iso: string, timezone: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: timezone });
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: hour12Preference(), timeZone: timezone });
 }
 
 function hourOf(iso: string, timezone: string): number {
@@ -89,6 +90,7 @@ export function WorkdayChart({ data, height = 300 }: { data: WorkdayData; height
   return (
     <ChartFrame
       height={height}
+      minWidth={720}
       isEmpty={isEmpty}
       emptyTitle="No agent activity on this day"
       emptyBody="Nothing was observed from Claude Code, Cursor, or other connected agents. Days with the connector paused or offline are marked as coverage gaps instead."

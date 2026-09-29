@@ -56,10 +56,11 @@ import type {
   LiveStatus,
   OrganizationAnalytics,
 } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 export default function OverviewPage() {
   const { user, token } = useAuth();
-  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [range, setRange] = useState<RangeValue>(() => ({ preset: initialRangePreset("7d") }));
   const [team, setTeam] = useState("");
   const [provider, setProvider] = useState("");
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
@@ -213,7 +214,7 @@ export default function OverviewPage() {
               value={provider}
               onChange={setProvider}
               allLabel="All AI tools"
-              width="w-[170px]"
+              width="w-full min-w-0 sm:w-[170px]"
               options={(meta.data?.providers ?? []).map((p) => ({
                 value: p.id,
                 label: p.label,
@@ -275,7 +276,7 @@ export default function OverviewPage() {
       ) : (
         <>
           {/* ---------------- KPI row ---------------- */}
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key metrics">
             <StatTile
               label="AI active time"
               value={formatDuration(t!.activeMs, { compact: true })}

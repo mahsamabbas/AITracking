@@ -5,7 +5,7 @@ import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "rec
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { InfoDot } from "@/components/ui/InfoDot";
 import { EmptyState } from "@/components/ui/States";
-import { AXIS, ChartFrame, GRID, TooltipShell } from "@/components/charts/ChartFrame";
+import { AXIS, trendMinWidth, ChartFrame, GRID, TooltipShell } from "@/components/charts/ChartFrame";
 import { formatDate, formatDuration, formatNumber, formatRelative } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
 import { useChartAnimation } from "@/lib/use-reduced-motion";
@@ -208,7 +208,7 @@ function TierBDailyChart({
       {series.length === 0 ? (
         <EmptyState compact variant="provider-missing" />
       ) : (
-        <ChartFrame height={200}>
+        <ChartFrame height={200} minWidth={trendMinWidth(days.length)}>
           <BarChart data={days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid {...GRID} />
             <XAxis dataKey="date" {...AXIS} tickFormatter={(v: string) => formatDate(v)} minTickGap={16} />

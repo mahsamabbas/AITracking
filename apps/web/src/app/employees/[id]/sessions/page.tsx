@@ -24,6 +24,7 @@ import { formatDuration, formatNumber } from "@/lib/format";
 import { providerLabel } from "@/lib/providers";
 import { CLASSIFICATION } from "@/lib/vocab";
 import type { EmployeeProfile, FilterMeta, SessionRow } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 const PAGE_SIZE = 25;
 
@@ -38,7 +39,7 @@ function SessionsInner() {
   const id = params.id as string;
 
   // Opened from a page with a range → show the same range, so counts match.
-  const [range, setRange] = useState<RangeValue>(() => rangeFromParams(searchParams, { preset: "30d" }));
+  const [range, setRange] = useState<RangeValue>(() => rangeFromParams(searchParams, { preset: initialRangePreset("30d") }));
   const [provider, setProvider] = useState(searchParams.get("provider") ?? "");
   const [classification, setClassification] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -151,7 +152,7 @@ function SessionsInner() {
           value={provider}
           onChange={setProvider}
           allLabel="All AI tools"
-          width="w-[170px]"
+          width="w-full min-w-0 sm:w-[170px]"
           options={(meta.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
         />
         <SelectFilter
@@ -159,7 +160,7 @@ function SessionsInner() {
           value={classification}
           onChange={setClassification}
           allLabel="All patterns"
-          width="w-[180px]"
+          width="w-full min-w-0 sm:w-[180px]"
           options={CLASSIFICATION_OPTIONS}
         />
         <SelectFilter
@@ -167,7 +168,7 @@ function SessionsInner() {
           value={projectId}
           onChange={setProjectId}
           allLabel="All projects"
-          width="w-[190px]"
+          width="w-full min-w-0 sm:w-[190px]"
           options={(meta.data?.projects ?? []).map((p) => ({ value: p.id, label: p.name }))}
         />
         <SelectFilter
@@ -175,7 +176,7 @@ function SessionsInner() {
           value={workItemId}
           onChange={setWorkItemId}
           allLabel="All work items"
-          width="w-[190px]"
+          width="w-full min-w-0 sm:w-[190px]"
           options={(meta.data?.workItems ?? [])
             .filter((w) => !projectId || w.projectId === projectId)
             .map((w) => ({ value: w.id, label: w.title }))}
@@ -185,7 +186,7 @@ function SessionsInner() {
           value={coverageState}
           onChange={setCoverageState}
           allLabel="Any coverage"
-          width="w-[160px]"
+          width="w-full min-w-0 sm:w-[160px]"
           options={[
             { value: "complete", label: "Complete" },
             { value: "partial", label: "Partial" },
@@ -197,7 +198,7 @@ function SessionsInner() {
           value={clockHour}
           onChange={setClockHour}
           allLabel="Any hour"
-          width="w-[130px]"
+          width="w-full min-w-0 sm:w-[130px]"
           options={Array.from({ length: 24 }, (_, hour) => ({
             value: String(hour),
             label: `${String(hour).padStart(2, "0")}:00`,
@@ -210,7 +211,7 @@ function SessionsInner() {
       {query.loading ? (
         <StatSkeleton count={3} />
       ) : (
-        <section className="grid gap-3 sm:grid-cols-3" aria-label="Page summary">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Page summary">
           <StatTile
             label="Sessions matched"
             icon="sessions"

@@ -20,7 +20,7 @@ export function HourPatternChart({
   const anim = useChartAnimation();
   const max = Math.max(...data.map((d) => d.activeMs), 0);
   return (
-    <ChartFrame height={height} isEmpty={max === 0} emptyVariant={emptyVariant}>
+    <ChartFrame height={height} minWidth={420} isEmpty={max === 0} emptyVariant={emptyVariant}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid {...GRID} />
         <XAxis

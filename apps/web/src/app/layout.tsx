@@ -7,6 +7,7 @@ import { DisplayTimezoneProvider } from "@/lib/display-timezone";
 import { ThemeProvider } from "@/lib/theme";
 import { BRAND } from "@/lib/brand";
 import { PwaProvider } from "@/lib/pwa";
+import { PREFS_BOOT } from "@/lib/preferences-boot";
 
 export const metadata: Metadata = {
   title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
@@ -39,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT + PREFS_BOOT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

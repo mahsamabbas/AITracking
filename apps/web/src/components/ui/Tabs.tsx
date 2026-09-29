@@ -10,7 +10,7 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
+    <div role="tablist" className="seg w-full sm:w-auto">
       {tabs.map((t) => {
         const active = t.id === value;
         return (
@@ -20,15 +20,11 @@ export function Tabs<T extends string>({
             aria-selected={active}
             type="button"
             onClick={() => onChange(t.id)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-              active
-                ? "border-brand-600 text-brand-700"
-                : "border-transparent text-ink-500 hover:text-ink-900"
-            }`}
+            className={`${active ? "seg-item-on" : "seg-item"} px-3.5 py-2 text-sm`}
           >
             {t.label}
             {t.count !== undefined ? (
-              <span className="num ml-1.5 text-xs text-ink-400">{t.count}</span>
+              <span className={`num ml-1.5 text-xs ${active ? "text-white/80" : "text-ink-400"}`}>{t.count}</span>
             ) : null}
           </button>
         );

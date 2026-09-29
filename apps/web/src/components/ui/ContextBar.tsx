@@ -35,7 +35,7 @@ export function ContextBar({
 
   return (
     <div
-      className="mb-4 flex flex-col gap-2 rounded-lg border border-line bg-card/60 px-3 py-2 text-xs text-ink-500 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
+      className="mb-4 flex flex-col gap-2 rounded-xl border border-line/80 bg-card/70 px-3.5 py-2.5 text-xs text-ink-500 shadow-sm backdrop-blur sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
       aria-label="Data context"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">

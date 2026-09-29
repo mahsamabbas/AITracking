@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AXIS, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
+import { AXIS, trendMinWidth, ChartFrame, GRID, TooltipShell, durationTicks } from "./ChartFrame";
 import { formatDate, formatDuration, formatNumber } from "@/lib/format";
 import type { ChangeTrendPoint } from "@/lib/types";
 
@@ -54,6 +54,7 @@ export function ChangeTrendChart({
     <ChartFrame
       height={height}
       fill={fill}
+      minWidth={trendMinWidth(merged.length)}
       isEmpty={!hasData}
       emptyTitle="No AI usage, file changes, or commits in this period"
       emptyBody="Agent active time, agent file edits, and commits in repos the agents work in appear here once the connector reports them."

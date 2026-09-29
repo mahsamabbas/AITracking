@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiGet } from "./api";
 import { useAuth } from "./auth-context";
 import { useDisplayTimezoneVersion } from "./display-timezone";
+import { getPreferences } from "./preferences";
 
 export interface QueryState<T> {
   data: T | null;
@@ -82,7 +83,8 @@ export function useApi<T>(
     if (options?.pollMs) {
       // No background polling while the tab is hidden; refresh on return.
       const tick = () => {
-        if (document.visibilityState === "visible") void run(true);
+        // Settings → Appearance → Live updates off: refresh only on demand.
+        if (document.visibilityState === "visible" && getPreferences().liveUpdates) void run(true);
       };
       const id = setInterval(tick, options.pollMs);
       document.addEventListener("visibilitychange", tick);

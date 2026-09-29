@@ -138,6 +138,16 @@
   }
   body {
     @apply bg-canvas font-sans text-[15px] leading-relaxed text-ink-900 antialiased;
+    /* A faint accent wash at the top so the canvas reads as a surface, not a void. */
+    background-image:
+      radial-gradient(1100px 520px at 85% -8%, rgb(var(--color-brand-100) / 0.45), transparent 62%),
+      radial-gradient(900px 480px at -10% -12%, rgb(var(--color-brand-50) / 0.7), transparent 60%);
+    background-repeat: no-repeat;
+  }
+  html.dark body {
+    background-image:
+      radial-gradient(1100px 520px at 85% -8%, rgb(var(--color-brand-200) / 0.16), transparent 62%),
+      radial-gradient(900px 480px at -10% -12%, rgb(var(--color-brand-100) / 0.22), transparent 60%);
   }
   ::selection {
     @apply bg-brand-100 text-brand-900;
@@ -173,6 +183,15 @@
 }
 
 @layer components {
+  /*
+   * Grid items default to min-width:auto, so one wide child (a long label, a
+   * table, a chart) pushes its column past the screen edge. Let items shrink
+   * to their track; explicit min-w-* utilities still win (utilities load later).
+   */
+  .grid > * {
+    min-width: 0;
+  }
+
   /* ---------- surfaces ---------- */
   /*
    * Cards in a grid row are stretched to the tallest card. The body grows to
@@ -180,7 +199,7 @@
    * short chart next to a long list never leaves a blank band.
    */
   .card {
-    @apply flex min-w-0 flex-col rounded-xl border border-line bg-card shadow-card;
+    @apply flex min-w-0 flex-col rounded-2xl border border-line/80 bg-card shadow-card;
   }
   .card > .card-body {
     flex: 1 1 auto;
@@ -195,9 +214,6 @@
     height: auto !important;
     min-height: var(--chart-h, 220px);
   }
-  .card-body > .chart-sized {
-    flex-shrink: 0;
-  }
   /* Dark cards get a hairline top highlight so surfaces read as layered. */
   html.dark .card {
     background-image: linear-gradient(180deg, rgb(255 255 255 / 0.018), transparent 120px);
@@ -209,7 +225,17 @@
     @apply card p-5;
   }
   .card-head {
-    @apply flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4;
+    @apply flex flex-wrap items-start justify-between gap-3 border-b border-line/70 px-5 py-4;
+  }
+  /* Headline number tile. */
+  .stat-tile {
+    @apply card relative overflow-hidden p-4 transition-[box-shadow,transform] sm:p-5 duration-fast ease-out-soft hover:-translate-y-px hover:shadow-pop;
+  }
+  .stat-tile::before {
+    content: "";
+    @apply pointer-events-none absolute inset-x-0 top-0 h-[3px];
+    background: linear-gradient(90deg, var(--tile-accent, var(--chart-1)), transparent 85%);
+    opacity: 0.85;
   }
 
   /* ---------- type ---------- */
@@ -217,7 +243,7 @@
     @apply text-xl font-semibold tracking-[-0.01em] text-ink-900 sm:text-[22px];
   }
   .h-section {
-    @apply text-sm font-semibold tracking-tight text-ink-900;
+    @apply text-[15px] font-semibold tracking-tight text-ink-900;
   }
   .label {
     @apply text-2xs font-medium uppercase tracking-[0.07em] text-ink-500;
@@ -286,7 +312,7 @@
     @apply btn px-2 text-ink-500 hover:bg-slate-100 hover:text-ink-900 dark:hover:bg-white/10;
   }
   .field {
-    @apply h-9 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink-900 outline-none transition-colors duration-fast placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0;
+    @apply h-9 w-full rounded-lg border border-line bg-card px-3 shadow-[0_1px_1px_rgb(16_24_40/0.03)] text-sm text-ink-900 outline-none transition-colors duration-fast placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0;
   }
   .field:focus-visible {
     border-color: rgb(var(--color-brand-500));
@@ -333,13 +359,17 @@
     }
   }
   .seg {
-    @apply inline-flex max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-line bg-card p-0.5;
+    @apply inline-flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain rounded-xl border border-line bg-raised p-1 dark:bg-white/[0.03];
+    scrollbar-width: none;
+  }
+  .seg::-webkit-scrollbar {
+    display: none;
   }
   .seg-item {
-    @apply rounded-[6px] px-2.5 py-1 text-xs font-medium text-ink-500 transition hover:text-ink-900;
+    @apply whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-ink-500 transition-colors duration-fast hover:bg-card hover:text-ink-900 dark:hover:bg-white/5;
   }
   .seg-item-on {
-    @apply seg-item bg-brand-solid text-white hover:text-white;
+    @apply seg-item bg-brand-solid text-white shadow-sm hover:bg-brand-solid hover:text-white dark:hover:bg-brand-solid;
   }
 
   /* ---------- tables ---------- */
@@ -347,7 +377,7 @@
     @apply w-full border-collapse text-sm;
   }
   .tbl thead th {
-    @apply whitespace-nowrap border-b border-line bg-slate-50/70 px-4 py-2.5 text-start text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500 dark:bg-raised;
+    @apply whitespace-nowrap border-b border-line bg-raised px-4 py-2.5 text-start text-2xs font-semibold uppercase tracking-[0.06em] text-ink-500;
   }
   .tbl thead th.text-right {
     @apply text-end;
@@ -452,6 +482,31 @@
     @apply max-h-[min(24rem,52vh)] overflow-x-auto overflow-y-auto overscroll-y-contain;
     -webkit-overflow-scrolling: touch;
   }
+  /*
+   * Charts keep a readable minimum width; on narrow screens they scroll
+   * sideways (edge fades hint at more) instead of squeezing bars together.
+   */
+  .chart-scroll {
+    @apply relative min-h-0 max-w-full flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-md;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .chart-min {
+    min-width: var(--chart-min, 0);
+  }
+  @media (min-width: 1024px) {
+    .chart-min {
+      min-width: 0;
+    }
+  }
+  .chart-scroll-hint {
+    @apply mt-1.5 flex items-center justify-center gap-1 text-2xs text-ink-400 sm:hidden;
+  }
+  .chart-scroll-hint::before,
+  .chart-scroll-hint::after {
+    content: "↔";
+    @apply text-ink-400;
+  }
   .card-table {
     @apply flex min-h-0 flex-col overflow-hidden;
   }
@@ -495,6 +550,163 @@
   .login-hero-copy-in {
     animation: login-hero-copy-in 700ms var(--ease-out) both;
   }
+}
+
+/*
+ * Accent colours (Settings → Appearance). Indigo is the default in :root /
+ * html.dark above; each accent swaps the brand scale in both themes. Solid
+ * fills and link shades are chosen so white labels and links stay at WCAG AA.
+ */
+html[data-accent="violet"] {
+  --color-brand-50: 245 243 255;
+  --color-brand-100: 237 233 254;
+  --color-brand-200: 221 214 254;
+  --color-brand-300: 196 181 253;
+  --color-brand-400: 167 139 250;
+  --color-brand-500: 139 92 246;
+  --color-brand-600: 124 58 237;
+  --color-brand-700: 109 40 217;
+  --color-brand-800: 91 33 182;
+  --color-brand-900: 76 29 149;
+  --color-brand-950: 46 16 101;
+  --color-brand-solid: 124 58 237;
+  --color-brand-solid-hover: 109 40 217;
+  --focus-ring: 139 92 246;
+}
+html.dark[data-accent="violet"] {
+  --color-brand-50: 39 13 85;
+  --color-brand-100: 46 16 101;
+  --color-brand-200: 91 33 182;
+  --color-brand-300: 139 92 246;
+  --color-brand-400: 167 139 250;
+  --color-brand-500: 139 92 246;
+  --color-brand-600: 167 139 250;
+  --color-brand-700: 196 181 253;
+  --color-brand-800: 221 214 254;
+  --color-brand-900: 237 233 254;
+  --color-brand-950: 27 9 60;
+  --color-brand-solid: 124 58 237;
+  --color-brand-solid-hover: 139 92 246;
+  --focus-ring: 196 181 253;
+}
+html[data-accent="blue"] {
+  --color-brand-50: 239 246 255;
+  --color-brand-100: 219 234 254;
+  --color-brand-200: 191 219 254;
+  --color-brand-300: 147 197 253;
+  --color-brand-400: 96 165 250;
+  --color-brand-500: 59 130 246;
+  --color-brand-600: 37 99 235;
+  --color-brand-700: 29 78 216;
+  --color-brand-800: 30 64 175;
+  --color-brand-900: 30 58 138;
+  --color-brand-950: 23 37 84;
+  --color-brand-solid: 37 99 235;
+  --color-brand-solid-hover: 29 78 216;
+  --focus-ring: 59 130 246;
+}
+html.dark[data-accent="blue"] {
+  --color-brand-50: 19 31 71;
+  --color-brand-100: 23 37 84;
+  --color-brand-200: 30 64 175;
+  --color-brand-300: 59 130 246;
+  --color-brand-400: 96 165 250;
+  --color-brand-500: 59 130 246;
+  --color-brand-600: 96 165 250;
+  --color-brand-700: 147 197 253;
+  --color-brand-800: 191 219 254;
+  --color-brand-900: 219 234 254;
+  --color-brand-950: 13 22 50;
+  --color-brand-solid: 37 99 235;
+  --color-brand-solid-hover: 59 130 246;
+  --focus-ring: 147 197 253;
+}
+html[data-accent="teal"] {
+  --color-brand-50: 240 253 250;
+  --color-brand-100: 204 251 241;
+  --color-brand-200: 153 246 228;
+  --color-brand-300: 94 234 212;
+  --color-brand-400: 45 212 191;
+  --color-brand-500: 20 184 166;
+  --color-brand-600: 15 118 110;
+  --color-brand-700: 17 94 89;
+  --color-brand-800: 17 94 89;
+  --color-brand-900: 19 78 74;
+  --color-brand-950: 4 47 46;
+  --color-brand-solid: 15 118 110;
+  --color-brand-solid-hover: 17 94 89;
+  --focus-ring: 20 184 166;
+}
+html.dark[data-accent="teal"] {
+  --color-brand-50: 3 39 39;
+  --color-brand-100: 4 47 46;
+  --color-brand-200: 17 94 89;
+  --color-brand-300: 20 184 166;
+  --color-brand-400: 45 212 191;
+  --color-brand-500: 20 184 166;
+  --color-brand-600: 45 212 191;
+  --color-brand-700: 94 234 212;
+  --color-brand-800: 153 246 228;
+  --color-brand-900: 204 251 241;
+  --color-brand-950: 2 28 27;
+  --color-brand-solid: 15 118 110;
+  --color-brand-solid-hover: 13 148 136;
+  --focus-ring: 94 234 212;
+}
+html[data-accent="rose"] {
+  --color-brand-50: 255 241 242;
+  --color-brand-100: 255 228 230;
+  --color-brand-200: 254 205 211;
+  --color-brand-300: 253 164 175;
+  --color-brand-400: 251 113 133;
+  --color-brand-500: 244 63 94;
+  --color-brand-600: 225 29 72;
+  --color-brand-700: 190 18 60;
+  --color-brand-800: 159 18 57;
+  --color-brand-900: 136 19 55;
+  --color-brand-950: 76 5 25;
+  --color-brand-solid: 225 29 72;
+  --color-brand-solid-hover: 190 18 60;
+  --focus-ring: 244 63 94;
+}
+html.dark[data-accent="rose"] {
+  --color-brand-50: 64 4 21;
+  --color-brand-100: 76 5 25;
+  --color-brand-200: 159 18 57;
+  --color-brand-300: 244 63 94;
+  --color-brand-400: 251 113 133;
+  --color-brand-500: 244 63 94;
+  --color-brand-600: 251 113 133;
+  --color-brand-700: 253 164 175;
+  --color-brand-800: 254 205 211;
+  --color-brand-900: 255 228 230;
+  --color-brand-950: 45 3 15;
+  --color-brand-solid: 225 29 72;
+  --color-brand-solid-hover: 244 63 94;
+  --focus-ring: 253 164 175;
+}
+
+/* Compact density (Settings → Appearance): tighter cards and table rows. */
+html[data-density="compact"] body { font-size: 14px; }
+html[data-density="compact"] .card-body { padding: 1rem; }
+html[data-density="compact"] .card-head { padding: 0.75rem 1rem; }
+html[data-density="compact"] .stat-tile { padding: 1rem; }
+html[data-density="compact"] .tbl tbody td { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+html[data-density="compact"] .tbl thead th { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+/* Reduce motion chosen in Settings, independent of the OS setting. */
+html[data-motion="reduce"] {
+  --motion-fast: 0ms;
+  --motion-normal: 0ms;
+  --motion-slow: 0ms;
+}
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 @keyframes enter {

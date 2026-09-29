@@ -52,17 +52,17 @@ export function StatTile({
   void invertDelta; // kept for API compatibility; deltas are always neutral now
 
   return (
-    <div className="card relative p-5 transition-shadow duration-fast hover:shadow-pop">
+    <div className="stat-tile" style={{ "--tile-accent": SPARK_COLOR[accent] } as React.CSSProperties}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="label truncate">{label}</p>
           {help ? <InfoDot text={help} label={`About ${label}`} /> : null}
         </div>
-        {icon ? <IconChip name={icon} tone={accent as Tone} size="sm" /> : null}
+        {icon ? <span className="hidden sm:inline-flex"><IconChip name={icon} tone={accent as Tone} size="sm" /></span> : null}
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="flex min-w-0 items-baseline gap-1.5">
-          <span className="num truncate text-[22px] font-semibold leading-none tracking-tight text-ink-900 sm:text-[26px]">
+          <span className="num truncate text-xl font-semibold leading-none tracking-tight text-ink-900 sm:text-[26px]">
             {value}
           </span>
           {unit ? <span className="text-sm text-ink-500">{unit}</span> : null}

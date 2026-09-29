@@ -20,7 +20,8 @@ export function Callout({
 }) {
   return (
     <div className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 ${STYLES[tone]}`}>
-      <div className="min-w-0 flex-1">
+      {/* The text keeps at least 16rem; on phones the action wraps below instead of squeezing it. */}
+      <div className="min-w-0 flex-1 basis-[16rem]">
         <p className="text-sm font-semibold">{title}</p>
         {children ? <div className="mt-0.5 text-xs leading-relaxed opacity-90">{children}</div> : null}
       </div>

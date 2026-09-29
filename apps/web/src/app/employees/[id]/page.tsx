@@ -59,13 +59,14 @@ import { canViewTeam, canManageUsers } from "@/lib/permissions";
 import { deriveHighlights } from "@/lib/insights";
 import { analyticsPollMs, LIVE_POLL_MS } from "@/lib/live-poll";
 import type { EmployeeAnalytics, LiveStatus } from "@/lib/types";
+import { initialRangePreset } from "@/lib/preferences";
 
 export default function EmployeeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const { user } = useAuth();
-  const [range, setRange] = useState<RangeValue>({ preset: "7d" });
+  const [range, setRange] = useState<RangeValue>(() => ({ preset: initialRangePreset("7d") }));
 
   const employeeId =
     id === "self" && user?.developerId ? user.developerId : id;
@@ -263,7 +264,7 @@ export default function EmployeeDetailPage() {
           ) : null}
 
           {/* ---------------- KPIs ---------------- */}
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key metrics">
             <StatTile
               label="Total AI usage"
               value={formatDuration(t.activeMs, { compact: true })}

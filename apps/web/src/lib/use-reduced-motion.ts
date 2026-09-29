@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePreferences } from "./preferences";
 
-/** True when the user asked the OS to reduce motion. Charts use it to skip animation. */
+/** True when the OS or Settings → Appearance asks for reduced motion. Charts use it to skip animation. */
 export function useReducedMotion(): boolean {
+  const { reduceMotion } = usePreferences();
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -12,7 +14,7 @@ export function useReducedMotion(): boolean {
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
-  return reduced;
+  return reduced || reduceMotion;
 }
 
 /** Recharts animation props: draw once on first paint, instantly under reduced motion. */

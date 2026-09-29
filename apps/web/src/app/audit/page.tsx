@@ -47,7 +47,7 @@ export default function AuditPage() {
           value={search}
           onChange={setSearch}
           placeholder="Filter by action or detail…"
-          width="w-[300px]"
+          width="w-full min-w-0 sm:w-[300px]"
         />
       </FilterBar>
 
