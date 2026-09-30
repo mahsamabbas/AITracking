@@ -1,3 +1,4 @@
+import type { ConnectorState } from "./vocab";
 export type Role = "manager" | "developer" | "administrator" | "auditor" | "super_admin";
 
 export interface Totals {
@@ -155,7 +156,7 @@ export interface EmployeeRow {
   title: string | null;
   status: string;
   avatarUrl: string | null;
-  connectorState: "online" | "stale" | "paused" | "offline";
+  connectorState: ConnectorState;
   lastHeartbeat: string | null;
   lastActiveAt: string | null;
   activeMs: number;
@@ -191,7 +192,7 @@ export interface EmployeeDevice {
   lastHeartbeat: string | null;
   queueDepth: number | null;
   paused: boolean;
-  state: "online" | "stale" | "paused" | "offline";
+  state: ConnectorState;
 }
 
 export interface SessionRow {
@@ -352,7 +353,7 @@ export interface LiveConnector {
   lastHeartbeat: string | null;
   queueDepth: number | null;
   paused: boolean;
-  state: "online" | "stale" | "paused" | "offline";
+  state: ConnectorState;
 }
 
 export interface LiveStatus {

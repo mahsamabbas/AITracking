@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
+import { teamMemberFilter } from "../sql-helpers.js";
 
 /**
  * Read side of activity_hourly: per person, per UTC hour, the event-time
@@ -95,7 +96,7 @@ export async function readHourly(input: {
     WHERE h.organization_id = ${organizationId}
       AND h.hour_start >= ${input.from} AND h.hour_start < ${input.to}
       ${input.developerIds ? sql`AND h.developer_id IN (${sql.join(input.developerIds.map((d) => sql`${d}`), sql`, `)})` : sql``}
-      ${input.team ? sql`AND h.developer_id IN (SELECT id FROM employees WHERE organization_id = ${organizationId} AND team = ${input.team})` : sql``}
+      ${input.team ? sql`AND ${teamMemberFilter(sql.raw("h.developer_id"), organizationId, input.team)}` : sql``}
       ${input.provider ? sql`AND h.by_provider ? ${input.provider}` : sql``}
   `);
   return res.rows.map((r) => {

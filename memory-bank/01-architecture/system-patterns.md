@@ -57,3 +57,15 @@
 21. **Polling, not sockets, with limits.** `useApi` polls only while the tab is visible and the
     range includes today; one coalesced poller for the local connector; the *Live updates*
     preference can turn polling off.
+22. **Shared helpers live in one place — import, don't re-declare.**
+    - Connector: `paths.ts` (`dataDir()` = `~/.techlio-connector`, `installDir()` =
+      `~/.techlio/connector`), `os-utils.ts` (`onPath`, `QUIET` spawn options, `uuidFromSeed`).
+      Exception: the generated hook template in `agent-hooks.ts` must stay self-contained.
+    - server-core: `time-utils.ts` (`HOUR_MS`, `hourStartUtc`), `sql-helpers.ts` (`toNumber`,
+      `toNumberOrNull`, `teamMemberFilter`), work-mix owns `mergeIntervals`/`Interval`,
+      sessions owns `LATE_EVENT_MS`.
+    - API: `auth/access.ts` (`scopeDeveloperIds`, `assertCanViewPeople`, `assertInScope`,
+      `assertCanViewDeveloper`); dev identities come from server-core (`DEV_ORG`, …).
+    - Web: storage keys, accent ids and the pre-paint boot scripts come from
+      `lib/preferences-boot.ts`; `ConnectorState`/`WorkMix` types from `lib/vocab`;
+      `LivePerson` from `lib/types`; poll interval `LIVE_POLL_MS` from `lib/live-poll`.

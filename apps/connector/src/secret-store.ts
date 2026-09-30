@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, platform } from "node:os";
+import { platform } from "node:os";
 import { join } from "node:path";
+import { dataDir } from "./paths.js";
 
 /**
  * Connector secrets (device token, Ed25519 signing key, queue key) live in the
@@ -16,7 +17,7 @@ import { join } from "node:path";
  * to 0600 files, and `backend()` reports "file" so health can say so.
  */
 const SERVICE = "techlio-connector";
-const DIR = join(homedir(), ".techlio-connector", "secrets");
+const DIR = join(dataDir(), "secrets");
 
 export type SecretBackend = "keychain" | "dpapi" | "secret-service" | "file";
 

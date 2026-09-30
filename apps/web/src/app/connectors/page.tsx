@@ -18,10 +18,11 @@ import { apiPost } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import { canManageConnectors } from "@/lib/permissions";
 import type { LiveStatus } from "@/lib/types";
+import { LIVE_POLL_MS } from "@/lib/live-poll";
 
 export default function ConnectorsPage() {
   const { token, user } = useAuth();
-  const query = useApi<LiveStatus>("/v1/dashboard/live?limit=1", { pollMs: 30_000 });
+  const query = useApi<LiveStatus>("/v1/dashboard/live?limit=1", { pollMs: LIVE_POLL_MS });
   const [search, setSearch] = useState("");
   const [state, setState] = useState("");
   const [busy, setBusy] = useState<string | null>(null);

@@ -3,6 +3,7 @@ import { db } from "./db.js";
 import { activityTypeOf } from "./activity.js";
 import type { DateRange } from "./analytics.js";
 import { fullEventFromSql } from "./retention/payload.js";
+import { LATE_EVENT_MS } from "./sessions.js";
 
 /**
  * The activity feed: every agent event in the selected range, newest first,
@@ -38,7 +39,6 @@ export interface ActivityFeed {
   range: { from: string; to: string };
 }
 
-const LATE_EVENT_MS = 5 * 60_000;
 
 function encodeCursor(occurredAt: string, eventId: string): string {
   return Buffer.from(`${occurredAt}|${eventId}`).toString("base64url");

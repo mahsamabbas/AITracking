@@ -5,10 +5,6 @@ import { formatNumber } from "@/lib/format";
 import { providerMeta } from "@/lib/providers";
 import type { EmployeeAiSubscription } from "@/lib/types";
 
-function formatTokens(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return formatNumber(n);
-}
 
 function usageHeadline(row: EmployeeAiSubscription): {
   label: string;
@@ -22,7 +18,7 @@ function usageHeadline(row: EmployeeAiSubscription): {
   if (unit === "model_requests") {
     return {
       label: "Agent turns (prompt → stop)",
-      value: formatTokens(row.tokensUsed),
+      value: formatNumber(row.tokensUsed),
       missing: false,
     };
   }
@@ -30,13 +26,13 @@ function usageHeadline(row: EmployeeAiSubscription): {
     return {
       // tokensUsed carries Cursor's billable request count (see ai-plan.ts).
       label: "Billable requests (Cursor daily report)",
-      value: formatTokens(row.tokensUsed),
+      value: formatNumber(row.tokensUsed),
       missing: false,
     };
   }
   return {
     label: "Tokens used (in + out)",
-    value: formatTokens(row.tokensUsed),
+    value: formatNumber(row.tokensUsed),
     missing: false,
   };
 }
@@ -120,7 +116,7 @@ export function EmployeeAiPlanUsage({
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Completions / chat requests</dt>
                     <dd className="num text-ink-700">
-                      {formatTokens(row.completionsCount)} / {formatTokens(row.chatRequestsCount)}
+                      {formatNumber(row.completionsCount)} / {formatNumber(row.chatRequestsCount)}
                     </dd>
                   </div>
                 ) : null}
@@ -128,21 +124,21 @@ export function EmployeeAiPlanUsage({
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Input / output</dt>
                     <dd className="num text-ink-700">
-                      {formatTokens(row.tokenInput)} / {formatTokens(row.tokenOutput)}
+                      {formatNumber(row.tokenInput)} / {formatNumber(row.tokenOutput)}
                     </dd>
                   </div>
                 ) : null}
                 {row.modelRequests != null && row.usageUnit === "model_requests" ? (
                   <div className="flex justify-between gap-3 text-xs">
                     <dt className="text-ink-400">Observed by connector hooks</dt>
-                    <dd className="num text-ink-700">{formatTokens(row.modelRequests)}</dd>
+                    <dd className="num text-ink-700">{formatNumber(row.modelRequests)}</dd>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">
                   <dt className="text-ink-500">{limitLabel(row)}</dt>
                   <dd className="num font-medium text-ink-900">
                     {row.monthlyLimit != null ? (
-                      `${formatTokens(row.monthlyLimit)} / month`
+                      `${formatNumber(row.monthlyLimit)} / month`
                     ) : (
                       <span className="hint font-sans font-normal">No limit configured</span>
                     )}
@@ -151,7 +147,7 @@ export function EmployeeAiPlanUsage({
                 {row.remaining != null ? (
                   <div className="flex justify-between gap-3">
                     <dt className="text-ink-500">Remaining</dt>
-                    <dd className="num font-medium text-ink-900">{formatTokens(row.remaining)}</dd>
+                    <dd className="num font-medium text-ink-900">{formatNumber(row.remaining)}</dd>
                   </div>
                 ) : null}
               </dl>

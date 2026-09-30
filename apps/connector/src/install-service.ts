@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync, type SpawnSyncOptions } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
@@ -15,6 +15,8 @@ import { removeAgentHooks } from "./agent-hooks.js";
 import { deleteSecret } from "./secret-store.js";
 import { userPort } from "./port.js";
 import { PACKAGED_API_URL, PACKAGED_DASHBOARD_ORIGIN, PACKAGED_DASHBOARD_ORIGINS } from "./production-hosts.js";
+import { dataDir, installDir } from "./paths.js";
+import { onPath, QUIET } from "./os-utils.js";
 
 /**
  * Registers the connector as a per-user background service so it starts at
@@ -56,19 +58,12 @@ export const MAC_SYSTEM_PLIST = `/Library/LaunchAgents/${LABEL}.plist`;
 
 // Every child process is hidden: on Windows a console program started from
 // the GUI-subsystem connector would otherwise flash a window.
-const QUIET: SpawnSyncOptions = { stdio: "ignore", windowsHide: true };
 
 function sleepMs(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-export function installDir(): string {
-  return join(homedir(), ".techlio", "connector");
-}
-
-function dataDir(): string {
-  return join(homedir(), ".techlio-connector");
-}
+export { installDir };
 
 export function logPath(): string {
   return join(dataDir(), "connector.log");
@@ -347,10 +342,7 @@ function unregisterLinux(): void {
 /** Editor CLIs the IDE companion extension is installed through. */
 const COMPANION_CLIS = ["cursor", "code", "windsurf", "antigravity"] as const;
 
-function which(cmd: string): boolean {
-  const probe = platform() === "win32" ? "where" : "which";
-  return spawnSync(probe, [cmd], QUIET).status === 0;
-}
+const which = (cmd: string): boolean => onPath(cmd, QUIET);
 
 function connectIdes(): void {
   const file = join(installDir(), "techlio-companion.vsix");

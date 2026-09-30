@@ -23,11 +23,7 @@ export function MetricGrid({ metrics, columns = 4 }: { metrics: Metric[]; column
             <span className="label">{m.label}</span>
             {m.help ? <InfoDot text={m.help} /> : null}
           </dt>
-          <dd
-            className={`num mt-1 text-[15px] font-semibold ${
-              m.unavailable ? "font-sans text-xs font-normal text-ink-400" : "text-ink-900"
-            }`}
-          >
+          <dd className="num mt-1 text-[15px] font-semibold text-ink-900">
             {m.value}
           </dd>
         </div>

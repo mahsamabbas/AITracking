@@ -1,11 +1,8 @@
-import Link from "next/link";
-
 export interface BarItem {
   label: string;
   value: number;
   formatted: string;
   meta?: string;
-  href?: string;
   color?: string;
 }
 
@@ -41,17 +38,7 @@ export function BarList({ items, emptyLabel = "No data in this period" }: {
             {item.meta ? <p className="hint mt-1">{item.meta}</p> : null}
           </>
         );
-        return (
-          <li key={item.label}>
-            {item.href ? (
-              <Link href={item.href} className="block rounded-lg p-1 -m-1 transition hover:bg-slate-50 dark:hover:bg-white/5">
-                {inner}
-              </Link>
-            ) : (
-              inner
-            )}
-          </li>
-        );
+        return <li key={item.label}>{inner}</li>;
       })}
     </ul>
   );

@@ -182,7 +182,7 @@ Drizzle schema in `packages/server-core/src/schema.ts` should stay aligned with 
 | `admin-create-prod.sh` | Create portal admin against prod DB |
 | `restore-env-from-vercel.sh` | Pull Vercel env into `.env.production.local` |
 | `sync-vercel-env.sh` | Push standard vars (JWT, SKIP_REDIS, ORG_TIMEZONE, web API URL) |
-| `build-connector-bundle.mjs`, `pack-connector.mjs` | Connector release artifacts |
+| `pack-connector.mjs` | Connector release artifacts |
 | `deploy-all.sh`, `deploy-vercel.sh` | Deployment helpers |
 | `check-env-files.mjs` | Validates local env files (no `[SENSITIVE]` placeholders) |
 

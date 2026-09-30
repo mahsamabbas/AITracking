@@ -3,7 +3,6 @@ import {
   resolveReportingTimezone,
   TECHLIO_DISPLAY_TIMEZONE_HEADER,
 } from "@techlio/server-core";
-import { orgAccessFromRequest } from "./org-scope.js";
 
 export function displayTimezoneFromRequest(req: FastifyRequest): string | undefined {
   const raw = req.headers[TECHLIO_DISPLAY_TIMEZONE_HEADER];
@@ -18,11 +17,3 @@ export async function reportingTimezoneFromRequest(
 }
 
 /** Organisation id plus effective reporting timezone for analytics queries. */
-export async function orgAnalyticsContext(req: FastifyRequest): Promise<{
-  organizationId: string;
-  timeZone: string;
-}> {
-  const { organizationId } = await orgAccessFromRequest(req);
-  const timeZone = await reportingTimezoneFromRequest(req, organizationId);
-  return { organizationId, timeZone };
-}

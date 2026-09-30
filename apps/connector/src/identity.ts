@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { SecretUnavailableError, deleteSecret, getSecret, setSecret } from "./secret-store.js";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { dataDir } from "./paths.js";
 
 export type ConnectorIdentity = {
   organizationId: string;
@@ -16,7 +16,7 @@ export type ConnectorIdentity = {
   providers?: string[];
 };
 
-const DIR = join(homedir(), ".techlio-connector");
+const DIR = dataDir();
 const FILE = join(DIR, "identity.json");
 
 export function identityDir(): string {

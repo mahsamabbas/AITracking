@@ -8,12 +8,13 @@ import {
   useMemo,
   useState,
 } from "react";
+import { THEME_STORAGE_KEY } from "./preferences-boot";
 
 export type Theme = "light" | "dark";
 /** What the user chose; "system" follows the OS and updates live. */
 export type ThemePreference = Theme | "system";
 
-const STORAGE_KEY = "techlio-theme";
+const STORAGE_KEY = THEME_STORAGE_KEY;
 
 function applyTheme(theme: Theme): void {
   const root = document.documentElement;

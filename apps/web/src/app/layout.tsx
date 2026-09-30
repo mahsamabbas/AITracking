@@ -7,7 +7,7 @@ import { DisplayTimezoneProvider } from "@/lib/display-timezone";
 import { ThemeProvider } from "@/lib/theme";
 import { BRAND } from "@/lib/brand";
 import { PwaProvider } from "@/lib/pwa";
-import { PREFS_BOOT } from "@/lib/preferences-boot";
+import { PREFS_BOOT, THEME_BOOT } from "@/lib/preferences-boot";
 
 export const metadata: Metadata = {
   title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
@@ -34,7 +34,6 @@ export const viewport = {
   ],
 };
 
-const THEME_BOOT = `(function(){try{var t=localStorage.getItem("techlio-theme");var d=t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme:dark)").matches);document.documentElement.classList.toggle("dark",d);document.documentElement.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

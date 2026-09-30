@@ -132,12 +132,6 @@ export class EncryptedQueue {
     this.save();
   }
 
-  dequeueBatch(limit = 100): ActivityEvent[] {
-    const batch = this.peekBatch(limit);
-    this.acknowledge(batch.rowIds);
-    return batch.events;
-  }
-
   depth(): number {
     return this.rows.length;
   }

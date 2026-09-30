@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import {
   EventTypes,
   isKnownProvider,
+  SCHEMA_VERSION,
   providerCapability,
   providerFromHostApp,
   type ActivityEvent,
@@ -15,7 +16,7 @@ import {
   type ClaudeHookPayload,
   type OtlpLogsPayload,
 } from "@techlio/provider-adapters";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { getSecret, setSecret, backend as secretBackend } from "./secret-store.js";
 import { claudeOtelConfigured, ensureAgentHooks } from "./agent-hooks.js";
 import { config } from "./config.js";
@@ -36,6 +37,7 @@ import { uploadBatch } from "./uploader.js";
 import { BASE_PORT, PORT_COUNT, choosePort, osUser, recordUserPort } from "./port.js";
 import { createGitWatcher } from "./git-watch.js";
 import { createServer } from "node:net";
+import { uuidFromSeed } from "./os-utils.js";
 
 // Pause is the employee's choice and must survive restarts and reboots.
 const STATE_FILE = join(identityDir(), "state.json");
@@ -109,8 +111,7 @@ function asSessionId(value: string | undefined): string | undefined {
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
     return value;
   }
-  const hash = createHash("sha256").update(value).digest("hex");
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+  return uuidFromSeed(value);
 }
 
 function describeEvent(event: ActivityEvent): string {
@@ -216,7 +217,7 @@ function baseEvent(
   }
   return {
     event_id: crypto.randomUUID(),
-    schema_version: "1.0.0",
+    schema_version: SCHEMA_VERSION,
     organization_id: identity.organizationId,
     developer_id: identity.developerId,
     device_id: identity.deviceId,
@@ -698,31 +699,20 @@ app.post("/hooks/extension", async (req) => {
   if (typeof body.session_id === "string") {
     activeSessionId = body.session_id;
   }
-  if (eventType === EventTypes.session_started && body.session_id) {
-    activeSessionId = String(body.session_id);
-  }
   const workspaceLabel =
     typeof body.workspace === "string"
       ? body.workspace.slice(0, 64)
       : typeof body.label === "string"
         ? body.label.slice(0, 64)
         : undefined;
-  if (eventType === EventTypes.task_context_changed && workspaceLabel) {
-    contextLabel = workspaceLabel;
-  } else if (workspaceLabel && !contextLabel) {
-    contextLabel = workspaceLabel;
-  }
+  // Only task_context_changed passes the allowlist above.
+  if (workspaceLabel) contextLabel = workspaceLabel;
 
   const caps = providerCapability(hostProvider);
-  const event = baseEvent(eventType as ActivityEvent["event_type"], {
+  const event = baseEvent(EventTypes.task_context_changed, {
     provider: hostProvider,
     session_id: activeSessionId,
-    status:
-      eventType === EventTypes.task_context_changed ||
-      eventType === EventTypes.session_started ||
-      eventType === EventTypes.session_heartbeat
-        ? "succeeded"
-        : undefined,
+    status: "succeeded",
     metadata: {
       provider_name: caps?.label,
       tier: caps?.tier,
@@ -737,7 +727,7 @@ app.post("/hooks/extension", async (req) => {
   if (clean) {
     queue.enqueue([clean]);
     void flushQueue();
-    if (clean.event_type !== "session_heartbeat") note(describeEvent(clean));
+    note(describeEvent(clean));
     return { accepted: 1, provider: hostProvider };
   }
   return { accepted: 0 };
@@ -989,9 +979,6 @@ app.post("/hooks/ci-gate", async (req) => {
   return { accepted: 1 };
 });
 
-/**
- * Local git post-commit hook. Allowlisted signal only — no commit message or hash.
- */
 /**
  * Local git post-commit hook: scan that repo now. The commit is reported by
  * the git watcher (counts only — no hash, message, or code), exactly once.

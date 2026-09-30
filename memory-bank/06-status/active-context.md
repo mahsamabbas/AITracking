@@ -20,7 +20,9 @@
    Antigravity and maps their editor names.
 3. **Linux connector** — x64/arm64 `.tar.gz`, `install-connector-linux.sh`, systemd user service
    with XDG autostart fallback, Linux tab on the setup page, rebuilt installers + checksums.
-4. **Docs** — `docs/Techlio-Pulse-Project-Documentation.pdf`; this memory bank restructured.
+4. **Modularisation pass** — shared helpers, dead code removed, no behaviour change (see
+   progress log).
+5. **Docs** — `docs/Techlio-Pulse-Project-Documentation.pdf`; this memory bank restructured.
 
 Tests: 15/15 turbo tasks, connector 24 tests (incl. end-to-end hook script), all workspaces
 type-check, lint clean. Linux installer verified in an Ubuntu 24.04 container.
@@ -36,3 +38,12 @@ type-check, lint clean. Linux installer verified in an Ubuntu 24.04 container.
 - GitHub Copilot: if a user enables `chat.useClaudeHooks` in VS Code, Copilot runs the Claude
   hooks too and would also be reported as Claude Code (off by default).
 - Devin cloud sessions cannot be observed by a connector; only Devin CLI.
+- Refactor audit findings left unchanged on purpose (behaviour decisions for the owner):
+  breadcrumbs / NotFound / some `router.push` and links to `/settings`, `/users`, `/policy` drop
+  the platform-org workspace; raw fetches in `auth-context.tsx` and `connector-setup.ts` skip the
+  timezone/org headers; `scopeDeveloperIds` returns `[]` for a developer without a developerId
+  (session queries then see the whole org, event-time queries nothing); connectors controller
+  staleness differs from `connectorStateOf`; API Redis lacks `rediss` TLS handling;
+  `progressTimeline` defaults to the UTC day; leaderboard ignores display timezone; session
+  `clockHour` uses the server timezone; sessions/exports use `lte` on `to`; some controllers use
+  `user.organizationId` and ignore the platform header.

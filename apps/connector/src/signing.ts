@@ -1,5 +1,5 @@
 import * as ed from "@noble/ed25519";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 
 /** Required for @noble/ed25519 in Node (no Web Crypto sha512 sync by default). */
 ed.etc.sha512Sync = (...messages: Uint8Array[]) => {
@@ -49,8 +49,4 @@ export async function publicSigningKey(
 ): Promise<string> {
   const key = await ed.getPublicKeyAsync(privateKey);
   return Buffer.from(key).toString("base64");
-}
-
-export function newDeviceToken(): string {
-  return randomBytes(32).toString("hex");
 }

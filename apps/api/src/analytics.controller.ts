@@ -54,7 +54,6 @@ import {
   withEventTime,
   employeeAiSubscriptions,
   deleteEmployeeWithData,
-  type AuthUser,
   type DateRange,
 } from "@techlio/server-core";
 import { PROVIDER_CAPABILITIES } from "@techlio/event-schema";
@@ -62,6 +61,7 @@ import { eq } from "drizzle-orm";
 import { DashboardAuthGuard, requireRoles } from "./auth/guards.js";
 import { orgAccessFromRequest } from "./auth/org-scope.js";
 import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
+import { assertCanViewDeveloper, assertCanViewPeople, scopeDeveloperIds } from "./auth/access.js";
 
 interface RangeQuery {
   preset?: string;
@@ -77,23 +77,9 @@ async function rangeFor(
   req: FastifyRequest,
   organizationId: string,
   q: RangeQuery,
-): Promise<{ range: DateRange; preset: string }> {
+): Promise<{ range: DateRange; preset: string; timeZone: string }> {
   const timeZone = await reportingTimezoneFromRequest(req, organizationId);
-  return resolveRange({ preset: q.preset, from: q.from, to: q.to, timeZone });
-}
-
-/** Developers may only ever resolve to their own record (FR-002, FR-004). */
-function scopeDeveloperIds(user: AuthUser): string[] | undefined {
-  if (user.role === "developer") {
-    return user.developerId ? [user.developerId] : [];
-  }
-  return undefined;
-}
-
-function assertCanViewPeople(user: AuthUser): void {
-  if (user.role === "auditor") {
-    throw new ForbiddenException("auditor_cannot_view_individual_activity");
-  }
+  return { ...resolveRange({ preset: q.preset, from: q.from, to: q.to, timeZone }), timeZone };
 }
 
 /** Optional analytics — must not break the employee page if a query or migration lags. */
@@ -119,8 +105,7 @@ export class AnalyticsController {
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     requireRoles(user, ["administrator", "manager", "developer"]);
-    const { range, preset } = await rangeFor(req, organizationId, q);
-    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    const { range, preset, timeZone } = await rangeFor(req, organizationId, q);
     const data = await organizationAnalytics({
       organizationId: organizationId,
       range,
@@ -221,8 +206,7 @@ export class AnalyticsController {
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     assertCanViewPeople(user);
-    const { range, preset } = await rangeFor(req, organizationId, q);
-    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    const { range, preset, timeZone } = await rangeFor(req, organizationId, q);
     const rows = await listEmployeeDirectory({
       organizationId: organizationId,
       range,
@@ -283,11 +267,9 @@ export class AnalyticsController {
     @Query() q: RangeQuery,
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
 
-    const { range, preset } = await rangeFor(req, organizationId, q);
-    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    const { range, preset, timeZone } = await rangeFor(req, organizationId, q);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
 
@@ -392,11 +374,9 @@ export class AnalyticsController {
     @Query() q: RangeQuery,
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
 
-    const { range, preset } = await rangeFor(req, organizationId, q);
-    const timeZone = await reportingTimezoneFromRequest(req, organizationId);
+    const { range, preset, timeZone } = await rangeFor(req, organizationId, q);
     const profile = await getEmployee(organizationId, id);
     if (!profile) throw new NotFoundException("employee_not_found");
 
@@ -477,8 +457,7 @@ export class AnalyticsController {
     @Query("date") date?: string,
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     return aiProgressTimeline({ organizationId: organizationId, developerId: id, date: day, timeZone });
@@ -488,8 +467,7 @@ export class AnalyticsController {
   @Get("employees/:id/activity-calendar")
   async employeeActivityCalendar(@Param("id") id: string, @Req() req: FastifyRequest) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     return activityCalendar({ organizationId: organizationId, developerId: id, timeZone });
   }
@@ -529,8 +507,7 @@ export class AnalyticsController {
     @Query("date") date?: string,
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
     const timeZone = await reportingTimezoneFromRequest(req, organizationId);
     const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today;
@@ -554,8 +531,7 @@ export class AnalyticsController {
     },
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    assertCanViewPeople(user);
-    if (!canViewDeveloper(user, id)) throw new ForbiddenException("out_of_scope");
+    assertCanViewDeveloper(user, id);
 
     const { range, preset } = await rangeFor(req, organizationId, q);
     const pageSize = Math.min(Number(q.pageSize ?? 25) || 25, 100);

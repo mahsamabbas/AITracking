@@ -5,6 +5,7 @@ import { resolveRange } from "./range.js";
 import { renderSummaryPdf } from "./pdf.js";
 import { csvCell } from "./retention/archive.js";
 import { activityEvents, activityExports, auditLog } from "./schema.js";
+import { teamMemberFilter } from "./sql-helpers.js";
 
 export async function createActivityExport(input: {
   organizationId: string;
@@ -31,7 +32,7 @@ export async function createActivityExport(input: {
   }
   if (input.team) {
     conditions.push(
-      sql`${activityEvents.developerId} IN (SELECT id FROM employees WHERE organization_id = ${input.organizationId} AND team = ${input.team})`,
+      teamMemberFilter(activityEvents.developerId, input.organizationId, input.team),
     );
   }
   if (input.provider) {

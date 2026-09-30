@@ -1,8 +1,9 @@
-import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, platform } from "node:os";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { normalizeHookPayload } from "./hook-payload.js";
+import { onPath } from "./os-utils.js";
+import { installDir } from "./paths.js";
 import { userPort } from "./port.js";
 
 const SCRIPT_NAME = "report-hook.mjs";
@@ -53,10 +54,6 @@ const CURSOR_EVENTS = [
   "stop",
 ] as const;
 
-function installDir(): string {
-  return join(homedir(), ".techlio", "connector");
-}
-
 /**
  * Standalone hook script for unpackaged (node) installs. Its normaliser is the
  * same function the packaged binary runs, written out verbatim, so every
@@ -94,7 +91,10 @@ function isPackaged(): boolean {
   return !exec.includes("node") && !exec.includes("tsx");
 }
 
-type HookProvider = "claude_code" | "cursor" | "antigravity" | "windsurf" | "github_copilot" | "gemini" | "codex";
+/** Every tool whose hook config this connector writes (`--hook <provider>`). */
+const HOOK_PROVIDERS = ["claude_code", "cursor", "antigravity", "windsurf", "github_copilot", "gemini", "codex"] as const;
+type HookProvider = (typeof HOOK_PROVIDERS)[number];
+const TECHLIO_HOOK_COMMAND = new RegExp(`--hook (${HOOK_PROVIDERS.join("|")})\\b`);
 
 function commandFor(scriptPath: string, provider: HookProvider, eventName?: string): string {
   const suffix = eventName ? ` ${eventName}` : "";
@@ -110,12 +110,6 @@ function powershellFor(scriptPath: string, provider: HookProvider, eventName?: s
   return `& ${commandFor(scriptPath, provider, eventName)}`;
 }
 
-/** True when a CLI is on PATH (a hook file is only written for tools that are installed). */
-function onPath(cmd: string): boolean {
-  const probe = spawnSync(platform() === "win32" ? "where" : "which", [cmd], { stdio: "ignore" });
-  return probe.status === 0;
-}
-
 /**
  * True only for hook entries this connector wrote (script or packaged form).
  * Matching a bare "--hook" would also delete unrelated user hooks such as
@@ -126,7 +120,7 @@ function isTechlioHook(entry: unknown): boolean {
   return (
     text.includes(SCRIPT_NAME) ||
     text.includes("techlio-connector") ||
-    /--hook (claude_code|cursor|antigravity|windsurf|github_copilot|gemini|codex)\b/.test(text)
+    TECHLIO_HOOK_COMMAND.test(text)
   );
 }
 
@@ -293,15 +287,7 @@ function installWindsurf(scriptPath: string): boolean {
  * ~/.copilot/hooks/*.json; the PascalCase event names are the format both read.
  * The event is passed as an argument because Copilot CLI does not name it on stdin.
  */
-const COPILOT_EVENTS = [
-  "SessionStart",
-  "SessionEnd",
-  "UserPromptSubmit",
-  "PreToolUse",
-  "PostToolUse",
-  "PostToolUseFailure",
-  "Stop",
-] as const;
+const COPILOT_EVENTS = CLAUDE_EVENTS; // Copilot's PascalCase names are Claude Code's.
 
 function copilotHooksPath(): string {
   return join(homedir(), ".copilot", "hooks", "techlio-connector.json");

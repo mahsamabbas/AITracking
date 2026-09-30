@@ -1,5 +1,5 @@
 import * as ed from "@noble/ed25519";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 
 ed.etc.sha512Sync = (...messages: Uint8Array[]) => {
   const h = createHash("sha512");
@@ -26,7 +26,3 @@ export async function verifyBatchSignature(input: {
   }
 }
 
-/** Constant-time helper for tests and future keyed signature schemes. */
-export function equalSignature(a: Uint8Array, b: Uint8Array): boolean {
-  return a.length === b.length && timingSafeEqual(a, b);
-}

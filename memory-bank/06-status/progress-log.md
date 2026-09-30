@@ -296,3 +296,15 @@ credential rotation, SSO, §19 CI suite, Claude OTel tokens).
 - Tests: connector 24 (hook normaliser per tool, privacy, installers in a temp HOME, generated
   script end-to-end); event-schema 6; turbo 15/15.
 - Memory bank restructured into folders (this layout).
+
+## 2026-09-30 modularisation pass (behaviour-neutral)
+- New shared modules: connector `paths.ts`, `os-utils.ts`; server-core `time-utils.ts`,
+  `sql-helpers.ts`; API `auth/access.ts`; web boot scripts generated from `preferences-boot.ts`.
+- Removed dead code: `activityEventJsonSchema`/`EVOLUTION_RULES` (+ `zod-to-json-schema` dep),
+  `newDeviceToken`, `dequeueBatch`, `orgAnalyticsContext`, `assertNotPlatformReadOnly`,
+  `equalSignature`, `apps/api/src/constants.ts`, legacy `agent.mjs`/zip connector bundle and old
+  macOS/Windows install scripts (+ `connector:bundle`/`connector:install-*` scripts), unused
+  `useAppPaths` routes, `BarList` href branch, `MetricGrid` unavailable branch, `formatTokens`.
+- Verified: turbo 15/15, tsc 0 errors all workspaces, lint clean, web build ok, 56 API responses
+  (4 roles) identical to the pre-refactor snapshot.
+- Found but deliberately NOT changed (behaviour): see active-context watch-outs.

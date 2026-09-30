@@ -7,23 +7,17 @@ import {
   connectorStateOf,
   rollupConnectorState,
 } from "./connector-state.js";
-import { resolveOrgTimezone, resolveReportingTimezone } from "./timezone.js";
+import { resolveReportingTimezone } from "./timezone.js";
+import { teamMemberFilter } from "./sql-helpers.js";
 
 export interface DateRange {
   from: Date;
   to: Date;
 }
 
-async function scopeTimezone(f: ScopeFilters): Promise<string> {
-  if (f.timeZone?.trim()) {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: f.timeZone.trim() });
-      return f.timeZone.trim();
-    } catch {
-      /* invalid override */
-    }
-  }
-  return resolveOrgTimezone(f.organizationId);
+/** Viewer display timezone when valid, else the organisation's. */
+function scopeTimezone(f: ScopeFilters): Promise<string> {
+  return resolveReportingTimezone(f.organizationId, f.timeZone);
 }
 
 /** Same-length window immediately before `range`, for period-over-period deltas. */
@@ -464,7 +458,7 @@ function scopeWhere(f: ScopeFilters, range: DateRange) {
   if (f.projectId) parts.push(sql`s.project_id = ${f.projectId}`);
   if (f.team) {
     parts.push(
-      sql`s.developer_id IN (SELECT id FROM employees WHERE organization_id = ${f.organizationId} AND team = ${f.team})`,
+      teamMemberFilter(sql.raw("s.developer_id"), f.organizationId, f.team),
     );
   }
   return sql.join(parts, sql` AND `);
@@ -753,7 +747,7 @@ export async function coverageSummary(
   // Same people as the headcount and charts beside it.
   const inTeam = (col: string) =>
     team
-      ? sql`AND ${sql.raw(col)} IN (SELECT id FROM employees WHERE organization_id = ${organizationId} AND team = ${team})`
+      ? sql`AND ${teamMemberFilter(sql.raw(col), organizationId, team)}`
       : sql``;
   const [gaps, sessionsRow, health, silent] = await Promise.all([
     db.execute<{ count: number }>(sql`
@@ -1180,7 +1174,7 @@ function eventScope(f: ScopeFilters, range: DateRange) {
   if (f.provider) parts.push(sql`e.payload->>'provider' = ${f.provider}`);
   if (f.team) {
     parts.push(
-      sql`e.developer_id IN (SELECT id FROM employees WHERE organization_id = ${f.organizationId} AND team = ${f.team})`,
+      teamMemberFilter(sql.raw("e.developer_id"), f.organizationId, f.team),
     );
   }
   return sql.join(parts, sql` AND `);
@@ -1355,7 +1349,7 @@ function commitScope(f: ScopeFilters, range: DateRange) {
   }
   if (f.team) {
     parts.push(
-      sql`c.developer_id IN (SELECT id FROM employees WHERE organization_id = ${f.organizationId} AND team = ${f.team})`,
+      teamMemberFilter(sql.raw("c.developer_id"), f.organizationId, f.team),
     );
   }
   return sql.join(parts, sql` AND `);

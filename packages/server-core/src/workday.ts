@@ -1,4 +1,4 @@
-import { workCategory } from "./work-mix.js";
+import { MIN_ACTIVE_MS, mergeIntervals, workCategory, type Interval } from "./work-mix.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
@@ -20,10 +20,6 @@ import { resolveReportingTimezone } from "./timezone.js";
  * and are never counted as idle or as "left".
  */
 
-interface Interval {
-  start: number;
-  end: number;
-}
 
 export interface WorkdayHour {
   hour: number;
@@ -62,16 +58,7 @@ export interface Workday {
   providers: string[];
 }
 
-function merge(intervals: Interval[]): Interval[] {
-  const sorted = intervals.filter((i) => i.end > i.start).sort((a, b) => a.start - b.start);
-  const out: Interval[] = [];
-  for (const i of sorted) {
-    const last = out[out.length - 1];
-    if (last && i.start <= last.end) last.end = Math.max(last.end, i.end);
-    else out.push({ ...i });
-  }
-  return out;
-}
+const merge = mergeIntervals;
 
 function clip(intervals: Interval[], from: number, to: number): number {
   let total = 0;
@@ -96,7 +83,6 @@ export function distinctFileChanges(
 }
 
 /** Minimum active slice when the provider reports completion without duration_ms. */
-const MIN_ACTIVE_MS = 60_000;
 
 export async function workday(input: {
   organizationId: string;

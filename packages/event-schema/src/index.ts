@@ -1,17 +1,10 @@
+/**
+ * Activity event contract shared by the connector, API and worker.
+ *
+ * Evolution rules (additive only): new event types may be added to the catalog;
+ * new optional metadata keys may be added with a strict schema update; breaking
+ * changes require a new schema_version and a dual-read window.
+ */
 export * from "./catalog.js";
 export * from "./event.js";
 export * from "./providers.js";
-export { zodToJsonSchema } from "zod-to-json-schema";
-import { ActivityEventSchema } from "./event.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
-
-export const activityEventJsonSchema = zodToJsonSchema(ActivityEventSchema, {
-  name: "ActivityEvent",
-});
-
-/** Additive-only: bump schema_version and extend MetadataSchema; never remove fields in-place. */
-export const EVOLUTION_RULES = `
-- New event types may be added to the catalog.
-- New optional metadata keys may be added with strict schema update.
-- Breaking changes require a new schema_version and dual-read window.
-`;

@@ -36,6 +36,5 @@ export function inferToolCategory(toolName: string): ToolCategory {
   if (n.includes("search") || n.includes("web")) return "search";
   if (n.includes("test")) return "test";
   if (n.includes("build")) return "build";
-  if (n.includes("browser")) return "browser";
   return "other";
 }

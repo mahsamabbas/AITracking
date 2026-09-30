@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir, userInfo } from "node:os";
+import { userInfo } from "node:os";
 import { join } from "node:path";
+import { dataDir } from "./paths.js";
 
 /**
  * Each OS user runs their own connector. Two people signed in to one computer
@@ -13,7 +14,7 @@ export const BASE_PORT = 9477;
 export const PORT_COUNT = 10;
 
 export function portFile(): string {
-  return join(homedir(), ".techlio-connector", "port");
+  return join(dataDir(), "port");
 }
 
 /** The port this user's connector listens on (env override → recorded → default). */
@@ -32,7 +33,7 @@ export function userPort(): number {
 }
 
 export function recordUserPort(port: number): void {
-  mkdirSync(join(homedir(), ".techlio-connector"), { recursive: true, mode: 0o700 });
+  mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
   const tmp = `${portFile()}.${process.pid}.tmp`;
   writeFileSync(tmp, `${port}\n`, { mode: 0o644 });
   renameSync(tmp, portFile());

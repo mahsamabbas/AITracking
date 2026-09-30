@@ -10,6 +10,7 @@ import { and, eq, gte, lt } from "drizzle-orm";
 import { db } from "./db.js";
 import { activityEvents, employees, hourlySnapshots } from "./schema.js";
 import { fullEvent } from "./retention/payload.js";
+import { hourStartUtc } from "./time-utils.js";
 
 const COVERAGE_EVENT_TYPES = new Set([
   "connector_paused",
@@ -19,16 +20,6 @@ const COVERAGE_EVENT_TYPES = new Set([
   "provider_capability_missing",
 ]);
 
-function hourStartUtc(d: Date): Date {
-  return new Date(
-    Date.UTC(
-      d.getUTCFullYear(),
-      d.getUTCMonth(),
-      d.getUTCDate(),
-      d.getUTCHours(),
-    ),
-  );
-}
 
 export async function finalizeHourForDeveloper(
   organizationId: string,

@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { uuidFromSeed } from "./os-utils.js";
 
 /**
  * Commit → Verified → Shipped, observed locally.
@@ -109,11 +110,6 @@ function countChanges(numstat: string): { files: number; added: number; deleted:
     deleted += Number(d) || 0;
   }
   return { files, added, deleted };
-}
-
-function uuidFrom(seed: string): string {
-  const h = createHash("sha256").update(seed).digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
 export function createGitWatcher(options: {
@@ -236,7 +232,7 @@ export function createGitWatcher(options: {
       changed = true;
       options.emit({
         type: "commit_created",
-        eventId: uuidFrom(`commit_created:${ref}`),
+        eventId: uuidFromSeed(`commit_created:${ref}`),
         occurredAt: new Date(at).toISOString(),
         ref,
         repo: basename(repo.root).slice(0, 64),
@@ -264,7 +260,7 @@ export function createGitWatcher(options: {
         changed = true;
         options.emit({
           type: "commit_pushed",
-          eventId: uuidFrom(`commit_pushed:${c.ref}`),
+          eventId: uuidFromSeed(`commit_pushed:${c.ref}`),
           occurredAt: new Date().toISOString(),
           ref: c.ref,
           repo: basename(repo.root).slice(0, 64),

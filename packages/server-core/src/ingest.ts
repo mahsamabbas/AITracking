@@ -7,6 +7,7 @@ import { fullEvent, slimPayload } from "./retention/payload.js";
 import { scanEventForSecrets } from "./security.js";
 import { applySessionization } from "./sessionize.js";
 import { isRemotelyPaused, recordLiveHeartbeat } from "./devices.js";
+import { hourStartUtc } from "./time-utils.js";
 
 /**
  * Recently accepted event ids (fast replay rejection within this process).
@@ -30,16 +31,6 @@ export function setLateRecalcHandler(handler: RecalcCallback | null): void {
   onLateRecalc = handler;
 }
 
-function hourStartUtc(d: Date): Date {
-  return new Date(
-    Date.UTC(
-      d.getUTCFullYear(),
-      d.getUTCMonth(),
-      d.getUTCDate(),
-      d.getUTCHours(),
-    ),
-  );
-}
 
 async function maybeScheduleLateRecalc(event: ActivityEvent): Promise<void> {
   const occurred = new Date(event.occurred_at);

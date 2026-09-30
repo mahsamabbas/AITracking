@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { PREFS_STORAGE_KEY } from "./preferences-boot";
+import { ACCENT_IDS, PREFS_STORAGE_KEY } from "./preferences-boot";
 
 /**
  * Per-browser display preferences (Settings → Appearance). Purely how the
@@ -9,7 +9,7 @@ import { PREFS_STORAGE_KEY } from "./preferences-boot";
  * or changes what data is collected. Applied to <html> as data attributes
  * before first paint by the boot script in app/layout.tsx.
  */
-export type Accent = "indigo" | "violet" | "blue" | "teal" | "rose";
+export type Accent = (typeof ACCENT_IDS)[number];
 export type Density = "comfortable" | "compact";
 export type TimeFormat = "auto" | "12h" | "24h";
 export type DefaultRange = "today" | "yesterday" | "7d" | "30d" | "90d";

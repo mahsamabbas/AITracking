@@ -7,6 +7,7 @@ import { PROVIDER_CAPABILITIES, providerLabel } from "@techlio/event-schema";
 import { db } from "./db.js";
 import { type DateRange } from "./analytics.js";
 import { resolveReportingTimezone } from "./timezone.js";
+import { toNumber, toNumberOrNull } from "./sql-helpers.js";
 
 /**
  * AI Progress — the per-person, per-provider rollup behind the employee hub.
@@ -89,8 +90,8 @@ export interface AiProgress {
   };
 }
 
-const n = (v: unknown) => (v == null ? 0 : Number(v));
-const nOrNull = (v: unknown) => (v == null ? null : Number(v));
+const n = toNumber;
+const nOrNull = toNumberOrNull;
 
 /**
  * The capability to show for a provider: the newest connector report from this

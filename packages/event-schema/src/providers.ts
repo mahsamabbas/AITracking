@@ -40,9 +40,9 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     label: "Claude Code",
     tier: "A",
     hourly: true,
-    // Hooks carry no token counts and no per-call model timing. Token totals
-    // need Claude Code OpenTelemetry, which this connector build does not
-    // ingest (its OTLP routes return 501).
+    // Hooks carry no token counts and no per-call model timing. While Claude
+    // Code OpenTelemetry logs reach the connector (/v1/logs), its capability
+    // report drops both from "missing".
     missing: ["token_totals", "model_call_timing"],
     emptyState:
       "Claude Code hooks do not report token totals. They are unavailable, not zero.",

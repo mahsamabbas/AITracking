@@ -2,9 +2,7 @@ import { OrgLink } from "@/components/OrgLink";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ProviderBadge } from "@/components/domain/Badges";
 import { formatRelative } from "@/lib/format";
-import type { LiveStatus } from "@/lib/types";
-
-type LivePerson = NonNullable<LiveStatus["people"]>[number];
+import type { LivePerson } from "@/lib/types";
 
 /** Per-person live strip: what each connected agent did in the last two hours. */
 export function RightNowTable({ people }: { people: LivePerson[] }) {

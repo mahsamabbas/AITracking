@@ -26,6 +26,3 @@ export async function orgAccessFromRequest(req: FastifyRequest): Promise<{
   }
 }
 
-export function assertNotPlatformReadOnly(platformView: boolean): void {
-  if (platformView) throw new ForbiddenException("platform_read_only");
-}

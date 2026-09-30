@@ -3,6 +3,7 @@ import { db } from "./db.js";
 import { activityTypeOf, IDLE_THRESHOLD_MS, isAgentReported } from "./activity.js";
 import type { DateRange } from "./analytics.js";
 import { readHourly, summarizedBefore } from "./retention/hourly-store.js";
+import { teamMemberFilter } from "./sql-helpers.js";
 
 /**
  * Work mix — how agent time split between verify & ship, writing code, and
@@ -58,7 +59,7 @@ export function isAgentWork(e: MixEvent): boolean {
   return true;
 }
 
-interface Interval {
+export interface Interval {
   start: number;
   end: number;
 }
@@ -353,7 +354,7 @@ export async function activityTimeline(input: {
       AND e.event_type NOT IN ('heartbeat_sent', 'session_heartbeat', 'commit_created', 'commit_pushed')
       ${input.provider ? sql`AND e.payload->>'provider' = ${input.provider}` : sql``}
       ${devs ? sql`AND e.developer_id IN (${sql.join(devs.map((d) => sql`${d}`), sql`, `)})` : sql``}
-      ${input.team ? sql`AND e.developer_id IN (SELECT id FROM employees WHERE organization_id = ${organizationId} AND team = ${input.team})` : sql``}
+      ${input.team ? sql`AND ${teamMemberFilter(sql.raw("e.developer_id"), organizationId, input.team)}` : sql``}
     ORDER BY e.developer_id, e.occurred_at
   `);
 

@@ -1,6 +1,5 @@
 import {
   Controller,
-  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -12,7 +11,6 @@ import type { FastifyRequest } from "fastify";
 import {
   activityTypeOf,
   canViewActivityEvents,
-  canViewDeveloper,
   connectorStateOf,
   db,
   devAffordancesEnabled,
@@ -27,6 +25,7 @@ import { providerLabel } from "@techlio/event-schema";
 import { listRecentEvents } from "./services/ingest.js";
 import { DashboardAuthGuard, requireRoles, userFromRequest } from "./auth/guards.js";
 import { orgAccessFromRequest } from "./auth/org-scope.js";
+import { assertInScope } from "./auth/access.js";
 import { reportingTimezoneFromRequest } from "./auth/reporting-timezone.js";
 
 export interface LiveConnector {
@@ -336,9 +335,7 @@ export class DashboardController {
     @Query("hours") hours?: string,
   ) {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
-    if (!canViewDeveloper(user, developerId)) {
-      throw new ForbiddenException("out_of_scope");
-    }
+    assertInScope(user, developerId);
     const lookback = Math.min(Number(hours ?? 48) || 48, 24 * 14);
     const since = new Date(Date.now() - lookback * 3600_000);
     const snapshots = await db
@@ -384,9 +381,7 @@ export class DashboardController {
     const { organizationId, actor: user } = await orgAccessFromRequest(req);
     const detail = await getHourlySnapshotDetail(organizationId, id);
     if (!detail.snapshot) throw new NotFoundException("snapshot_not_found");
-    if (!canViewDeveloper(user, detail.snapshot.developerId)) {
-      throw new ForbiddenException("out_of_scope");
-    }
+    assertInScope(user, detail.snapshot.developerId);
     return detail;
   }
 }

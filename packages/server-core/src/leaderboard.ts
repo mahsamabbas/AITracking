@@ -3,6 +3,7 @@ import { resolveReportingTimezone } from "./timezone.js";
 import { sql } from "drizzle-orm";
 import { db } from "./db.js";
 import type { DateRange } from "./analytics.js";
+import { toNumber, toNumberOrNull } from "./sql-helpers.js";
 
 /**
  * AI usage leaderboard — one row per employee, ranked by a chosen AI-usage
@@ -55,8 +56,8 @@ export interface LeaderboardRow {
   lastActiveAt: string | null;
 }
 
-const num = (v: unknown) => (v == null ? 0 : Number(v));
-const numOrNull = (v: unknown) => (v == null ? null : Number(v));
+const num = toNumber;
+const numOrNull = toNumberOrNull;
 
 function metric(row: LeaderboardRow, sort: LeaderboardSort): number | null {
   switch (sort) {

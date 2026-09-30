@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { PACKAGED_API_URL } from "./production-hosts.js";
 import { userPort } from "./port.js";
+import { dataDir, installDir } from "./paths.js";
 
 /** Optional local env for API URL / port — identity is claimed, not stored here. */
 function loadLocalEnv(): void {
   const candidates = [
-    join(homedir(), ".techlio", "connector", ".env"),
+    join(installDir(), ".env"),
     join(process.cwd(), ".env"),
   ];
   for (const envPath of candidates) {
@@ -43,6 +43,6 @@ export const config = {
   consentVersion: process.env.TECHLIO_CONSENT_VERSION ?? "1",
   connectorVersion: "0.1.0",
   provider: process.env.TECHLIO_PROVIDER ?? "cursor",
-  dbPath: process.env.CONNECTOR_DB ?? join(homedir(), ".techlio-connector", "queue.db"),
+  dbPath: process.env.CONNECTOR_DB ?? join(dataDir(), "queue.db"),
   signingKeyHex: process.env.CONNECTOR_SIGNING_KEY_HEX,
 };

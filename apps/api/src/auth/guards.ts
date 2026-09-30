@@ -6,9 +6,8 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import { devAffordancesEnabled, type AuthUser, type Role } from "@techlio/server-core";
+import { DEV_DEVELOPER_ALEX, DEV_ORG, devAffordancesEnabled, type AuthUser, type Role } from "@techlio/server-core";
 import { verifyUserToken } from "./jwt.js";
-import { DEV_DEVELOPER, DEV_ORG } from "../constants.js";
 
 export function userFromRequest(req: FastifyRequest): AuthUser {
   const auth = req.headers.authorization;
@@ -29,7 +28,7 @@ export function userFromRequest(req: FastifyRequest): AuthUser {
     id: (req.headers["x-user-id"] as string) ?? "user-1",
     organizationId: (req.headers["x-org-id"] as string) ?? DEV_ORG,
     role: role as Role,
-    developerId: DEV_DEVELOPER,
+    developerId: DEV_DEVELOPER_ALEX,
     displayName: "Dev user",
     email: "dev@local",
   };
